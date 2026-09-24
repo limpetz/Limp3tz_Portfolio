@@ -31,10 +31,10 @@ import {
 import { crossfadeMs, shouldAutoAdvance, usePrefersReducedMotion } from '../utils/motion';
 import { spriteCanvasSize, spritePlacement } from '../data/sprite';
 import { shadowForHeight } from '../utils/shadow';
-import moveControlsImg from '../assets/images/move.png';
-import jumpControlsImg from '../assets/images/jump.png';
-import bumpBlocksImg from '../assets/images/bump-blocks.png';
-import clickMeImg from '../assets/images/click-me.png';
+import moveControlsImg from '../assets/images/move.webp';
+import jumpControlsImg from '../assets/images/jump.webp';
+import bumpBlocksImg from '../assets/images/bump-blocks.webp';
+import clickMeImg from '../assets/images/click-me.webp';
 
 interface ArcadeStageProps {
   onAddScore: (amount: number) => void;
