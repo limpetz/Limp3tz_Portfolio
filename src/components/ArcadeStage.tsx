@@ -31,6 +31,11 @@ import {
 import { crossfadeMs, shouldAutoAdvance, usePrefersReducedMotion } from '../utils/motion';
 import { spriteCanvasSize, spritePlacement } from '../data/sprite';
 import { shadowForHeight } from '../utils/shadow';
+import {
+  WALK_SHEET,
+  backgroundPositionFor,
+  frameAtElapsed,
+} from '../utils/walk';
 import moveControlsImg from '../assets/images/move.webp';
 import jumpControlsImg from '../assets/images/jump.webp';
 import bumpBlocksImg from '../assets/images/bump-blocks.webp';
@@ -217,6 +222,23 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   // The ground shadow tracks the character's visible width, not the collision box.
   const SHADOW_W = Math.round(SPRITE_PLACEMENT.visibleWidth) - 12;
   const SHADOW_LEFT = (ACTOR_W - SHADOW_W) / 2;
+
+  // --- Walk cycle ---
+  // The sprite sheet replaces the old single still. Per the asset spec:
+  // frames render at NATIVE size (88×170), the horizontal centre of the cell
+  // is the character's position, and the feet sit on a baseline 164px from the
+  // cell top. The physics loop pokes a background-position on the sprite
+  // element, so frames never touch React state.
+  const WALK_RENDER_W = WALK_SHEET.frameWidth; // 88 — native, do not scale
+  const WALK_RENDER_H = WALK_SHEET.frameHeight; // 170
+  const WALK_BASELINE_Y = WALK_SHEET.footY; // 164px from cell top
+  const WALK_SPEED = 100; // CSS px/s (spec: start at 100)
+
+  // Refs the loop mutates without re-rendering.
+  const walkElapsedRef = useRef(0);
+  const walkFrameRef = useRef<number | null>(null);
+  // Click-to-move destination (centre X). Null = no destination.
+  const clickDestRef = useRef<number | null>(null);
 
   // Hold-to-jump: holding the jump key bounces continuously while grounded.
   const HOLD_TO_JUMP = true;
@@ -413,6 +435,8 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     onAddScore(100);
     onAddCoin(1);
     sound.playCoin();
+    // A click on the character itself also cancels any pending walk.
+    clickDestRef.current = null;
 
     const stageH = containerRef.current?.clientHeight || 800;
     const actorCenterX = stateRef.current.x + stateRef.current.actorWidth / 2;
@@ -512,10 +536,21 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
+    // Tab hiding: clear movement and the click destination (per spec).
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        keysRef.current.left = false;
+        keysRef.current.right = false;
+        keysRef.current.jump = false;
+        clickDestRef.current = null;
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [doJump, triggerKonami]);
 
@@ -577,7 +612,24 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
       // --- Turn / lean kinematics ---
       // Horizontal input direction: -1 = left, 0 = idle, +1 = right.
-      const moveDir = moveDirection(keysRef.current.left, keysRef.current.right);
+      // Keyboard overrides a click destination (per the asset spec).
+      const moveDir =
+        moveDirection(keysRef.current.left, keysRef.current.right) ||
+        (clickDestRef.current != null
+          ? Math.sign(clickDestRef.current - (stateRef.current.x + stateRef.current.actorWidth / 2))
+          : 0);
+
+      // Cancel the click destination once arrived (stop precisely, no jitter).
+      if (
+        clickDestRef.current != null &&
+        Math.abs(clickDestRef.current - (stateRef.current.x + stateRef.current.actorWidth / 2)) <
+          Math.max(2, Math.abs(stateRef.current.vx) * dt)
+      ) {
+        stateRef.current.x =
+          clickDestRef.current - stateRef.current.actorWidth / 2; // snap exactly
+        clickDestRef.current = null;
+        stateRef.current.vx = 0;
+      }
 
       // Face the direction of travel (classic platformer flip). This is
       // instant, but the lean below smooths the *feel* of changing direction.
@@ -594,8 +646,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         (targetTurn - stateRef.current.turnAngle) * Math.min(1, dt * TURN_SPEED);
 
       // Smooth speed ramp: accelerate toward the target velocity at ACCEL,
-      // and decelerate with friction when there's no input.
-      const targetVx = moveDir * MAX_SPEED;
+      // and decelerate with friction when there's no input. Click-to-move
+      // walks at the spec's 100px/s; keyboard walks at full sprint speed.
+      const targetVx =
+        moveDir * (clickDestRef.current != null && moveDirection(keysRef.current.left, keysRef.current.right) === 0 ? WALK_SPEED : MAX_SPEED);
       stateRef.current.vx =
         moveDir !== 0
           ? rampVelocity(stateRef.current.vx, targetVx, ACCEL, dt)
@@ -787,17 +841,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           bobY = 0;
         }
       } else if (Math.abs(stateRef.current.vx) > 15) {
-        // Running stride cadence & forward lean.
-        // Advance the stride at a natural cadence (~4.5 cycles/sec at full
-        // speed) scaled by actual speed. Running the cycle too fast makes the
-        // sprite visibly vibrate instead of walking.
-        const speedRatio = Math.abs(stateRef.current.vx) / MAX_SPEED;
-        stateRef.current.runCycle += dt * STRIDE_HZ * speedRatio * Math.PI * 2;
-
-        // Gentle vertical bob and subtle squash (kept low to avoid jitter)
-        bobY = -Math.abs(Math.sin(stateRef.current.runCycle)) * 2.2;
-        squashX = 1 + Math.sin(stateRef.current.runCycle * 2) * 0.018;
-        squashY = 1 - Math.sin(stateRef.current.runCycle * 2) * 0.013;
+        // WALKING: advance the sheet's clock only while actually moving, so the
+        // cadence is tied to motion (10fps from the JSON). Frame advance happens
+        // below in the sprite-update block; here we just keep the lean.
+        walkElapsedRef.current += dt * 1000;
 
         // Smooth turn lean toward movement direction
         const targetTilt = stateRef.current.turnAngle;
@@ -807,11 +854,38 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         // Idle breathing on ground
         stateRef.current.tilt = 0;
         stateRef.current.runCycle = 0;
+        walkElapsedRef.current = 0; // reset the cycle clock while standing
         isIdle = true;
       }
 
-      // Update character sprite element
+      // Update character sprite element.
+      // The sheet frame is selected from real elapsed time (refresh-rate
+      // independent) and applied as a background-position — no React state.
       if (spriteRef.current) {
+        const walkingNow = !isIdle && !isCheering && Math.abs(stateRef.current.vx) > 15;
+        const animName =
+          facingDirRef.current === 1
+            ? walkingNow
+              ? 'walkRight'
+              : 'idleRight'
+            : walkingNow
+              ? 'walkLeft'
+              : 'idleLeft';
+        const indices = WALK_SHEET.animations[animName];
+        const frameIdx = walkingNow
+          ? frameAtElapsed(walkElapsedRef.current, indices, WALK_SHEET.frames, WALK_SHEET.defaultFps)
+          : indices[0];
+
+        if (walkFrameRef.current !== frameIdx) {
+          walkFrameRef.current = frameIdx;
+          spriteRef.current.style.backgroundPosition = backgroundPositionFor(
+            WALK_SHEET.frames[frameIdx],
+            WALK_SHEET,
+            WALK_RENDER_W,
+            WALK_RENDER_H,
+          );
+        }
+
         if (isIdle && !isCheering) {
           if (!spriteRef.current.classList.contains('animate-idle-breathe')) {
             spriteRef.current.classList.add('animate-idle-breathe');
@@ -1218,23 +1292,30 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           transformOrigin: 'bottom center',
         }}
       >
+        {/* Walk-cycle sheet. Native cell size, centred on the collision box;
+            the feet baseline (164px into the cell) sits on the box bottom. */}
         <div
           ref={spriteRef}
-          className="relative w-full h-full origin-bottom"
-          style={{ transformOrigin: 'bottom center' }}
-        >
-          <img
-            src={spriteUrl}
-            alt="Pixel character of Arshad Mohemed"
-            className="absolute max-w-none object-contain pixel-art drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]"
-            style={{
-              left: `${SPRITE_PLACEMENT.left}px`,
-              bottom: `${SPRITE_PLACEMENT.bottom}px`,
-              width: `${SPRITE_SIZE.width}px`,
-              height: `${SPRITE_SIZE.height}px`,
-            }}
-          />
-        </div>
+          className="absolute pixel-art drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]"
+          style={{
+            left: `${(ACTOR_W - WALK_RENDER_W) / 2}px`,
+            bottom: `${-(WALK_RENDER_H - WALK_BASELINE_Y)}px`,
+            width: `${WALK_RENDER_W}px`,
+            height: `${WALK_RENDER_H}px`,
+            backgroundImage: `url(${WALK_SHEET.src})`,
+            backgroundRepeat: 'no-repeat',
+            // Row 0, column 0 = standing, facing right (matches initial state).
+            backgroundPosition: backgroundPositionFor(
+              WALK_SHEET.frames[WALK_SHEET.animations.idleRight[0]],
+              WALK_SHEET,
+              WALK_RENDER_W,
+              WALK_RENDER_H,
+            ),
+            transformOrigin: 'bottom center',
+          }}
+          role="img"
+          aria-label="Pixel character of Arshad Mohemed"
+        />
       </div>
 
       {/* Controls Hint — the four sign panels, centred mid-screen. Rendered from
