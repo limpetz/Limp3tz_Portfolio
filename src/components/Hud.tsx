@@ -1,0 +1,177 @@
+import React, { useState } from 'react';
+import { sound } from '../utils/soundEngine';
+
+interface HudProps {
+  score: number;
+  coins: number;
+  scorePopping: boolean;
+  musicOn: boolean;
+  sfxOn: boolean;
+  onToggleMusic: () => void;
+  onToggleSfx: () => void;
+  activeSection: string;
+}
+
+export const Hud: React.FC<HudProps> = ({
+  score,
+  coins,
+  scorePopping,
+  musicOn,
+  sfxOn,
+  onToggleMusic,
+  onToggleSfx,
+  activeSection,
+}) => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navItems = [
+    { id: 'stage', label: 'STAGE' },
+    { id: 'about', label: 'L1 ABOUT' },
+    { id: 'skills', label: 'L2 SKILLS' },
+    { id: 'quests', label: 'L3 QUESTS' },
+    { id: 'projects', label: 'L4 CARTS' },
+    { id: 'contact', label: 'L5 CONTINUE' },
+  ];
+
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50 h-[58px] bg-[#070512]/95 border-b-2 border-[#00e5ff] shadow-[0_0_14px_rgba(0,229,255,0.28)] font-pixel text-[9px] text-white flex items-center px-4 gap-4 backdrop-blur-sm">
+      {/* Lives & P1 */}
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="flex gap-1" aria-label="3 lives">
+          <span className="w-2.5 h-2.5 bg-[#ff2d78] shadow-[0_0_6px_rgba(255,45,120,0.7)] block" />
+          <span className="w-2.5 h-2.5 bg-[#ff2d78] shadow-[0_0_6px_rgba(255,45,120,0.7)] block" />
+          <span className="w-2.5 h-2.5 bg-[#ff2d78] shadow-[0_0_6px_rgba(255,45,120,0.7)] block" />
+        </div>
+        <span className="text-[#ffd23f] tracking-wider hidden sm:inline-block">P1: LIMP3TZ</span>
+      </div>
+
+      {/* Desktop Navigation */}
+      <nav className="hidden lg:flex items-center gap-4 mx-auto text-slate-300">
+        {navItems.map((item) => {
+          const isActive = activeSection === item.id;
+          return (
+            <a
+              key={item.id}
+              href={`#${item.id}`}
+              onClick={() => sound.playBlip(750, 0.03, 0.05)}
+              className={`py-1 px-1 transition-all ${
+                isActive
+                  ? 'text-[#3dffa2] shadow-[0_0_8px_rgba(61,255,162,0.7)]'
+                  : 'hover:text-[#00e5ff] hover:shadow-[0_0_8px_rgba(0,229,255,0.7)]'
+              }`}
+            >
+              {item.label}
+            </a>
+          );
+        })}
+      </nav>
+
+      {/* Right HUD Zone: Score, Coins, Audio, Assets, Menu */}
+      <div className="flex items-center gap-3 ml-auto shrink-0">
+        {/* Score */}
+        <div className="hidden sm:flex items-center gap-1.5">
+          <span className="text-[#7d7aa3]">SCORE</span>
+          <b
+            className={`text-[#3dffa2] font-normal tabular-nums transition-transform duration-150 inline-block ${
+              scorePopping ? 'scale-125 text-[#ffd23f]' : ''
+            }`}
+          >
+            {String(score).padStart(6, '0')}
+          </b>
+        </div>
+
+        {/* Coins */}
+        <div className="flex items-center gap-1.5 text-[#ffd23f]">
+          <span className="w-3.5 h-3.5 bg-[#ffd23f] border-2 border-[#5a3d00] shadow-[inset_-2px_-2px_0_#b8860b,inset_1px_1px_0_#fff] block" />
+          <span className="tabular-nums">x{String(coins).padStart(2, '0')}</span>
+        </div>
+
+        {/* SFX Toggle */}
+        <button
+          type="button"
+          onClick={onToggleSfx}
+          className={`px-2 py-1 border-2 transition-all font-pixel text-[8px] cursor-pointer ${
+            sfxOn
+              ? 'border-[#3dffa2] text-[#3dffa2] bg-[#0a0817] shadow-[0_0_8px_rgba(61,255,162,0.4)]'
+              : 'border-[#241c42] text-[#7d7aa3] bg-[#0a0817]'
+          }`}
+          title="Toggle 8-bit sound effects"
+        >
+          SFX {sfxOn ? 'ON' : 'OFF'}
+        </button>
+
+        {/* Music Toggle */}
+        <button
+          type="button"
+          onClick={onToggleMusic}
+          className={`hidden md:block px-2 py-1 border-2 transition-all font-pixel text-[8px] cursor-pointer ${
+            musicOn
+              ? 'border-[#00e5ff] text-[#00e5ff] bg-[#0a0817] shadow-[0_0_8px_rgba(0,229,255,0.4)]'
+              : 'border-[#241c42] text-[#7d7aa3] bg-[#0a0817]'
+          }`}
+          title="Toggle synthesized chiptune music"
+        >
+          BGM {musicOn ? 'ON' : 'OFF'}
+        </button>
+
+        {/* Mobile Menu Button */}
+        <button
+          type="button"
+          onClick={() => {
+            sound.playBlip(600, 0.03, 0.05);
+            setMobileMenuOpen(!mobileMenuOpen);
+          }}
+          className="lg:hidden px-2 py-1 border-2 border-[#241c42] text-[#00e5ff] hover:border-[#00e5ff] bg-[#0a0817] text-xs font-pixel"
+          aria-label="Toggle navigation menu"
+        >
+          ≡
+        </button>
+      </div>
+
+      {/* Mobile Drawer Menu */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden absolute top-[58px] left-0 right-0 bg-[#070512]/98 border-b-2 border-[#00e5ff] flex flex-col p-2 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="px-4 py-2 border-b border-[#241c42] flex justify-between items-center text-[#ffd23f]">
+            <span>SCORE: {String(score).padStart(6, '0')}</span>
+            <span>COINS: x{String(coins).padStart(2, '0')}</span>
+          </div>
+          {navItems.map((item) => (
+            <a
+              key={item.id}
+              href={`#${item.id}`}
+              onClick={() => {
+                sound.playBlip(750, 0.03, 0.05);
+                setMobileMenuOpen(false);
+              }}
+              className={`px-4 py-3 border-b border-[#241c42]/60 hover:text-[#00e5ff] ${
+                activeSection === item.id ? 'text-[#3dffa2] bg-[#3dffa2]/10' : 'text-slate-300'
+              }`}
+            >
+              {item.label}
+            </a>
+          ))}
+          <div className="p-3 flex justify-between items-center">
+            <button
+              type="button"
+              onClick={onToggleMusic}
+              className={`px-3 py-1.5 border text-[9px] ${
+                musicOn ? 'border-[#00e5ff] text-[#00e5ff]' : 'border-[#241c42] text-slate-400'
+              }`}
+            >
+              MUSIC: {musicOn ? 'ON' : 'OFF'}
+            </button>
+            <button
+              type="button"
+              onClick={onToggleSfx}
+              className={`px-3 py-1.5 border text-[9px] ${
+                sfxOn ? 'border-[#3dffa2] text-[#3dffa2]' : 'border-[#241c42] text-slate-400'
+              }`}
+            >
+              SFX: {sfxOn ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        </div>
+      )}
+    </header>
+  );
+};

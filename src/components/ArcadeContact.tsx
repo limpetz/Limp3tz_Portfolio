@@ -1,0 +1,199 @@
+import React, { useState, useEffect } from 'react';
+import { PORTFOLIO_CONFIG } from '../data/portfolioData';
+import { sound } from '../utils/soundEngine';
+
+interface ArcadeContactProps {
+  onAddScore: (amount: number) => void;
+}
+
+export const ArcadeContact: React.FC<ArcadeContactProps> = ({ onAddScore }) => {
+  const [countdown, setCountdown] = useState(9);
+  const [name, setName] = useState('');
+  const [message, setMessage] = useState('');
+  const [selectedTopic, setSelectedTopic] = useState('AdOps Enablement & Training');
+
+  // Arcade countdown timer
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          sound.playBlip(220, 0.1, 0.05);
+          return 9;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const resetTimer = () => {
+    setCountdown(9);
+    sound.playCoin();
+    onAddScore(50);
+  };
+
+  const handleTopicSelect = (topic: string) => {
+    setSelectedTopic(topic);
+    sound.playBlip(540, 0.03, 0.05);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    sound.playPower();
+    onAddScore(250);
+
+    const subject = encodeURIComponent(`PORTFOLIO QUEST: [${selectedTopic}] from ${name || 'Operator'}`);
+    const body = encodeURIComponent(
+      `Hello Arshad,\n\nTopic: ${selectedTopic}\nSender: ${name}\n\nMessage:\n${message}\n\n— Sent from Limp3tz Arcade Terminal`
+    );
+
+    window.location.href = `mailto:${PORTFOLIO_CONFIG.email}?subject=${subject}&body=${body}`;
+  };
+
+  return (
+    <section id="contact" className="py-24 px-4 sm:px-8 max-w-4xl mx-auto scroll-mt-16 text-center">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-10 justify-center">
+        <span className="font-pixel text-xs px-3 py-2 bg-[#0a0817] border-2 border-[#3dffa2] text-[#3dffa2] shadow-[4px_4px_0_#000]">
+          FINAL LEVEL
+        </span>
+        <h2 className="font-pixel text-xl sm:text-2xl text-white tracking-wide">
+          CONTINUE?
+        </h2>
+      </div>
+
+      {/* Retro Countdown */}
+      <div className="my-8">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={resetTimer}
+          onMouseEnter={resetTimer}
+          className="inline-block cursor-pointer group"
+          title="Click to reset timer and add score!"
+        >
+          <p className="font-retro text-7xl sm:text-9xl text-[#ff2d78] animate-glitch select-none tracking-widest leading-none">
+            CONTINUE? <span className="text-[#ffd23f]">{countdown}</span>
+          </p>
+          <p className="font-pixel text-[9px] text-[#00e5ff] mt-2 group-hover:text-[#3dffa2] transition-colors">
+            [ CLICK TIMER TO INSERT COIN &amp; RESET ]
+          </p>
+        </div>
+      </div>
+
+      <p className="font-pixel text-xs text-[#00e5ff] tracking-widest mb-8 animate-pulse">
+        INSERT COIN TO CONNECT WITH ARSHAD
+      </p>
+
+      {/* Main Action Links */}
+      <div className="flex flex-wrap gap-4 justify-center mb-8">
+        <a
+          href={`mailto:${PORTFOLIO_CONFIG.email}`}
+          onClick={() => sound.playPower()}
+          className="font-pixel text-xs px-6 py-4 bg-[#0a0817] border-2 border-[#3dffa2] text-[#3dffa2] hover:bg-[#3dffa2] hover:text-[#001016] transition-all shadow-[0_5px_0_#000] active:translate-y-1 active:shadow-none"
+        >
+          SEND EMAIL DIRECTLY
+        </a>
+
+        <a
+          href={PORTFOLIO_CONFIG.linkedin}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => sound.playCoin()}
+          className="font-pixel text-xs px-6 py-4 bg-[#0a0817] border-2 border-[#00e5ff] text-[#00e5ff] hover:bg-[#00e5ff] hover:text-[#001016] transition-all shadow-[0_5px_0_#000] active:translate-y-1 active:shadow-none"
+        >
+          LINKEDIN PROFILE
+        </a>
+
+        <a
+          href={PORTFOLIO_CONFIG.github}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => sound.playCoin()}
+          className="font-pixel text-xs px-6 py-4 bg-[#0a0817] border-2 border-[#ffd23f] text-[#ffd23f] hover:bg-[#ffd23f] hover:text-[#001016] transition-all shadow-[0_5px_0_#000] active:translate-y-1 active:shadow-none"
+        >
+          GITHUB LABS
+        </a>
+      </div>
+
+      <p className="font-retro text-xl text-[#7d7aa3] mb-8">
+        Direct Email Transmission: <span className="text-[#00e5ff]">{PORTFOLIO_CONFIG.email}</span>
+      </p>
+
+      {/* Transmission Terminal Form */}
+      <div className="bg-[#110d24] border-2 border-[#241c42] p-6 sm:p-8 text-left shadow-[8px_8px_0_#000] max-w-2xl mx-auto">
+        <h3 className="font-pixel text-xs text-[#ffd23f] mb-4">
+          ARCADE COMMS TERMINAL // QUICK DISPATCH
+        </h3>
+
+        {/* Preset Topic Selection */}
+        <div className="mb-6">
+          <p className="font-pixel text-[8px] text-[#7d7aa3] mb-2">SELECT QUEST OBJECTIVE:</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              'AdOps Enablement & Training',
+              'Applied AI & LLM Systems',
+              'QA Frameworks / RCA',
+              'Speaking & Consulting',
+            ].map((topic) => (
+              <button
+                key={topic}
+                type="button"
+                onClick={() => handleTopicSelect(topic)}
+                className={`font-pixel text-[8px] px-3 py-1.5 border-2 transition-all cursor-pointer ${
+                  selectedTopic === topic
+                    ? 'border-[#3dffa2] bg-[#3dffa2]/10 text-[#3dffa2] shadow-[0_0_8px_rgba(61,255,162,0.4)]'
+                    : 'border-[#241c42] bg-[#0a0817] text-[#7d7aa3] hover:text-white'
+                }`}
+              >
+                {topic}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block font-pixel text-[8px] text-[#7d7aa3] mb-1">
+              YOUR NAME / COGNOMEN:
+            </label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Elena Vance"
+              className="w-full bg-[#0a0817] border-2 border-[#241c42] focus:border-[#00e5ff] text-white font-retro text-xl px-3 py-2 outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block font-pixel text-[8px] text-[#7d7aa3] mb-1">
+              MESSAGE TRANSMISSION:
+            </label>
+            <textarea
+              required
+              rows={4}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Let's build high-impact AdOps training systems, deploy local LLM automation, or review campaign QA frameworks..."
+              className="w-full bg-[#0a0817] border-2 border-[#241c42] focus:border-[#00e5ff] text-white font-retro text-xl px-3 py-2 outline-none resize-y"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="w-full font-pixel text-xs py-4 bg-[#0a0817] border-2 border-[#3dffa2] text-[#3dffa2] hover:bg-[#3dffa2] hover:text-[#001016] transition-colors cursor-pointer shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-none"
+          >
+            TRANSMIT QUEST PROPOSAL &gt;
+          </button>
+        </form>
+
+        <p className="font-retro text-base text-[#7d7aa3] mt-3 text-center">
+          * Opens your local email client with your message cleanly encoded
+        </p>
+      </div>
+    </section>
+  );
+};

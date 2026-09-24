@@ -1,0 +1,6 @@
+{
+  "name": "LIMP3TZ // Neon Pixel Arcade Portfolio",
+  "description": "Interactive neon cyberpunk arcade portfolio for Arshad Mohemed (Limp3tz) - Senior Specialist Trainer in Ad Ops and ex-NVIDIA QA, featuring a playable 2D platformer minigame, chiptune sound synthesis, skill tree, and quest log.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

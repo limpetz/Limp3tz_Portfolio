@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg0: #070512;
+    --bg1: #0b0819;
+    --panel: #110d24;
+    --line: #241c42;
+    --ink: #efedf7;
+    --dim: #7d7aa3;
+    --cyan: #00e5ff;
+    --mag: #ff2d78;
+    --yel: #ffd23f;
+    --pur: #8f6cff;
+    --grn: #3dffa2;
+    --org: #ff9e3d;
+  }
+
+  body {
+    background-color: var(--bg0);
+    color: var(--ink);
+    font-family: 'VT323', monospace;
+  }
+}
+
+.font-pixel {
+  font-family: 'Press Start 2P', monospace;
+}
+
+.font-retro {
+  font-family: 'VT323', monospace;
+}
+
+.pixel-art {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+/* Background Cyberpunk Grid */
+.cyber-grid {
+  background-image: 
+    linear-gradient(rgba(0, 229, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.035) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Glitch Animation */
+@keyframes glitch {
+  0%, 88%, 100% {
+    transform: none;
+    text-shadow: 2px 2px 0 #000;
+  }
+  90% {
+    transform: translate(-2px, 1px);
+    text-shadow: -2px 0 var(--cyan), 2px 0 var(--mag);
+  }
+  92% {
+    transform: translate(2px, -1px);
+    text-shadow: 2px 0 var(--cyan), -2px 0 var(--mag);
+  }
+  94% {
+    transform: translate(-1px, 0);
+    text-shadow: -2px 0 var(--yel), 2px 0 var(--mag);
+  }
+  96% {
+    transform: none;
+    text-shadow: 2px 2px 0 #000;
+  }
+}
+
+.animate-glitch {
+  animation: glitch 5s infinite;
+}
+
+/* Score Pop */
+@keyframes scorePop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+.animate-score-pop {
+  animation: scorePop 0.3s steps(2);
+}
+
+/* Party rainbow hue shift for Konami Code */
+@keyframes partyHue {
+  to { filter: hue-rotate(360deg); }
+}
+
+.party-mode {
+  animation: partyHue 1.2s linear infinite;
+}
+
+/* Character Idle Breathing Animation */
+@keyframes idleBreathe {
+  0%, 100% {
+    transform: scale(1, 1) translateY(0);
+  }
+  38% {
+    transform: scale(0.985, 1.026) translateY(-1.5px);
+  }
+  65% {
+    transform: scale(1.012, 0.99) translateY(0px);
+  }
+}
+
+.animate-idle-breathe {
+  animation: idleBreathe 2.6s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+/* Custom retro scrollbar */
+::-webkit-scrollbar {
+  width: 12px;
+  background: #070512;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #241c42;
+  border: 2px solid #070512;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00e5ff;
+}
