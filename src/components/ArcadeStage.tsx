@@ -998,15 +998,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         ))}
       </div>
 
-      {/* Ground: curb + asphalt + reflections */}
+      {/* Ground: neon curb + asphalt */}
       <div className="absolute left-0 right-0 bottom-0 h-[92px] pointer-events-none flex flex-col z-10">
         <div className="h-1 bg-[#00e5ff] shadow-[0_0_12px_rgba(0,229,255,0.8),0_0_24px_rgba(0,229,255,0.4)]" />
-        <div className="flex-1 bg-[#0d0a1a] relative overflow-hidden">
-          {/* Wet asphalt puddle reflections */}
-          <div className="absolute bottom-2 left-[15%] w-24 h-8 bg-[#00e5ff]/20 blur-[2px] rounded-full" />
-          <div className="absolute bottom-2 right-[25%] w-32 h-8 bg-[#ff2d78]/25 blur-[2px] rounded-full" />
-          <div className="absolute bottom-3 left-[48%] w-20 h-6 bg-[#ffd23f]/20 blur-[2px] rounded-full" />
-        </div>
+        <div className="flex-1 bg-[#0d0a1a]" />
       </div>
 
       {/* Top Left Intro Overlay */}
