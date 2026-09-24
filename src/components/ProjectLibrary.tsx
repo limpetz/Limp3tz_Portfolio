@@ -35,19 +35,6 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({ onAddScore }) =>
           GAME LIBRARY &amp; CARTRIDGES
         </h2>
         <div className="flex-1 border-t-2 border-dashed border-[#241c42] min-w-[60px]" />
-
-        {/* Live GitHub Telemetry Quick Launcher */}
-        <button
-          type="button"
-          onClick={() => {
-            const ghCart = PROJECT_CARTRIDGES.find((c) => c.id === 'github-activity');
-            if (ghCart) handleOpenModal(ghCart);
-          }}
-          className="font-pixel text-[8px] px-3 py-2 bg-[#0a0817] border-2 border-[#00e5ff] text-[#00e5ff] hover:bg-[#00e5ff] hover:text-black transition-colors cursor-pointer flex items-center gap-2 shadow-[3px_3px_0_#000]"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-[#00e5ff] animate-ping" />
-          <span>LAUNCH GITHUB RADAR &gt;</span>
-        </button>
       </div>
 
       {/* Cartridge Grid */}
@@ -89,9 +76,8 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({ onAddScore }) =>
                   </span>
 
                   {isGitHubActivity && (
-                    <span className="font-pixel text-[7px] bg-[#00ff88]/20 text-[#3dffa2] border border-[#3dffa2] px-1.5 py-0.5 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#3dffa2] animate-ping" />
-                      LIVE API
+                    <span className="font-pixel text-[7px] bg-[#00ff88]/20 text-[#3dffa2] border border-[#3dffa2] px-1.5 py-0.5">
+                      LIVE IN L1
                     </span>
                   )}
                 </div>
@@ -116,16 +102,16 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({ onAddScore }) =>
                       : `linear-gradient(135deg, #0a0817 0%, ${cartridge.color}35 50%, ${cartridge.color} 100%)`,
                   }}
                 >
-                  <span className="font-pixel text-[8px] text-black bg-white/90 px-2 py-0.5 border border-black shadow-[2px_2px_0_#000]">
-                    {isGitHubActivity ? 'CART #2 · LIVE' : `CART #${idx + 1}`}
+                  <span className="font-pixel text-[8px] text-black bg-white/90 px-2 py-0.5 border border-black">
+                    {isGitHubActivity ? 'CART #2' : `CART #${idx + 1}`}
                   </span>
                 </div>
               </div>
 
               {/* Hover Insert Button */}
               <div className="absolute left-1/2 bottom-2 -translate-x-1/2 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity">
-                <span className="font-pixel text-[8px] bg-[#3dffa2] text-[#001016] px-3 py-1.5 border-2 border-black font-bold animate-pulse whitespace-nowrap">
-                  {isGitHubActivity ? 'OPEN RADAR &gt;' : 'PLAY / INSPECT &gt;'}
+                <span className="font-pixel text-[8px] bg-[#3dffa2] text-[#001016] px-3 py-1.5 border-2 border-black font-bold whitespace-nowrap">
+                  PLAY / INSPECT &gt;
                 </span>
               </div>
             </article>
