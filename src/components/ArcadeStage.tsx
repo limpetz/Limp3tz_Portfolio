@@ -928,14 +928,17 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           ))
         )}
 
-        {/* Readability overlay so HUD text stays legible over any image */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              'radial-gradient(ellipse at center, rgba(7,5,18,0.35) 0%, rgba(7,5,18,0.9) 100%)',
-          }}
-        />
+        {/* Dimming overlay only for the procedural fallback — the custom
+            slideshow shows the artwork at full brightness. */}
+        {!hasMultipleBackgrounds && (
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'radial-gradient(ellipse at center, rgba(7,5,18,0.35) 0%, rgba(7,5,18,0.9) 100%)',
+            }}
+          />
+        )}
       </div>
 
       {/* Manual slideshow navigation */}
