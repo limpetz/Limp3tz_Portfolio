@@ -10,3 +10,7 @@ coverage/
 # Original full-size images, kept on disk for re-export only.
 # The app ships the compressed .webp versions sitting next to them.
 .originals/
+
+# Walk-pack sources: individual frames, previews, demo files, full-size sheets.
+# The app ships only sprite/Walk/arshad-walk.png + .json (compact sheet).
+src/assets/images/sprite/.originals/
