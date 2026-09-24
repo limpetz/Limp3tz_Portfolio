@@ -31,6 +31,10 @@ import {
 import { crossfadeMs, shouldAutoAdvance, usePrefersReducedMotion } from '../utils/motion';
 import { spriteCanvasSize, spritePlacement } from '../data/sprite';
 import { shadowForHeight } from '../utils/shadow';
+import moveControlsImg from '../assets/images/move.png';
+import jumpControlsImg from '../assets/images/jump.png';
+import bumpBlocksImg from '../assets/images/bump-blocks.png';
+import clickMeImg from '../assets/images/click-me.png';
 
 interface ArcadeStageProps {
   onAddScore: (amount: number) => void;
@@ -1233,45 +1237,17 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         </div>
       </div>
 
-      {/* Controls Hint (desktop) — flat neon panels matching the reference sign:
-          solid 2px borders, opaque fills, chunky square keycaps, no glow.
-          BUMP BLOCKS only fits at lg; md shows the two bare-minimum panels. */}
-      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 hidden md:flex items-stretch gap-3 lg:gap-5 font-pixel">
-        {[
-          { keys: ['←', '→', 'A', 'D'], label: 'MOVE' },
-          { keys: ['SPACE', 'W'], label: 'JUMP' },
-          { keys: ['↑'], label: 'BUMP BLOCKS', wrap: true },
-        ].map(({ keys, label, wrap }) => (
-          <div
-            key={label}
-            className={`flex items-center gap-3 lg:gap-4 border-2 border-[#00e5ff] bg-[#04030c] px-4 py-3 lg:px-5 lg:py-4 ${
-              wrap ? 'hidden lg:flex' : ''
-            }`}
-          >
-            <span className="flex items-center gap-1.5 lg:gap-2">
-              {keys.map((k) => (
-                <kbd
-                  key={k}
-                  className="inline-flex items-center justify-center min-w-[28px] h-[26px] lg:min-w-[34px] lg:h-[30px] px-1.5 text-[10px] lg:text-[12px] leading-none text-[#ffd23f] border-2 border-[#ffd23f] bg-[#0e0b02]"
-                >
-                  {k}
-                </kbd>
-              ))}
-            </span>
-            <span
-              className={`text-[10px] lg:text-[12px] text-[#00e5ff] tracking-wider leading-tight ${
-                wrap ? 'max-w-[80px] lg:max-w-[92px]' : ''
-              }`}
-            >
-              {label}
-            </span>
-          </div>
-        ))}
-        <div className="flex items-center justify-center border-2 border-[#ff2d78] bg-[#2a0a1e] px-4 py-3 lg:px-5 lg:py-4">
-          <span className="text-[10px] lg:text-[12px] text-[#ff2d78] tracking-wider leading-tight max-w-[72px] lg:max-w-[80px] text-center">
-            CLICK ME
-          </span>
-        </div>
+      {/* Controls Hint — the four sign panels, centred mid-screen. Rendered from
+          the sliced artwork (2x source, so crisp at this size). Decorative:
+          pointer-events-none so it never blocks stage clicks. */}
+      <div
+        aria-label="Character controls"
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 hidden md:flex items-center gap-3 lg:gap-4 pointer-events-none"
+      >
+        <img src={moveControlsImg} alt="Move: left, right arrows or A and D" className="h-12 lg:h-14 w-auto" />
+        <img src={jumpControlsImg} alt="Jump: Space or W" className="h-12 lg:h-14 w-auto" />
+        <img src={bumpBlocksImg} alt="Bump blocks: jump with the up direction" className="h-12 lg:h-14 w-auto" />
+        <img src={clickMeImg} alt="Click the character" className="h-12 lg:h-14 w-auto" />
       </div>
 
       {/* Mobile Touch D-Pad */}
