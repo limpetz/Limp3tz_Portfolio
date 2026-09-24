@@ -30,17 +30,17 @@ export const Hud: React.FC<HudProps> = ({
     { id: 'skills', label: 'L2 SKILLS' },
     { id: 'quests', label: 'L3 QUESTS' },
     { id: 'projects', label: 'L4 CARTS' },
-    { id: 'contact', label: 'L5 CONTINUE' },
+    { id: 'contact', label: 'L5 CONTACT' },
   ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-[58px] bg-[#070512]/95 border-b-2 border-[#00e5ff] shadow-[0_0_14px_rgba(0,229,255,0.28)] font-pixel text-[9px] text-white flex items-center px-4 gap-4 backdrop-blur-sm">
+    <header className="fixed top-0 left-0 right-0 z-50 h-[58px] bg-[#070512]/95 border-b-2 border-[#00e5ff] font-pixel text-[9px] text-white flex items-center px-4 gap-4 backdrop-blur-sm">
       {/* Lives & P1 */}
       <div className="flex items-center gap-2 shrink-0">
         <div className="flex gap-1" aria-label="3 lives">
-          <span className="w-2.5 h-2.5 bg-[#ff2d78] shadow-[0_0_6px_rgba(255,45,120,0.7)] block" />
-          <span className="w-2.5 h-2.5 bg-[#ff2d78] shadow-[0_0_6px_rgba(255,45,120,0.7)] block" />
-          <span className="w-2.5 h-2.5 bg-[#ff2d78] shadow-[0_0_6px_rgba(255,45,120,0.7)] block" />
+          <span className="w-2.5 h-2.5 bg-[#ff2d78] block" />
+          <span className="w-2.5 h-2.5 bg-[#ff2d78] block" />
+          <span className="w-2.5 h-2.5 bg-[#ff2d78] block" />
         </div>
         <span className="text-[#ffd23f] tracking-wider hidden sm:inline-block">P1: LIMP3TZ</span>
       </div>
@@ -54,10 +54,10 @@ export const Hud: React.FC<HudProps> = ({
               key={item.id}
               href={`#${item.id}`}
               onClick={() => sound.playBlip(750, 0.03, 0.05)}
-              className={`py-1 px-1 transition-all ${
+              className={`py-1 px-1 border-b-2 transition-colors ${
                 isActive
-                  ? 'text-[#3dffa2] shadow-[0_0_8px_rgba(61,255,162,0.7)]'
-                  : 'hover:text-[#00e5ff] hover:shadow-[0_0_8px_rgba(0,229,255,0.7)]'
+                  ? 'text-[#3dffa2] border-[#3dffa2]'
+                  : 'text-slate-300 border-transparent hover:text-[#00e5ff] hover:border-[#00e5ff]'
               }`}
             >
               {item.label}
@@ -82,17 +82,18 @@ export const Hud: React.FC<HudProps> = ({
 
         {/* Coins */}
         <div className="flex items-center gap-1.5 text-[#ffd23f]">
-          <span className="w-3.5 h-3.5 bg-[#ffd23f] border-2 border-[#5a3d00] shadow-[inset_-2px_-2px_0_#b8860b,inset_1px_1px_0_#fff] block" />
+          <span className="w-3.5 h-3.5 bg-[#ffd23f] border-2 border-[#5a3d00] block" />
           <span className="tabular-nums">x{String(coins).padStart(2, '0')}</span>
         </div>
 
-        {/* SFX Toggle */}
+        {/* SFX Toggle — flat neon: solid border, opaque fill, glow only when ON */}
         <button
           type="button"
           onClick={onToggleSfx}
-          className={`px-2 py-1 border-2 transition-all font-pixel text-[8px] cursor-pointer ${
+          aria-pressed={sfxOn}
+          className={`px-2 py-1 border-2 transition-colors font-pixel text-[8px] cursor-pointer ${
             sfxOn
-              ? 'border-[#3dffa2] text-[#3dffa2] bg-[#0a0817] shadow-[0_0_8px_rgba(61,255,162,0.4)]'
+              ? 'border-[#3dffa2] text-[#3dffa2] bg-[#0a0817]'
               : 'border-[#241c42] text-[#7d7aa3] bg-[#0a0817]'
           }`}
           title="Toggle 8-bit sound effects"
@@ -104,9 +105,10 @@ export const Hud: React.FC<HudProps> = ({
         <button
           type="button"
           onClick={onToggleMusic}
-          className={`hidden md:block px-2 py-1 border-2 transition-all font-pixel text-[8px] cursor-pointer ${
+          aria-pressed={musicOn}
+          className={`hidden md:block px-2 py-1 border-2 transition-colors font-pixel text-[8px] cursor-pointer ${
             musicOn
-              ? 'border-[#00e5ff] text-[#00e5ff] bg-[#0a0817] shadow-[0_0_8px_rgba(0,229,255,0.4)]'
+              ? 'border-[#00e5ff] text-[#00e5ff] bg-[#0a0817]'
               : 'border-[#241c42] text-[#7d7aa3] bg-[#0a0817]'
           }`}
           title="Toggle synthesized chiptune music"

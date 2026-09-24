@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { PROJECT_CARTRIDGES, ProjectCartridge } from '../data/portfolioData';
 import { sound } from '../utils/soundEngine';
-import { GitHubActivity } from './GitHubActivity';
 
 interface ProjectLibraryProps {
   onAddScore: (amount: number) => void;
@@ -29,7 +28,7 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({ onAddScore }) =>
     <section id="projects" className="py-24 px-4 sm:px-8 max-w-6xl mx-auto scroll-mt-16">
       {/* Header */}
       <div className="flex items-center gap-4 mb-12 flex-wrap">
-        <span className="font-pixel text-xs px-3 py-2 bg-[#0a0817] border-2 border-[#8f6cff] text-[#8f6cff] shadow-[4px_4px_0_#000]">
+        <span className="font-pixel text-xs px-3 py-2 bg-[#0a0817] border-2 border-[#8f6cff] text-[#8f6cff]">
           LEVEL 4
         </span>
         <h2 className="font-pixel text-xl sm:text-2xl text-white tracking-wide">
@@ -179,73 +178,65 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({ onAddScore }) =>
               </button>
             </div>
 
-            {/* If GitHub Activity cartridge, mount live interactive GitHubActivity component */}
-            {selectedProject.id === 'github-activity' ? (
-              <div className="py-2">
-                <GitHubActivity onAddScore={onAddScore} />
+            {/* GitHub Activity now lives live in the L1 character card; its
+                cartridge shows the standard overview instead of a duplicate. */}
+            <div className="py-4 space-y-4 font-retro text-xl text-slate-300 leading-relaxed">              <p>{selectedProject.fullOverview}</p>
+
+              <div>
+                <p className="font-pixel text-[9px] text-[#ffd23f] mb-2">
+                  KEY CAPABILITIES &amp; HIGHLIGHTS:
+                </p>
+                <ul className="space-y-1.5">
+                  {selectedProject.highlights.map((h, i) => (
+                    <li key={i} className="flex items-center gap-2 text-white">
+                      <span className="text-[#3dffa2] font-pixel text-[9px]">★</span>
+                      <span>{h}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            ) : (
-              /* Standard Cartridge View */
-              <div className="py-4 space-y-4 font-retro text-xl text-slate-300 leading-relaxed">
-                <p>{selectedProject.fullOverview}</p>
 
-                <div>
-                  <p className="font-pixel text-[9px] text-[#ffd23f] mb-2">
-                    KEY CAPABILITIES &amp; HIGHLIGHTS:
-                  </p>
-                  <ul className="space-y-1.5">
-                    {selectedProject.highlights.map((h, i) => (
-                      <li key={i} className="flex items-center gap-2 text-white">
-                        <span className="text-[#3dffa2] font-pixel text-[9px]">★</span>
-                        <span>{h}</span>
-                      </li>
-                    ))}
-                  </ul>
+              {/* Tech Badges */}
+              <div className="pt-2">
+                <p className="font-pixel text-[8px] text-[#7d7aa3] mb-2">TECH ARSENAL:</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedProject.tech.map((t, i) => (
+                    <span
+                      key={i}
+                      className="font-pixel text-[8px] px-2.5 py-1.5 bg-[#0a0817] border border-[#241c42] text-[#00e5ff]"
+                    >
+                      {t}
+                    </span>
+                  ))}
                 </div>
-
-                {/* Tech Badges */}
-                <div className="pt-2">
-                  <p className="font-pixel text-[8px] text-[#7d7aa3] mb-2">TECH ARSENAL:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedProject.tech.map((t, i) => (
-                      <span
-                        key={i}
-                        className="font-pixel text-[8px] px-2.5 py-1.5 bg-[#0a0817] border border-[#241c42] text-[#00e5ff]"
-                      >
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+              </div>
 
                 {/* Footer Actions */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-[#241c42] pt-4 mt-6">
-                  <a
-                    href={selectedProject.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full sm:w-auto font-pixel text-xs px-6 py-3 bg-[#0a0817] border-2 transition-colors shadow-[0_4px_0_#000] text-center"
-                    style={{
-                      borderColor: selectedProject.color,
-                      color: selectedProject.color,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = selectedProject.color;
-                      e.currentTarget.style.color = '#000';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#0a0817';
-                      e.currentTarget.style.color = selectedProject.color;
-                    }}
-                  >
-                    VIEW ON GITHUB &gt;
-                  </a>
-                  <span className="font-pixel text-[8px] text-[#7d7aa3]">
-                    PRESS ESC OR CLICK OUTSIDE TO CLOSE
-                  </span>
-                </div>
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-[#241c42] pt-4 mt-6">
+                <a
+                  href={selectedProject.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full sm:w-auto font-pixel text-xs px-6 py-3 bg-[#0a0817] border-2 transition-colors shadow-[0_4px_0_#000] text-center"
+                  style={{
+                    borderColor: selectedProject.color,
+                    color: selectedProject.color,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = selectedProject.color;
+                    e.currentTarget.style.color = '#000';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#0a0817';
+                    e.currentTarget.style.color = selectedProject.color;
+                  }}
+                >
+                  VIEW ON GITHUB &gt;
+                </a>                <span className="font-pixel text-[8px] text-[#7d7aa3]">
+                  PRESS ESC OR CLICK OUTSIDE TO CLOSE
+                </span>
               </div>
-            )}
+            </div>
           </div>
         </div>
       )}

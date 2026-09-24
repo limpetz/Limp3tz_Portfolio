@@ -21,7 +21,7 @@ export const QuestLog: React.FC = () => {
     <section id="quests" className="py-24 px-4 sm:px-8 max-w-6xl mx-auto scroll-mt-16">
       {/* Header */}
       <div className="flex items-center gap-4 mb-12 flex-wrap">
-        <span className="font-pixel text-xs px-3 py-2 bg-[#0a0817] border-2 border-[#ff2d78] text-[#ff2d78] shadow-[4px_4px_0_#000]">
+        <span className="font-pixel text-xs px-3 py-2 bg-[#0a0817] border-2 border-[#ff2d78] text-[#ff2d78]">
           LEVEL 3
         </span>
         <h2 className="font-pixel text-xl sm:text-2xl text-white tracking-wide">

@@ -1,10 +1,96 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { CORE_SKILL_TREE, INVENTORY_SKILLS, SKILL_CATEGORIES } from '../data/portfolioData';
 import { sound } from '../utils/soundEngine';
+import { usePrefersReducedMotion } from '../utils/motion';
 
 interface SkillInventoryProps {
   onAddScore: (amount: number) => void;
 }
+
+// One power-rating bar. Fills from 0 when scrolled into view (arcade stat-roll
+// style) instead of appearing pre-filled — the transition-all that used to sit
+// here never fired because the width was final at mount.
+const SkillBar: React.FC<{ name: string; level: number; color: string }> = ({
+  name,
+  level,
+  color,
+}) => {
+  const barRef = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(0);
+  const reducedMotion = usePrefersReducedMotion();
+
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+
+    // Reduced motion: no roll-up, land on the final value immediately.
+    if (reducedMotion) {
+      setShown(level);
+      return;
+    }
+
+    let raf = 0;
+    let observer: IntersectionObserver | undefined;
+
+    const animate = () => {
+      const t0 = performance.now();
+      const duration = 900;
+      const tick = (t: number) => {
+        // Ease-out so the bar races up then settles into the final percent.
+        const p = Math.min(1, (t - t0) / duration);
+        setShown(Math.round(level * (1 - Math.pow(1 - p, 3))));
+        if (p < 1) raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    };
+
+    observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          animate();
+          observer?.disconnect();
+        }
+      },
+      { threshold: 0.4 },
+    );
+    observer.observe(el);
+
+    return () => {
+      observer?.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, [level, reducedMotion]);
+
+  return (
+    <div
+      ref={barRef}
+      className="grid grid-cols-[140px_1fr_45px] sm:grid-cols-[180px_1fr_50px] items-center gap-3 font-pixel text-[8px] sm:text-[9px]"
+    >
+      <span className="text-slate-300 truncate" title={name}>
+        {name}
+      </span>
+      <div className="h-4 bg-[#0a0817] border-2 border-[#241c42] relative overflow-hidden">
+        <div
+          className="h-full relative"
+          style={{
+            width: `${shown}%`,
+            backgroundColor: color,
+            boxShadow: `0 0 10px ${color}`,
+          }}
+        >
+          {/* Subtle diagonal scanlines over progress bar */}
+          <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(0,0,0,0.25)_0_4px,transparent_4px_8px)]" />
+        </div>
+      </div>
+      <span
+        className="text-right tabular-nums"
+        style={{ color, textShadow: `0 0 8px ${color}66` }}
+      >
+        {shown}%
+      </span>
+    </div>
+  );
+};
 
 export const SkillInventory: React.FC<SkillInventoryProps> = ({ onAddScore }) => {
   const [activeCategory, setActiveCategory] = useState<string>('all');
@@ -44,7 +130,7 @@ export const SkillInventory: React.FC<SkillInventoryProps> = ({ onAddScore }) =>
     <section id="skills" className="py-24 px-4 sm:px-8 max-w-6xl mx-auto scroll-mt-16 bg-[#090714]/70 border-y-2 border-[#00e5ff]/30">
       {/* Level Header */}
       <div className="flex items-center gap-4 mb-10 flex-wrap">
-        <span className="font-pixel text-xs px-3 py-2 bg-[#0a0817] border-2 border-[#00e5ff] text-[#00e5ff] shadow-[4px_4px_0_#000]">
+        <span className="font-pixel text-xs px-3 py-2 bg-[#0a0817] border-2 border-[#00e5ff] text-[#00e5ff]">
           LEVEL 2
         </span>
         <h2 className="font-pixel text-xl sm:text-2xl text-white tracking-wide">
@@ -61,30 +147,7 @@ export const SkillInventory: React.FC<SkillInventoryProps> = ({ onAddScore }) =>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
           {CORE_SKILL_TREE.map((skill, i) => (
-            <div
-              key={i}
-              className="grid grid-cols-[140px_1fr_45px] sm:grid-cols-[180px_1fr_50px] items-center gap-3 font-pixel text-[8px] sm:text-[9px]"
-            >
-              <span className="text-slate-300 truncate" title={skill.name}>
-                {skill.name}
-              </span>
-              <div className="h-4 bg-[#0a0817] border-2 border-[#241c42] relative overflow-hidden">
-                <div
-                  className="h-full transition-all duration-1000 relative"
-                  style={{
-                    width: `${skill.level}%`,
-                    backgroundColor: skill.color,
-                    boxShadow: `0 0 10px ${skill.color}`,
-                  }}
-                >
-                  {/* Subtle diagonal scanlines over progress bar */}
-                  <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(0,0,0,0.25)_0_4px,transparent_4px_8px)]" />
-                </div>
-              </div>
-              <span className="text-[#7d7aa3] text-right font-mono tabular-nums">
-                {skill.level}%
-              </span>
-            </div>
+            <SkillBar key={i} name={skill.name} level={skill.level} color={skill.color} />
           ))}
         </div>
       </div>

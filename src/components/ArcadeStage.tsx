@@ -2,12 +2,40 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PORTFOLIO_CONFIG, MYSTERY_BLOCKS_DATA, IDLE_QUIPS } from '../data/portfolioData';
 import { sound } from '../utils/soundEngine';
 import { ArcadeParticleSystem } from '../utils/particleSystem';
+import {
+  STAGE_BACKGROUNDS,
+  SLIDESHOW_INTERVAL_MS,
+  SLIDESHOW_FADE_MS,
+  stepBackgroundIndex,
+} from '../data/backgrounds';
+import {
+  clampToStage,
+  findOverlappingBlock,
+  isInVerticalBand,
+  applyFriction,
+  jumpApexHeight,
+  rampVelocity,
+  resolveBlockCollision,
+} from '../utils/physics';
+import { isJumpKey, isLeftKey, isRightKey, moveDirection, shouldTriggerJump } from '../utils/input';
+import {
+  ALL_BLOCKS_BONUS,
+  BLOCK_COIN,
+  BLOCK_SCORE,
+  BUMP_HINT_RANGE,
+  HEAD_BUMP_BOUNCE,
+  collectBlock,
+  findHeadBumpedBlock,
+  nearestBumpTarget,
+} from '../utils/blocks';
+import { crossfadeMs, shouldAutoAdvance, usePrefersReducedMotion } from '../utils/motion';
+import { spriteCanvasSize, spritePlacement } from '../data/sprite';
+import { shadowForHeight } from '../utils/shadow';
 
 interface ArcadeStageProps {
   onAddScore: (amount: number) => void;
   onAddCoin: (amount: number) => void;
   spriteUrl: string;
-  backgroundUrl: string;
   useProceduralBackground?: boolean;
 }
 
@@ -22,7 +50,6 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   onAddScore,
   onAddCoin,
   spriteUrl,
-  backgroundUrl,
   useProceduralBackground,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,6 +85,79 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   const fallingCoinsRef = useRef<FallingCoin[]>([]);
   const [partyMode, setPartyMode] = useState(false);
 
+  // --- Off-screen pause -------------------------------------------------
+  // The stage is a full-height section pinned to the top of the page, so once
+  // a visitor scrolls into the chapters below we stop the physics loop, the
+  // particle canvas, the slideshow and the coin spawner instead of animating
+  // something nobody can see. Also pauses while the browser tab is hidden.
+  const stageOnScreenRef = useRef(true);
+  const stageVisibleRef = useRef(true);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const sync = () => {
+      stageVisibleRef.current = stageOnScreenRef.current && document.visibilityState !== 'hidden';
+    };
+
+    let observer: IntersectionObserver | undefined;
+    if (typeof IntersectionObserver !== 'undefined') {
+      observer = new IntersectionObserver(
+        ([entry]) => {
+          stageOnScreenRef.current = entry.isIntersecting;
+          sync();
+        },
+        { threshold: 0.05 },
+      );
+      observer.observe(el);
+    }
+
+    document.addEventListener('visibilitychange', sync);
+    return () => {
+      observer?.disconnect();
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }, []);
+
+  // Hero background slideshow (auto-discovers images in assets/images/backgrounds)
+  const hasMultipleBackgrounds = STAGE_BACKGROUNDS.length > 1;
+  const [bgIndex, setBgIndex] = useState(0);
+  // Bumped on manual navigation so the auto-advance timer restarts
+  const [slideEpoch, setSlideEpoch] = useState(0);
+
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  // Advance to the next background on an interval. Skipped entirely when the
+  // visitor asked for reduced motion — the chevrons still step manually.
+  useEffect(() => {
+    if (!shouldAutoAdvance(prefersReducedMotion, STAGE_BACKGROUNDS.length)) return;
+    const id = window.setInterval(() => {
+      if (!stageVisibleRef.current) return;
+      setBgIndex((i) => stepBackgroundIndex(i, 1, STAGE_BACKGROUNDS.length));
+    }, SLIDESHOW_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [prefersReducedMotion, slideEpoch]);
+
+  // Manual step through the backgrounds (wraps around) and restart the timer
+  const stepBackground = useCallback(
+    (dir: 1 | -1) => {
+      setBgIndex((i) => stepBackgroundIndex(i, dir, STAGE_BACKGROUNDS.length));
+      setSlideEpoch((e) => e + 1);
+    },
+    [],
+  );
+
+  // Preload the upcoming image so crossfades never flash an empty frame
+  useEffect(() => {
+    if (!hasMultipleBackgrounds) return;
+    const nextUrl = STAGE_BACKGROUNDS[
+      stepBackgroundIndex(bgIndex, 1, STAGE_BACKGROUNDS.length)
+    ];
+    const img = new Image();
+    img.src = nextUrl;
+  }, [bgIndex, hasMultipleBackgrounds]);
+
   // Keys state
   const keysRef = useRef<{ left: boolean; right: boolean; jump: boolean }>({
     left: false,
@@ -79,8 +179,45 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   const ACCEL = 1800; // px/sec²
   const FRICTION = 2200; // px/sec²
   const SKID_DECEL = 3400; // px/sec²
-  const JUMP_V = 780; // px/sec
+  const JUMP_V = 1100; // px/sec (raised so the player can reach the overhead blocks)
   const GRAVITY = 1950; // px/sec²
+  
+  // --- Turn / sprint kinematics ---
+  const TURN_SPEED = 10;       // how quickly the sprite springs toward its target turn
+  const TURN_DAMP = 0.96;      // per-frame damping on turn angle (reduces jitter)
+  const STRIDE_HZ = 4.5;       // stride cycles per second at full speed
+  // Maximum body lean, in degrees, when moving at full speed
+  const MAX_TILT_DEG = 8;
+
+  // --- Solid mystery blocks (hard collision) ---
+  // Block positions are NOT computed here: the row is laid out by CSS, so its
+  // centres are measured from the DOM (see measureBlocks below). Sizes below are
+  // only needed for the vertical band and as a pre-measurement fallback.
+  const BLOCK_SIZE = 56;        // rendered block size (w-14 = 56px)
+  const BLOCK_Y = 275;          // px above ground the blocks sit
+  // A block's collision box is the measured block plus this grace, so it is
+  // forgiving to hit without reaching far past its visible edges.
+  const BLOCK_BUMP_GRACE = 4;
+
+  // --- Character actor box ---
+  const ACTOR_W = 72; // collision-box width (px)
+
+  // The sprite canvas is mostly transparent margin, so it is sized by its
+  // *visible* character rather than by the canvas — otherwise the character
+  // renders far smaller than intended. Metrics and maths live in data/sprite.ts;
+  // 172px matches the height the original portrait sprite rendered at.
+  const SPRITE_VISIBLE_H = 172;
+  const SPRITE_SIZE = spriteCanvasSize(SPRITE_VISIBLE_H);
+  const SPRITE_PLACEMENT = spritePlacement(ACTOR_W, SPRITE_VISIBLE_H);
+
+  // The ground shadow tracks the character's visible width, not the collision box.
+  const SHADOW_W = Math.round(SPRITE_PLACEMENT.visibleWidth) - 12;
+  const SHADOW_LEFT = (ACTOR_W - SHADOW_W) / 2;
+
+  // Hold-to-jump: holding the jump key bounces continuously while grounded.
+  const HOLD_TO_JUMP = true;
+
+  const blocksRowRef = useRef<HTMLDivElement>(null);
 
   const stateRef = useRef({
     x: 200,
@@ -92,14 +229,49 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     distSincePuff: 0,
     distSinceSkid: 0,
     runCycle: 0,
+    turnAngle: 0,       // current smoothed lean angle, in degrees
+    turnDamping: 0,     // damped turn velocity (prevents jitter/overshoot)
+    blockCentres: [] as number[], // measured centres, in stage px
+    blockHalfWidth: BLOCK_SIZE / 2, // measured, until the first DOM measure
     tilt: 0,
     landingTimer: 0,
     landingIntensity: 1,
     stageWidth: 1000,
-    actorWidth: 72,
-    actorHeight: 175,
+    actorWidth: ACTOR_W,
+    // Visible character height, which is what head-bump detection should use.
+    actorHeight: SPRITE_VISIBLE_H,
     blocksLift: 275, // height of blocks above ground (positioned above speech bubble)
   });
+
+  // --- Block geometry ------------------------------------------------------
+  // The blocks are a CSS flex row whose size and gap change at the `sm`
+  // breakpoint, so their real centres are measured from the DOM rather than
+  // recomputed from a duplicated spacing constant. Those two had drifted apart:
+  // the collision centres were 6/4/14/24px off the drawn blocks, which left the
+  // right-hand edge of each block dead to head bumps and shoved the player out
+  // at the wrong x on side collisions.
+  const measureBlocks = useCallback(() => {
+    const stage = containerRef.current;
+    const row = blocksRowRef.current;
+    if (!stage || !row) return;
+
+    const stageLeft = stage.getBoundingClientRect().left;
+    const centres: number[] = [];
+    let halfWidth = 0;
+
+    Array.from(row.children).forEach((child) => {
+      const rect = child.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      centres.push(rect.left - stageLeft + rect.width / 2);
+      halfWidth = Math.max(halfWidth, rect.width / 2);
+    });
+
+    // Only trust a complete measurement; otherwise keep whatever we had.
+    if (centres.length === MYSTERY_BLOCKS_DATA.length) {
+      stateRef.current.blockCentres = centres;
+      stateRef.current.blockHalfWidth = halfWidth;
+    }
+  }, []);
 
   // Say something in speech bubble
   const say = useCallback((text: string, durationMs: number = 2400) => {
@@ -124,28 +296,39 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     }, durationMs + text.length * 28);
   }, []);
 
-  // Initialize and handle Canvas Particle System sizing
+  // Initialize and handle Canvas Particle System sizing. Doubles as the hook for
+  // re-measuring block geometry whenever the stage or the block row resizes.
   useEffect(() => {
     if (canvasRef.current) {
       particleSys.current.attachCanvas(canvasRef.current);
     }
+
     const handleResize = () => {
       particleSys.current.resize();
+      measureBlocks();
     };
     window.addEventListener('resize', handleResize);
 
     const ro = new ResizeObserver(() => {
       particleSys.current.resize();
+      measureBlocks();
     });
     if (containerRef.current) {
       ro.observe(containerRef.current);
     }
+    // The row's own size changes across the sm breakpoint (block and gap width).
+    if (blocksRowRef.current) {
+      ro.observe(blocksRowRef.current);
+    }
+
+    // Measure once the DOM exists so the first frame already has real centres.
+    measureBlocks();
 
     return () => {
       window.removeEventListener('resize', handleResize);
       ro.disconnect();
     };
-  }, []);
+  }, [measureBlocks]);
 
   // Open mystery block
   const openBlock = useCallback((key: string, blockCenterX: number) => {
@@ -155,20 +338,20 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     setBumpedBlockKey(key);
     setTimeout(() => setBumpedBlockKey(null), 300);
 
-    if (collectedItemsRef.current[key]) {
+    const result = collectBlock(collectedItemsRef.current, key, MYSTERY_BLOCKS_DATA.length);
+    if (!result.isNew) {
       sound.playBump();
       say(`ALREADY COLLECTED: ${itemDef.title}!`, 1500);
       return;
     }
 
-    const updated = { ...collectedItemsRef.current, [key]: true };
-    collectedItemsRef.current = updated;
-    setCollectedItems(updated);
+    collectedItemsRef.current = result.collected;
+    setCollectedItems(result.collected);
 
     sound.playPower();
     sound.playCoin();
-    onAddScore(50);
-    onAddCoin(1);
+    onAddScore(BLOCK_SCORE);
+    onAddCoin(BLOCK_COIN);
 
     // Burst golden sparkles and stars at block location
     const stageH = containerRef.current?.clientHeight || 800;
@@ -180,10 +363,9 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
     say(itemDef.getLine(), 2800);
 
-    const count = Object.keys(updated).length;
-    if (count === MYSTERY_BLOCKS_DATA.length) {
+    if (result.allCollected) {
       setTimeout(() => {
-        onAddScore(500);
+        onAddScore(ALL_BLOCKS_BONUS);
         sound.playTrophy();
         say('ALL 4 POWER ITEMS FOUND! +500 PTS!', 3500);
         // Coin rain
@@ -269,15 +451,24 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       // Don't capture when typing in inputs
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
 
-      if (['ArrowLeft', 'KeyA'].includes(e.code)) {
+      if (isLeftKey(e.code)) {
         keysRef.current.left = true;
       }
-      if (['ArrowRight', 'KeyD'].includes(e.code)) {
+      if (isRightKey(e.code)) {
         keysRef.current.right = true;
       }
-      if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) {
+      if (isJumpKey(e.code)) {
         e.preventDefault();
-        doJump();
+        // See shouldTriggerJump(): in hold-to-jump mode every event passes and
+        // doJump()'s grounded check prevents mid-air double jumps. Otherwise OS
+        // key-repeat is ignored so holding the key can't re-trigger a bounce.
+        const allow = shouldTriggerJump({
+          repeat: e.repeat,
+          heldJump: keysRef.current.jump,
+          holdToJump: HOLD_TO_JUMP,
+        });
+        keysRef.current.jump = true;
+        if (allow) doJump();
       }
 
       // Konami buffer
@@ -290,31 +481,47 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
-      if (['ArrowLeft', 'KeyA'].includes(e.code)) {
+      if (isLeftKey(e.code)) {
         keysRef.current.left = false;
       }
-      if (['ArrowRight', 'KeyD'].includes(e.code)) {
+      if (isRightKey(e.code)) {
         keysRef.current.right = false;
       }
-      // Variable jump height: release cuts vertical speed
-      if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) {
+      if (isJumpKey(e.code)) {
+        // Clear the held flag so the next press can jump again.
+        keysRef.current.jump = false;
+        // Variable jump height: release cuts vertical speed
         if (!stateRef.current.grounded && stateRef.current.vy > 250) {
           stateRef.current.vy = 250;
         }
       }
     };
 
+    // If the window loses focus while keys are held, keyup never fires and the
+    // character would keep running/jumping. Clear all held keys on blur.
+    const onBlur = () => {
+      keysRef.current.left = false;
+      keysRef.current.right = false;
+      keysRef.current.jump = false;
+    };
+
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
     };
   }, [doJump, triggerKonami]);
+
+  // Which block (if any) the player is standing under, for the bump hint.
+  const [hintedBlock, setHintedBlock] = useState<number | null>(null);
 
   // Periodic falling coins generator
   useEffect(() => {
     const coinInterval = setInterval(() => {
+      if (!stageVisibleRef.current) return;
       if (fallingCoinsRef.current.length < 5 && Math.random() < 0.7) {
         const newCoin: FallingCoin = {
           id: Math.random() + Date.now(),
@@ -333,6 +540,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   // Periodic quip generator
   useEffect(() => {
     const quipInterval = setInterval(() => {
+      if (!stageVisibleRef.current) return;
       if (Math.random() < 0.5) {
         const q = IDLE_QUIPS[Math.floor(Math.random() * IDLE_QUIPS.length)];
         say(q, 2600);
@@ -347,6 +555,15 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     let animId: number;
 
     const loop = (time: number) => {
+      // Idle while the stage is scrolled away or the tab is hidden: keep the
+      // frame alive but skip all physics, collision and canvas work so the
+      // character resumes exactly where it left off.
+      if (!stageVisibleRef.current) {
+        stateRef.current.lastT = time;
+        animId = requestAnimationFrame(loop);
+        return;
+      }
+
       const dt = Math.min((time - stateRef.current.lastT) / 1000, 0.05);
       stateRef.current.lastT = time;
 
@@ -354,80 +571,108 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         stateRef.current.stageWidth = containerRef.current.clientWidth;
       }
 
-      // Horizontal movement physics with acceleration, friction, and skidding
-      const moveDir = (keysRef.current.right ? 1 : 0) - (keysRef.current.left ? 1 : 0);
-      let vx = stateRef.current.vx;
-      const targetVx = moveDir * MAX_SPEED;
+      // --- Turn / lean kinematics ---
+      // Horizontal input direction: -1 = left, 0 = idle, +1 = right.
+      const moveDir = moveDirection(keysRef.current.left, keysRef.current.right);
 
-      if (moveDir !== 0) {
-        if (facingDirRef.current !== moveDir) {
-          facingDirRef.current = moveDir as 1 | -1;
-          setFacingDir(moveDir as 1 | -1);
-        }
-
-        // Check for skidding (changing direction while moving fast)
-        const isSkidding = (vx > 50 && moveDir < 0) || (vx < -50 && moveDir > 0);
-        if (isSkidding) {
-          const skidStep = SKID_DECEL * dt;
-          if (vx > 0) {
-            vx = Math.max(0, vx - skidStep);
-          } else {
-            vx = Math.min(0, vx + skidStep);
-          }
-
-          stateRef.current.distSinceSkid += dt;
-          if (stateRef.current.grounded && stateRef.current.distSinceSkid > 0.08 && Math.abs(vx) > 70) {
-            stateRef.current.distSinceSkid = 0;
-            const stageH = containerRef.current?.clientHeight || 800;
-            const feetCanvasX = stateRef.current.x + stateRef.current.actorWidth / 2;
-            const groundCanvasY = stageH - GROUND_H;
-            particleSys.current.triggerSkidDust(feetCanvasX, groundCanvasY, Math.sign(vx));
-          }
-        } else {
-          const accelStep = ACCEL * dt;
-          if (vx < targetVx) {
-            vx = Math.min(targetVx, vx + accelStep);
-          } else if (vx > targetVx) {
-            vx = Math.max(targetVx, vx - accelStep);
-          }
-        }
-      } else {
-        // Friction deceleration to smooth stop
-        const frictStep = FRICTION * dt;
-        if (vx > 0) {
-          vx = Math.max(0, vx - frictStep);
-        } else if (vx < 0) {
-          vx = Math.min(0, vx + frictStep);
-        }
-        if (Math.abs(vx) < 5) vx = 0;
+      // Face the direction of travel (classic platformer flip). This is
+      // instant, but the lean below smooths the *feel* of changing direction.
+      if (moveDir !== 0 && facingDirRef.current !== moveDir) {
+        facingDirRef.current = moveDir as 1 | -1;
+        setFacingDir(moveDir as 1 | -1);
       }
 
-      stateRef.current.vx = vx;
-      setIsWalking(Math.abs(vx) > 20);
+      // Lean angle (degrees) springs toward the movement direction, so the
+      // body rolls into a turn rather than snapping flat.
+      const targetTurn = moveDir * MAX_TILT_DEG;
+      stateRef.current.turnDamping *= TURN_DAMP;
+      stateRef.current.turnAngle +=
+        (targetTurn - stateRef.current.turnAngle) * Math.min(1, dt * TURN_SPEED);
 
-      // Position update
+      // Smooth speed ramp: accelerate toward the target velocity at ACCEL,
+      // and decelerate with friction when there's no input.
+      const targetVx = moveDir * MAX_SPEED;
+      stateRef.current.vx =
+        moveDir !== 0
+          ? rampVelocity(stateRef.current.vx, targetVx, ACCEL, dt)
+          : applyFriction(stateRef.current.vx, FRICTION, dt);
+
+      // --- Solid block collision (hard objects) ---
+      // The mystery blocks are hard physical objects. They occupy a horizontal
+      // band (around each block center) and a vertical band at BLOCK_Y above
+      // the ground. The player is only blocked when their body actually
+      // overlaps a block's vertical band (e.g. while jumping up to it);
+      // walking underneath them is unobstructed.
+      const stageW = stateRef.current.stageWidth;
+      const actorL = stateRef.current.x;
+      const actorR = stateRef.current.x + stateRef.current.actorWidth;
+      const actorBottom = GROUND_H + stateRef.current.y;
+      const actorTop = actorBottom + stateRef.current.actorHeight;
+      const blocks = stateRef.current.blockCentres;
+      // Collision box = the measured block plus a little grace.
+      const blockRadius = stateRef.current.blockHalfWidth + BLOCK_BUMP_GRACE;
+
+      // Vertical band occupied by the overhead blocks
+      const blockBandBottom = GROUND_H + BLOCK_Y;
+      const blockBandTop = blockBandBottom + BLOCK_SIZE;
+      const inBlockBand = isInVerticalBand(actorBottom, actorTop, blockBandBottom, blockBandTop);
+
+      // Distance from actor center to the nearest solid block (either side)
+      const nextHint = nearestBumpTarget(
+        stateRef.current.x + stateRef.current.actorWidth / 2,
+        blocks,
+        BUMP_HINT_RANGE,
+      );
+      if (nextHint !== hintedBlock) {
+        setHintedBlock(nextHint);
+      }
+
+      // Only block horizontal movement when the player is actually moving
+      // sideways into a block. Jumping straight up (vx ~ 0) should bump the
+      // block from below instead of being shoved out sideways.
+      if (inBlockBand && Math.abs(stateRef.current.vx) > 1) {
+        const hitIndex = findOverlappingBlock(actorL, actorR, blocks, blockRadius);
+
+        if (hitIndex !== -1) {
+          stateRef.current.x = clampToStage(
+            resolveBlockCollision(
+              stateRef.current.x,
+              stateRef.current.actorWidth,
+              blocks[hitIndex],
+              blockRadius,
+              stateRef.current.vx > 0
+            ),
+            stageW,
+            stateRef.current.actorWidth
+          );
+          setPosX(stateRef.current.x);
+          stateRef.current.vx = 0;
+        }
+      }
+
+      // Position update (use the local vx for physics)
       const nextX = Math.max(
         12,
         Math.min(
           stateRef.current.stageWidth - stateRef.current.actorWidth - 12,
-          stateRef.current.x + vx * dt
+          stateRef.current.x + stateRef.current.vx * dt
         )
       );
-      if ((nextX <= 12 && vx < 0) || (nextX >= stateRef.current.stageWidth - stateRef.current.actorWidth - 12 && vx > 0)) {
+      if ((nextX <= 12 && stateRef.current.vx < 0) || (nextX >= stateRef.current.stageWidth - stateRef.current.actorWidth - 12 && stateRef.current.vx > 0)) {
         stateRef.current.vx = 0;
       }
       stateRef.current.x = nextX;
       setPosX(nextX);
 
       // Footstep dust puffs while running
-      if (Math.abs(vx) > 25 && stateRef.current.grounded) {
-        stateRef.current.distSincePuff += Math.abs(vx) * dt;
+      if (Math.abs(stateRef.current.vx) > 25 && stateRef.current.grounded) {
+        stateRef.current.distSincePuff += Math.abs(stateRef.current.vx) * dt;
         if (stateRef.current.distSincePuff > 65) {
           stateRef.current.distSincePuff = 0;
           const stageH = containerRef.current?.clientHeight || 800;
           const feetCanvasX = nextX + stateRef.current.actorWidth / 2;
           const groundCanvasY = stageH - GROUND_H;
-          particleSys.current.triggerFootstepDust(feetCanvasX, groundCanvasY, Math.sign(vx));
+          particleSys.current.triggerFootstepDust(feetCanvasX, groundCanvasY, Math.sign(stateRef.current.vx));
         }
       }
 
@@ -440,22 +685,17 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
         // Check head collision with mystery blocks while moving UP
         if (stateRef.current.vy > 0) {
-          const actorHead = stateRef.current.y + stateRef.current.actorHeight;
-          const blockH = stateRef.current.blocksLift;
-          if (actorHead >= blockH && actorHead <= blockH + 40) {
-            // Check horizontal collision with any block
-            const actorCenterX = stateRef.current.x + stateRef.current.actorWidth / 2;
-            const containerW = stateRef.current.stageWidth;
-            const blockSpacing = 70;
-            const blocksStartX = containerW / 2 - (MYSTERY_BLOCKS_DATA.length * blockSpacing) / 2;
+          const hit = findHeadBumpedBlock({
+            actorCenterX: stateRef.current.x + stateRef.current.actorWidth / 2,
+            actorHead: stateRef.current.y + stateRef.current.actorHeight,
+            blockCentres: stateRef.current.blockCentres,
+            blockLift: stateRef.current.blocksLift,
+            radius: stateRef.current.blockHalfWidth + BLOCK_BUMP_GRACE,
+          });
 
-            MYSTERY_BLOCKS_DATA.forEach((b, idx) => {
-              const bCenterX = blocksStartX + idx * blockSpacing + 26;
-              if (Math.abs(actorCenterX - bCenterX) < 32) {
-                openBlock(b.key, bCenterX);
-                stateRef.current.vy = -120; // Bounce downward
-              }
-            });
+          if (hit) {
+            openBlock(MYSTERY_BLOCKS_DATA[hit.index].key, hit.centerX);
+            stateRef.current.vy = HEAD_BUMP_BOUNCE; // Bounce downward
           }
         }
 
@@ -482,6 +722,14 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         setPosY(stateRef.current.y);
       }
 
+      // Hold-to-jump: while the key is held, bounce again the instant we land.
+      // Driving this from the loop instead of waiting on OS key-repeat makes
+      // repeat bounces immediate (key-repeat has a ~500ms initial delay), and
+      // doJump()'s grounded check still blocks mid-air double jumps.
+      if (HOLD_TO_JUMP && keysRef.current.jump && stateRef.current.grounded) {
+        doJump();
+      }
+
       // Compute character dynamic squash, stretch, tilt, bob, and breathing
       let squashX = 1;
       let squashY = 1;
@@ -496,17 +744,17 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           const stretch = Math.min(0.20, (vy / JUMP_V) * 0.20);
           squashY = 1 + stretch;
           squashX = 1 - stretch * 0.6;
-          tilt = (stateRef.current.vx / MAX_SPEED) * 5;
+          tilt = stateRef.current.turnAngle * 1.15;
         } else if (vy < -60) {
           const fallStretch = Math.min(0.14, (Math.abs(vy) / JUMP_V) * 0.14);
           squashY = 1 + fallStretch;
           squashX = 1 - fallStretch * 0.5;
-          tilt = (stateRef.current.vx / MAX_SPEED) * 3;
+          tilt = stateRef.current.turnAngle;
         } else {
           // Apex float
           squashY = 1;
           squashX = 1;
-          tilt = (stateRef.current.vx / MAX_SPEED) * 3;
+          tilt = stateRef.current.turnAngle * 0.6;
         }
       } else if (stateRef.current.landingTimer > 0) {
         // Landing compression & spring rebound
@@ -535,14 +783,21 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           bobY = 0;
         }
       } else if (Math.abs(stateRef.current.vx) > 15) {
-        // Running stride cadence & forward lean
-        stateRef.current.runCycle += Math.abs(stateRef.current.vx) * dt * 0.036;
-        bobY = -Math.abs(Math.sin(stateRef.current.runCycle * Math.PI)) * 3.8;
-        squashX = 1 + Math.sin(stateRef.current.runCycle * Math.PI * 2) * 0.035;
-        squashY = 1 - Math.sin(stateRef.current.runCycle * Math.PI * 2) * 0.025;
+        // Running stride cadence & forward lean.
+        // Advance the stride at a natural cadence (~4.5 cycles/sec at full
+        // speed) scaled by actual speed. Running the cycle too fast makes the
+        // sprite visibly vibrate instead of walking.
+        const speedRatio = Math.abs(stateRef.current.vx) / MAX_SPEED;
+        stateRef.current.runCycle += dt * STRIDE_HZ * speedRatio * Math.PI * 2;
 
-        const targetTilt = (stateRef.current.vx / MAX_SPEED) * 5.2;
-        stateRef.current.tilt += (targetTilt - stateRef.current.tilt) * Math.min(1, dt * 14);
+        // Gentle vertical bob and subtle squash (kept low to avoid jitter)
+        bobY = -Math.abs(Math.sin(stateRef.current.runCycle)) * 2.2;
+        squashX = 1 + Math.sin(stateRef.current.runCycle * 2) * 0.018;
+        squashY = 1 - Math.sin(stateRef.current.runCycle * 2) * 0.013;
+
+        // Smooth turn lean toward movement direction
+        const targetTilt = stateRef.current.turnAngle;
+        stateRef.current.tilt += (targetTilt - stateRef.current.tilt) * Math.min(1, dt * 10);
         tilt = stateRef.current.tilt;
       } else {
         // Idle breathing on ground
@@ -620,9 +875,9 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
     animId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animId);
-  }, [openBlock, onAddScore, onAddCoin]);
+  }, [openBlock, onAddScore, onAddCoin, doJump]);
 
-  // Initial sizing
+  // Initial sizing + block position setup
   useEffect(() => {
     if (containerRef.current) {
       const w = containerRef.current.clientWidth;
@@ -632,21 +887,83 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     }
   }, []);
 
+  // --- Ground shadows ---
+  // The character's shadow and the floating blocks' contact shadows share one
+  // curve (utils/shadow.ts), so they read as sitting at the same depth.
+  const shadowApex = jumpApexHeight(JUMP_V, GRAVITY);
+  const actorShadow = shadowForHeight(posY, shadowApex, isLanding);
+  const blockShadow = shadowForHeight(BLOCK_Y, shadowApex);
+
   const totalCollected = Object.keys(collectedItems).length;
 
   return (
     <section
       ref={containerRef}
       id="stage"
-      className={`relative w-full h-[100svh] min-h-[640px] overflow-hidden select-none touch-manipulation ${
+      className={`relative w-full h-[100svh] min-h-[640px] overflow-hidden select-none touch-manipulation bg-[#070512] ${
         partyMode ? 'party-mode' : ''
       }`}
-      style={{
-        background: useProceduralBackground
-          ? 'linear-gradient(#03020a 0 38%, #0a0620 38% 54%, #130a2e 54% 68%, #1c1040 68% 82%, #331860 82% 100%)'
-          : `radial-gradient(ellipse at center, rgba(7,5,18,0.4) 0%, rgba(7,5,18,0.95) 100%), url('${backgroundUrl}') center/cover no-repeat`,
-      }}
     >
+      {/* Hero Background Slideshow */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+        {useProceduralBackground ? (
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(#03020a 0 38%, #0a0620 38% 54%, #130a2e 54% 68%, #1c1040 68% 82%, #331860 82% 100%)',
+            }}
+          />
+        ) : (
+          STAGE_BACKGROUNDS.map((url, i) => (
+            <div
+              key={url + i}
+              className="absolute inset-0 bg-cover bg-center"
+              style={{
+                backgroundImage: `url('${url}')`,
+                opacity: i === bgIndex ? 1 : 0,
+                transition: `opacity ${crossfadeMs(prefersReducedMotion, SLIDESHOW_FADE_MS)}ms ease-in-out`,
+              }}
+            />
+          ))
+        )}
+
+        {/* Readability overlay so HUD text stays legible over any image */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(ellipse at center, rgba(7,5,18,0.35) 0%, rgba(7,5,18,0.9) 100%)',
+          }}
+        />
+      </div>
+
+      {/* Manual slideshow navigation */}
+      {hasMultipleBackgrounds && (
+        <>
+          <button
+            type="button"
+            aria-label="Previous background"
+            onClick={() => stepBackground(-1)}
+            className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-sm border-2 border-[#00e5ff] bg-[#070512]/60 text-[#00e5ff] backdrop-blur-[2px] transition-all hover:bg-[#00e5ff]/20 hover:shadow-[0_0_16px_rgba(0,229,255,0.8)] active:scale-95"
+          >
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            aria-label="Next background"
+            onClick={() => stepBackground(1)}
+            className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-sm border-2 border-[#00e5ff] bg-[#070512]/60 text-[#00e5ff] backdrop-blur-[2px] transition-all hover:bg-[#00e5ff]/20 hover:shadow-[0_0_16px_rgba(0,229,255,0.8)] active:scale-95"
+          >
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </>
+      )}
+
       {/* Stars Background */}
       <div className="absolute inset-0 pointer-events-none opacity-60">
         {[...Array(36)].map((_, i) => (
@@ -685,8 +1002,6 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       <div className="absolute left-0 right-0 bottom-0 h-[92px] pointer-events-none flex flex-col z-10">
         <div className="h-1 bg-[#00e5ff] shadow-[0_0_12px_rgba(0,229,255,0.8),0_0_24px_rgba(0,229,255,0.4)]" />
         <div className="flex-1 bg-[#0d0a1a] relative overflow-hidden">
-          {/* Road dashes */}
-          <div className="absolute top-6 left-0 right-0 h-1.5 bg-[repeating-linear-gradient(90deg,#ffd23f_0_30px,transparent_30px_70px)] opacity-50" />
           {/* Wet asphalt puddle reflections */}
           <div className="absolute bottom-2 left-[15%] w-24 h-8 bg-[#00e5ff]/20 blur-[2px] rounded-full" />
           <div className="absolute bottom-2 right-[25%] w-32 h-8 bg-[#ff2d78]/25 blur-[2px] rounded-full" />
@@ -703,7 +1018,9 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         <p className="text-[9px] sm:text-xs text-[#00e5ff] mt-2">
           {PORTFOLIO_CONFIG.role} · {PORTFOLIO_CONFIG.company}
         </p>
-        <p className="text-[8px] text-[#7d7aa3] mt-3 animate-pulse">
+        {/* Easy to miss that the page keeps going below the arcade, so this hint
+            gets the full attract-mode treatment: neon glow + hard blink. */}
+        <p className="neon-blink mt-4 inline-block border-2 border-[#ffd23f] bg-[#0a0620]/90 px-3 py-2 font-pixel text-[10px] sm:text-xs leading-relaxed text-[#ffd23f] shadow-[0_0_18px_rgba(255,210,63,0.55)]">
           ▼ SCROLL DOWN FOR CHAPTERS OR JUMP OVERHEAD ▼
         </p>
       </div>
@@ -737,12 +1054,16 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
       {/* Overhead Mystery ? Blocks */}
       <div
+        ref={blocksRowRef}
         className="absolute left-1/2 -translate-x-1/2 flex gap-4 sm:gap-6 z-30"
         style={{ bottom: `${GROUND_H + stateRef.current.blocksLift}px` }}
       >
-        {MYSTERY_BLOCKS_DATA.map((block) => {
+        {MYSTERY_BLOCKS_DATA.map((block, idx) => {
           const isUsed = collectedItems[block.key];
           const isBumped = bumpedBlockKey === block.key;
+          // Attract hint: glow while the player stands under this block, so the
+          // "jump to bump" affordance is discoverable without a tutorial.
+          const isHinted = hintedBlock === idx && !isUsed;
           return (
             <button
               key={block.key}
@@ -759,11 +1080,20 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                 isUsed
                   ? 'bg-[#0c0a18] border-[#241c42] text-[#7d7aa3]'
                   : 'bg-[#0a0817] border-[#00e5ff] text-[#ff2d78] shadow-[0_0_12px_rgba(0,229,255,0.4),inset_0_0_10px_rgba(0,229,255,0.2)] hover:bg-[#0d1b2e]'
-              }`}
-              style={{
-                borderColor: isUsed ? '#241c42' : block.color,
-                color: isUsed ? '#7d7aa3' : block.color,
-              }}
+              } ${isHinted ? 'animate-pulse' : ''}`}
+              style={
+                isHinted
+                  ? {
+                      borderColor: '#ffd23f',
+                      color: '#ffd23f',
+                      boxShadow:
+                        '0 0 18px rgba(255,210,63,0.75), inset 0 0 12px rgba(255,210,63,0.3)',
+                    }
+                  : {
+                      borderColor: isUsed ? '#241c42' : block.color,
+                      color: isUsed ? '#7d7aa3' : block.color,
+                    }
+              }
               title={`Mystery Block: ${block.title}`}
               aria-label={`Mystery Block: ${block.title}`}
             >
@@ -776,6 +1106,27 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             </button>
           );
         })}
+      </div>
+
+      {/* Contact shadows for the floating blocks. They sit on the ground far
+          below, which is what sells the blocks as elevated. Rendered as a
+          separate row so the bump animation can't drag them upward with it. */}
+      <div
+        aria-hidden="true"
+        className="absolute left-1/2 -translate-x-1/2 flex gap-4 sm:gap-6 z-10 pointer-events-none"
+        style={{ bottom: `${GROUND_H - 6}px`, opacity: blockShadow.opacity.toFixed(3) }}
+      >
+        {MYSTERY_BLOCKS_DATA.map((block) => (
+          <div key={block.key} className="w-12 sm:w-14 h-2 flex justify-center">
+            <span
+              className="w-[60%] h-full"
+              style={{
+                background:
+                  'radial-gradient(ellipse at center, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0) 72%)',
+              }}
+            />
+          </div>
+        ))}
       </div>
 
       {/* Falling Coins */}
@@ -831,15 +1182,18 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         </div>
       )}
 
-      {/* Actor Shadow on Ground */}
+      {/* Actor Shadow on Ground — feathered so it reads as light falloff instead
+          of a flat black pill, which barely showed against the asphalt. */}
       <div
-        className="absolute z-10 h-3 bg-black/60 rounded-[50%] pointer-events-none transition-transform duration-75"
+        className="absolute z-10 h-3 rounded-[50%] pointer-events-none transition-transform duration-75 ease-out"
         style={{
-          left: `${posX + 6}px`,
+          left: `${posX + SHADOW_LEFT}px`,
           bottom: `${GROUND_H - 6}px`,
-          width: `${stateRef.current.actorWidth - 12}px`,
-          transform: `scale(${Math.max(0.2, 1 - posY / 220) * (isLanding ? 1.25 : 1)}, ${Math.max(0.2, 1 - posY / 220)})`,
-          opacity: Math.max(0.2, 0.8 - posY / 300),
+          width: `${SHADOW_W}px`,
+          background:
+            'radial-gradient(ellipse at center, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0) 72%)',
+          transform: `scale(${actorShadow.scaleX.toFixed(3)}, ${actorShadow.scaleY.toFixed(3)})`,
+          opacity: actorShadow.opacity.toFixed(3),
         }}
       />
 
@@ -855,26 +1209,71 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           left: `${posX}px`,
           bottom: `${GROUND_H + posY}px`,
           width: `${stateRef.current.actorWidth}px`,
+          // The box is the visible character: it's the click target and the
+          // squash/stretch origin sits at his feet. The sprite frame overflows it.
+          height: `${SPRITE_VISIBLE_H}px`,
           transform: `scaleX(${facingDir})`,
           transformOrigin: 'bottom center',
         }}
       >
         <div
           ref={spriteRef}
-          className="relative origin-bottom"
+          className="relative w-full h-full origin-bottom"
           style={{ transformOrigin: 'bottom center' }}
         >
           <img
             src={spriteUrl}
             alt="Pixel character of Arshad Mohemed"
-            className="w-full h-auto max-h-[175px] object-contain pixel-art drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]"
+            className="absolute max-w-none object-contain pixel-art drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]"
+            style={{
+              left: `${SPRITE_PLACEMENT.left}px`,
+              bottom: `${SPRITE_PLACEMENT.bottom}px`,
+              width: `${SPRITE_SIZE.width}px`,
+              height: `${SPRITE_SIZE.height}px`,
+            }}
           />
         </div>
       </div>
 
-      {/* Controls Hint & Mobile Touch D-Pad */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 font-pixel text-[8px] text-[#00e5ff] bg-[#04030c]/85 border border-[#00e5ff]/40 px-3 py-1.5 text-center hidden md:block shadow-[0_0_10px_rgba(0,229,255,0.4)]">
-        &larr; &rarr; / A D MOVE · SPACE / W JUMP · BUMP BLOCKS · CLICK ME
+      {/* Controls Hint (desktop) — flat neon panels matching the reference sign:
+          solid 2px borders, opaque fills, chunky square keycaps, no glow.
+          BUMP BLOCKS only fits at lg; md shows the two bare-minimum panels. */}
+      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 hidden md:flex items-stretch gap-3 lg:gap-5 font-pixel">
+        {[
+          { keys: ['←', '→', 'A', 'D'], label: 'MOVE' },
+          { keys: ['SPACE', 'W'], label: 'JUMP' },
+          { keys: ['↑'], label: 'BUMP BLOCKS', wrap: true },
+        ].map(({ keys, label, wrap }) => (
+          <div
+            key={label}
+            className={`flex items-center gap-3 lg:gap-4 border-2 border-[#00e5ff] bg-[#04030c] px-4 py-3 lg:px-5 lg:py-4 ${
+              wrap ? 'hidden lg:flex' : ''
+            }`}
+          >
+            <span className="flex items-center gap-1.5 lg:gap-2">
+              {keys.map((k) => (
+                <kbd
+                  key={k}
+                  className="inline-flex items-center justify-center min-w-[28px] h-[26px] lg:min-w-[34px] lg:h-[30px] px-1.5 text-[10px] lg:text-[12px] leading-none text-[#ffd23f] border-2 border-[#ffd23f] bg-[#0e0b02]"
+                >
+                  {k}
+                </kbd>
+              ))}
+            </span>
+            <span
+              className={`text-[10px] lg:text-[12px] text-[#00e5ff] tracking-wider leading-tight ${
+                wrap ? 'max-w-[80px] lg:max-w-[92px]' : ''
+              }`}
+            >
+              {label}
+            </span>
+          </div>
+        ))}
+        <div className="flex items-center justify-center border-2 border-[#ff2d78] bg-[#2a0a1e] px-4 py-3 lg:px-5 lg:py-4">
+          <span className="text-[10px] lg:text-[12px] text-[#ff2d78] tracking-wider leading-tight max-w-[72px] lg:max-w-[80px] text-center">
+            CLICK ME
+          </span>
+        </div>
       </div>
 
       {/* Mobile Touch D-Pad */}
@@ -934,6 +1333,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           &gt;
         </button>
       </div>
+
     </section>
   );
 };

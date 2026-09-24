@@ -1,16 +1,25 @@
 import React from 'react';
 import { PORTFOLIO_CONFIG } from '../data/portfolioData';
+import { spriteCanvasSize } from '../data/sprite';
+import { GitHubActivity } from './GitHubActivity';
 
 interface CharacterSheetProps {
   spriteUrl: string;
+  onAddScore: (amount: number) => void;
 }
 
-export const CharacterSheet: React.FC<CharacterSheetProps> = ({ spriteUrl }) => {
+// The portrait is sized by its *visible* character, since the sprite canvas is
+// mostly transparent margin. 301px matches the height the original portrait
+// sprite rendered at in this frame. The canvas keeps the artwork's aspect ratio
+// and shrinks together on narrow screens.
+const PORTRAIT = spriteCanvasSize(301);
+
+export const CharacterSheet: React.FC<CharacterSheetProps> = ({ spriteUrl, onAddScore }) => {
   return (
     <section id="about" className="py-24 px-4 sm:px-8 max-w-6xl mx-auto scroll-mt-16">
       {/* Header */}
       <div className="flex items-center gap-4 mb-12 flex-wrap">
-        <span className="font-pixel text-xs px-3 py-2 bg-[#0a0817] border-2 border-[#00e5ff] text-[#00e5ff] shadow-[4px_4px_0_#000]">
+        <span className="font-pixel text-xs px-3 py-2 bg-[#0a0817] border-2 border-[#00e5ff] text-[#00e5ff]">
           LEVEL 13
         </span>
         <h2 className="font-pixel text-xl sm:text-2xl text-white tracking-wide">
@@ -30,10 +39,13 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({ spriteUrl }) => 
 
           {/* Portrait Frame */}
           <div className="bg-gradient-to-b from-[#160f33] to-[#241348] border-2 border-[#241c42] p-4 flex items-center justify-center min-h-[320px] overflow-hidden">
+            {/* Width only: `h-auto` keeps the artwork's aspect ratio, so the
+                portrait shrinks without distorting when the panel narrows. */}
             <img
               src={spriteUrl}
               alt="Arshad Mohemed pixel character portrait"
-              className="w-auto max-h-[310px] object-contain pixel-art drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)] animate-idle-breathe"
+              className="h-auto max-w-full object-contain pixel-art drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)] animate-idle-breathe"
+              style={{ width: `${PORTRAIT.width}px` }}
             />
           </div>
 
@@ -50,6 +62,13 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({ spriteUrl }) => 
           <div className="mt-4 pt-3 border-t border-[#241c42] font-pixel text-[8px] text-[#7d7aa3] space-y-1">
             <p>CLASS: TRAINER / AD OPS ARCHITECT</p>
             <p className="text-[#ffd23f]">XP: 13+ YEARS IN TECH</p>
+          </div>
+
+          {/* Live GitHub radar, straight under the portrait. Compact variant:
+              status strip + stat tiles + heatmap, sized for this 320px column.
+              The full terminal feed lives on the L4 GitHub cartridge dialog. */}
+          <div className="mt-5 pt-4 border-t-2 border-dashed border-[#241c42]">
+            <GitHubActivity compact onAddScore={onAddScore} />
           </div>
         </div>
 

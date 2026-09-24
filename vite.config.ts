@@ -5,6 +5,9 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // GitHub Pages serves this repo from a project sub-path. Dev mirrors it so
+    // base-path mistakes surface locally instead of only after deploying.
+    base: '/Limp3tz_Portfolio/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

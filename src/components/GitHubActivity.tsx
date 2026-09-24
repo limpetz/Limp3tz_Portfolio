@@ -48,6 +48,11 @@ interface GitHubRepo {
 
 interface GitHubActivityProps {
   onAddScore?: (amount: number) => void;
+  /**
+   * Compact layout for narrow containers (the 320px character-card column in
+   * L1): status strip + stat tiles + heatmap only. The languages/repos panels,
+   * terminal feed and footer live in the full layout (L4 dialog).
+   */
   compact?: boolean;
 }
 
@@ -227,7 +232,9 @@ export const GitHubActivity: React.FC<GitHubActivityProps> = ({ onAddScore, comp
   };
 
   const getEventDescriptor = (ev: GitHubEvent) => {
-    const repoName = ev.repo.name.replace(/^limpetz\//, '');
+    // Keep the original repo name so users can tell which repo an event came from,
+    // but strip the leading 'limpetz/' prefix for a cleaner display.
+    const repoName = ev.repo.name.replace(/^limpetz\//, '') || ev.repo.name;
     switch (ev.type) {
       case 'PushEvent': {
         const commitMsg = ev.payload?.commits?.[0]?.message || 'Pushed commit';
@@ -293,6 +300,100 @@ export const GitHubActivity: React.FC<GitHubActivityProps> = ({ onAddScore, comp
         return 'bg-[#15102a] border-[#241c42]';
     }
   };
+
+  // Compact layout for narrow containers (the 320px character-card column in
+  // L1): status strip + stat tiles + heatmap. The full layout below adds the
+  // languages/repos panels, terminal feed and footer for the L4 dialog.
+  if (compact) {
+    return (
+      <div className="text-white space-y-3">
+        {/* Status strip */}
+        <div className="flex items-center justify-between gap-2 bg-[#0a0817] border-2 border-[#241c42] p-2.5 shadow-[4px_4px_0_#000]">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3dffa2] opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#3dffa2]" />
+            </span>
+            <span className="font-pixel text-[8px] text-[#3dffa2] tracking-wider truncate">
+              GITHUB RADAR // @{username.toUpperCase()}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => fetchData(true)}
+            disabled={loading}
+            aria-label="Re-sync GitHub data"
+            className="font-pixel text-[7px] px-2 py-1 bg-[#151029] border border-[#3dffa2] text-[#3dffa2] hover:bg-[#3dffa2] hover:text-black transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+          >
+            {loading ? '...' : 'SYNC'}
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-[#ff2d78]/10 border border-[#ff2d78] p-1.5 text-[#ff2d78] font-pixel text-[7px]">
+            [!] {error}
+          </div>
+        )}
+
+        {/* Stat tiles */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-[#0a0817] border-2 border-[#241c42] p-2 shadow-[3px_3px_0_#000]">
+            <span className="font-pixel text-[7px] text-[#7d7aa3] block">REPOS</span>
+            <span className="font-pixel text-base text-[#00e5ff]">
+              {profile ? profile.public_repos : '—'}
+            </span>
+          </div>
+          <div className="bg-[#0a0817] border-2 border-[#241c42] p-2 shadow-[3px_3px_0_#000]">
+            <span className="font-pixel text-[7px] text-[#7d7aa3] block">STARS</span>
+            <span className="font-pixel text-base text-[#ffd23f]">{totalStars} ★</span>
+          </div>
+          <div className="bg-[#0a0817] border-2 border-[#241c42] p-2 shadow-[3px_3px_0_#000]">
+            <span className="font-pixel text-[7px] text-[#7d7aa3] block">EVENTS</span>
+            <span className="font-pixel text-base text-[#3dffa2]">{events.length}</span>
+          </div>
+        </div>
+
+        {/* Contribution heatmap */}
+        <div className="bg-[#0a0817] border-2 border-[#241c42] p-2.5 shadow-[4px_4px_0_#000]">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="font-pixel text-[8px] text-[#3dffa2]">RADAR · 12W</span>
+            {hoveredCell && (
+              <span className="font-pixel text-[7px] text-[#ffd23f]">
+                {hoveredCell.count} {hoveredCell.count === 1 ? 'event' : 'events'}
+              </span>
+            )}
+          </div>
+          <div className="overflow-x-auto pb-1">
+            <div className="flex gap-[3px] min-w-[240px]">
+              {heatmapWeeks.map((week, wIdx) => (
+                <div key={wIdx} className="flex flex-col gap-[3px]">
+                  {week.map((day, dIdx) => (
+                    <div
+                      key={dIdx}
+                      onMouseEnter={() => setHoveredCell({ date: day.date, count: day.count })}
+                      onMouseLeave={() => setHoveredCell(null)}
+                      className={`w-2.5 h-2.5 border transition-transform hover:scale-125 cursor-pointer ${getHeatmapColor(
+                        day.level,
+                      )}`}
+                      title={`${day.date}: ${day.count} activity event(s)`}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+          <a
+            href={`https://github.com/${username}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block mt-2 text-center font-pixel text-[7px] px-2 py-1.5 bg-[#0a0817] border border-[#3dffa2] text-[#3dffa2] hover:bg-[#3dffa2] hover:text-black transition-colors"
+          >
+            OPEN GITHUB PROFILE &gt;
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="text-white space-y-6">

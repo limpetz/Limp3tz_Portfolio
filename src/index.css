@@ -111,6 +111,48 @@
   transform-origin: bottom center;
 }
 
+/* Arcade attract-mode blink for the "scroll down" nudge. Hard on/off steps
+   rather than a soft fade, so it reads like a cabinet's INSERT COIN prompt.
+   ~0.6Hz, well under the 3Hz flashing threshold. */
+@keyframes neonBlink {
+  0%, 62%, 75%, 100% {
+    opacity: 1;
+  }
+  63%, 74% {
+    opacity: 0.18;
+  }
+}
+
+.neon-blink {
+  animation: neonBlink 1.6s linear infinite;
+  text-shadow:
+    0 0 8px rgba(255, 210, 63, 0.85),
+    0 0 18px rgba(255, 210, 63, 0.45);
+}
+
+/* ---------------------------------------------------------------------------
+   Reduced motion
+
+   Visitors who ask their OS for less motion keep the full retro look but lose
+   the decorative loops: glitch text, score pops, the Konami rainbow, idle
+   breathing, twinkling stars and the pixel rain. Physics-driven feedback
+   (walking, jumping, landing squash) is left alone because it only moves in
+   response to input. The hero slideshow is handled in JS instead — it stops
+   auto-advancing and swaps instantly.
+   --------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .animate-glitch,
+  .animate-pulse,
+  .animate-bounce,
+  .animate-score-pop,
+  .animate-idle-breathe,
+  .neon-blink,
+  .party-mode {
+    /* The nudge stops blinking but keeps its neon glow, so it stays legible. */
+    animation: none !important;
+  }
+}
+
 /* Custom retro scrollbar */
 ::-webkit-scrollbar {
   width: 12px;

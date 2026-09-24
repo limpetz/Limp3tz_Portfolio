@@ -14,7 +14,9 @@ class RetroSoundEngine {
   private getBgm(): HTMLAudioElement | null {
     if (typeof window === 'undefined') return null;
     if (!this.bgmAudio) {
-      this.bgmAudio = new Audio('/background_music.mp3?v=2');
+      // BASE_URL keeps this working when the site is served from a sub-path
+      // (e.g. GitHub Pages project sites).
+      this.bgmAudio = new Audio(`${import.meta.env.BASE_URL}background_music.mp3?v=2`);
       this.bgmAudio.loop = true;
       this.bgmAudio.volume = 0.55;
       this.bgmAudio.preload = 'auto';

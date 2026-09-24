@@ -15,6 +15,8 @@ import { QuestLog } from './components/QuestLog';
 import { ProjectLibrary } from './components/ProjectLibrary';
 import { ArcadeContact } from './components/ArcadeContact';
 import { ArcadeFooter } from './components/ArcadeFooter';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { clampScore } from './utils/physics';
 
 export default function App() {
   const [hasStarted, setHasStarted] = useState(false);
@@ -35,9 +37,8 @@ export default function App() {
   // Active section for navigation
   const [activeSection, setActiveSection] = useState('stage');
 
-  // Official character sprite & background (fixed, no user alteration)
+  // Official character sprite (fixed, no user alteration)
   const spriteUrl = PORTFOLIO_CONFIG.defaultSprite;
-  const backgroundUrl = PORTFOLIO_CONFIG.defaultBackground;
 
   // Clear any legacy custom asset or CRT overrides from local storage
   useEffect(() => {
@@ -65,22 +66,25 @@ export default function App() {
 
   // Score & Coin handlers
   const handleAddScore = useCallback((amount: number) => {
-    setScore((prev) => {
-      const next = Math.min(prev + amount, 999999);
-      localStorage.setItem('limp3tz_score', String(next));
-      return next;
-    });
+    setScore((prev) => clampScore(prev, amount));
     setScorePopping(true);
     setTimeout(() => setScorePopping(false), 300);
   }, []);
 
   const handleAddCoin = useCallback((amount: number) => {
-    setCoins((prev) => {
-      const next = prev + amount;
-      localStorage.setItem('limp3tz_coins', String(next));
-      return next;
-    });
+    setCoins((prev) => prev + amount);
   }, []);
+
+  // Persist score & coins whenever they change. This is deliberately kept out
+  // of the state updaters: React may invoke an updater more than once
+  // (StrictMode, batching), which would double-write to localStorage there.
+  useEffect(() => {
+    localStorage.setItem('limp3tz_score', String(score));
+  }, [score]);
+
+  useEffect(() => {
+    localStorage.setItem('limp3tz_coins', String(coins));
+  }, [coins]);
 
   // Audio toggles
   const handleToggleMusic = useCallback(() => {
@@ -136,27 +140,38 @@ export default function App() {
 
       <main className="relative pt-[58px]">
         {/* Stage 0: Playable 2D Platformer Minigame */}
-        <ArcadeStage
-          onAddScore={handleAddScore}
-          onAddCoin={handleAddCoin}
-          spriteUrl={spriteUrl}
-          backgroundUrl={backgroundUrl}
-        />
+        <ErrorBoundary label="ARCADE STAGE">
+          <ArcadeStage
+            onAddScore={handleAddScore}
+            onAddCoin={handleAddCoin}
+            spriteUrl={spriteUrl}
+          />
+        </ErrorBoundary>
 
         {/* Level 1: Character Sheet & Lore */}
-        <CharacterSheet spriteUrl={spriteUrl} />
+        <ErrorBoundary label="CHARACTER SHEET">
+          <CharacterSheet spriteUrl={spriteUrl} onAddScore={handleAddScore} />
+        </ErrorBoundary>
 
         {/* Level 2: Skill Tree & 44-Item Inventory */}
-        <SkillInventory onAddScore={handleAddScore} />
+        <ErrorBoundary label="SKILL INVENTORY">
+          <SkillInventory onAddScore={handleAddScore} />
+        </ErrorBoundary>
 
         {/* Level 3: Quest Log (Career Timeline) */}
-        <QuestLog />
+        <ErrorBoundary label="QUEST LOG">
+          <QuestLog />
+        </ErrorBoundary>
 
         {/* Level 4: Game Cartridges Library */}
-        <ProjectLibrary onAddScore={handleAddScore} />
+        <ErrorBoundary label="GAME LIBRARY">
+          <ProjectLibrary onAddScore={handleAddScore} />
+        </ErrorBoundary>
 
         {/* Final Level: Continue? / Arcade Comms Terminal */}
-        <ArcadeContact onAddScore={handleAddScore} />
+        <ErrorBoundary label="COMMS TERMINAL">
+          <ArcadeContact onAddScore={handleAddScore} />
+        </ErrorBoundary>
       </main>
 
       {/* Retro Arcade Footer */}

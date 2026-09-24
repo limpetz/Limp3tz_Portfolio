@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Original full-size images, kept on disk for re-export only.
+# The app ships the compressed .webp versions sitting next to them.
+.originals/

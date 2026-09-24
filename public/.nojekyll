@@ -1,0 +1,2 @@
+Belongs to GitHub Pages: disables Jekyll processing so every built file
+(including any directory starting with an underscore) is served verbatim.

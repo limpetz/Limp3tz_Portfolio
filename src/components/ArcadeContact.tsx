@@ -55,7 +55,7 @@ export const ArcadeContact: React.FC<ArcadeContactProps> = ({ onAddScore }) => {
     <section id="contact" className="py-24 px-4 sm:px-8 max-w-4xl mx-auto scroll-mt-16 text-center">
       {/* Header */}
       <div className="flex items-center gap-4 mb-10 justify-center">
-        <span className="font-pixel text-xs px-3 py-2 bg-[#0a0817] border-2 border-[#3dffa2] text-[#3dffa2] shadow-[4px_4px_0_#000]">
+        <span className="font-pixel text-xs px-3 py-2 bg-[#0a0817] border-2 border-[#3dffa2] text-[#3dffa2]">
           FINAL LEVEL
         </span>
         <h2 className="font-pixel text-xl sm:text-2xl text-white tracking-wide">
