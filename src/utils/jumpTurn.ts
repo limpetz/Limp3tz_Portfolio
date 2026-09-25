@@ -245,6 +245,13 @@ export class AvatarAnimationController {
     targetDir: 1,
   };
   reducedMotion: boolean = false;
+  /**
+   * True while the current airborne arc came from an immediate (held-bounce)
+   * relaunch: the physics-derived jumpProgress is meaningless for it (full
+   * launch velocity would always read TAKEOFF), so the seeded clock drives
+   * the pose instead. Cleared when the controller returns to ground.
+   */
+  seededAir: boolean = false;
 
   constructor(options?: { facingDir?: 1 | -1; reducedMotion?: boolean }) {
     if (options?.facingDir) {
@@ -283,19 +290,32 @@ export class AvatarAnimationController {
   /**
    * Trigger a jump. Returns true if jump transition started.
    *
+   * `immediate` (held bounces) skips the anticipation crouch and starts the
+   * arc at RISING: the bounce relaunches the instant it touches down, and
+   * playing anticipation → takeoff again made each held bounce open with two
+   * stiff ground poses and end with a snap to takeoff. With `immediate` the
+   * air cycle reads rising → apex → falling → pre-landing — a flowing loop.
+   * A fresh (non-held) jump keeps the full anticipation read.
+   *
    * Landing and recovery count as grounded states: holding jump relaunches the
    * body the instant it touches down, while the controller is still playing
    * those poses. Without this, a held jump would leave the controller behind
-   * finishing its ground animation while the body was already airborne —
-   * rendering stiff standing frames for the first part of every held bounce.
+   * finishing its ground animation while the body was already airborne.
    */
-  startJump(): boolean {
+  startJump(options?: { immediate?: boolean }): boolean {
     if (this.mode !== 'ground' && this.mode !== 'landing' && this.mode !== 'recovery') {
       return false;
     }
     if (this.reducedMotion) {
       this.mode = 'air';
       this.elapsed = 0;
+      this.seededAir = false;
+      return true;
+    }
+    if (options?.immediate) {
+      this.mode = 'air';
+      this.elapsed = (0.15 / 0.85) * JUMP_TIMINGS.AIRTIME; // just into RISING
+      this.seededAir = true;
       return true;
     }
     this.mode = 'anticipation';
@@ -309,6 +329,7 @@ export class AvatarAnimationController {
   reset() {
     this.mode = 'ground';
     this.elapsed = 0;
+    this.seededAir = false;
     this.turnState.isTurning = false;
     this.turnState.progress = this.facingDir === 1 ? 1 : 0;
     this.turnState.targetDir = this.facingDir;
@@ -324,7 +345,12 @@ export class AvatarAnimationController {
       const clampedDt = Math.min(remaining, 0.02);
       remaining -= clampedDt;
 
-      // Update jump mode lifecycle
+      // Update jump mode lifecycle. A grounded controller never uses the seeded
+      // clock, so drop the flag as soon as we're back on the ground (covers
+      // direct mode assignment by the stage, not just the recovery transition).
+      if (this.mode === 'ground') {
+        this.seededAir = false;
+      }
       if (this.mode !== 'ground') {
         this.elapsed += clampedDt;
         if (this.mode === 'anticipation' && this.elapsed >= JUMP_TIMINGS.ANTICIPATION) {
@@ -336,6 +362,7 @@ export class AvatarAnimationController {
         } else if (this.mode === 'recovery' && this.elapsed >= JUMP_TIMINGS.RECOVERY) {
           this.mode = 'ground';
           this.elapsed = 0;
+          this.seededAir = false;
         }
       }
 
@@ -386,7 +413,15 @@ export class AvatarAnimationController {
       return getRenderPose('jump', JUMP_COLUMNS.ANTICIPATION, row, actorW);
     }
     if (this.mode === 'air') {
-      const p = Math.max(0, Math.min(1, options.jumpProgress ?? (this.elapsed / JUMP_TIMINGS.AIRTIME)));
+      // `immediateBounce` relaunches come in with full launch velocity, so the
+      // physics-derived jumpProgress starts at 0 (TAKEOFF) and the held-bounce
+      // loop would snap takeoff → apex → falling. When the controller was
+      // seeded into mid-air, progress is taken from the seeded clock instead,
+      // so the loop reads rising → apex → falling → pre-landing.
+      const p = Math.max(0, Math.min(1,
+        this.seededAir ? (this.elapsed / JUMP_TIMINGS.AIRTIME)
+                       : (options.jumpProgress ?? (this.elapsed / JUMP_TIMINGS.AIRTIME)),
+      ));
       // Columns in air:
       // takeoff (2), rising (3), apex (4), falling (5), pre-landing (6)
       let col: number;

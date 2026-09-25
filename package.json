@@ -10,7 +10,8 @@
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "playtest": "node scripts/playtest.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -25,6 +26,7 @@
     "@types/react-dom": "^19.3.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.1",
+    "puppeteer-core": "^24.0.0"
   }
 }

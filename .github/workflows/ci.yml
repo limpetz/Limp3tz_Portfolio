@@ -30,3 +30,9 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Playtest (walk + bounce assertions)
+        run: |
+          npx vite preview --port 4173 --strictPort &
+          sleep 3
+          node scripts/playtest.mjs "http://localhost:4173/Limp3tz_Portfolio/"

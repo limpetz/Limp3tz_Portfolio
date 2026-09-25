@@ -212,6 +212,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   // centres are measured from the DOM (see measureBlocks below). Sizes below are
   // only needed for the vertical band and as a pre-measurement fallback.
   const BLOCK_SIZE = 56;        // rendered block size (w-14 = 56px)
+
   // Set to the hero's full jump reach: apex is ~391px (JUMP_V²/2G), and the
   // bump registers while the head is inside the block band + tolerance, i.e.
   // from y ≥ BLOCK_Y − 240. 380 puts the band's bottom just under the head's
@@ -438,14 +439,15 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     }
   }, [onAddScore, onAddCoin, say]);
 
-  // Jump trigger
-  const doJump = useCallback(() => {
+  // Jump trigger. `immediate` (held bounces) skips the anticipation crouch —
+  // see startJump in utils/jumpTurn.ts.
+  const doJump = useCallback((options?: { immediate?: boolean }) => {
     if (!stateRef.current.grounded) return;
     stateRef.current.grounded = false;
     stateRef.current.y = 2;
     stateRef.current.vy = JUMP_V;
     stateRef.current.landingTimer = 0;
-    animCtrlRef.current.startJump();
+    animCtrlRef.current.startJump(options);
     setIsAirborne(true);
     setIsLanding(false);
     sound.playJump();
@@ -846,8 +848,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       // Driving this from the loop instead of waiting on OS key-repeat makes
       // repeat bounces immediate (key-repeat has a ~500ms initial delay), and
       // doJump()'s grounded check still blocks mid-air double jumps.
+      // `immediate` skips the anticipation crouch so held bounces loop
+      // rising → apex → falling → pre-landing without snapping back to takeoff.
       if (HOLD_TO_JUMP && keysRef.current.jump && stateRef.current.grounded) {
-        doJump();
+        doJump({ immediate: true });
       }
 
       // Compute character dynamic squash, stretch, tilt, bob, and breathing
@@ -909,7 +913,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         // WALKING: advance the sheet's clock only while actually moving. The
         // cadence tracks ground speed relative to the STRIDE_REFERENCE rate the
         // art was authored for; lower = faster legs, higher = slower legs.
-        const STRIDE_REFERENCE_PX_S = 190;
+        const STRIDE_REFERENCE_PX_S = 210;
         walkElapsedRef.current += dt * 1000 * (Math.abs(stateRef.current.vx) / STRIDE_REFERENCE_PX_S);
 
         // Smooth turn lean toward movement direction
@@ -1493,7 +1497,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             e.preventDefault();
             doJump();
           }}
-          onMouseDown={doJump}
+          onMouseDown={() => doJump()}
           className="w-14 h-14 bg-[#070512]/90 border-2 border-[#ff2d78] text-[#ff2d78] font-pixel text-sm active:translate-y-1 shadow-[0_4px_0_#000]"
           aria-label="Jump"
         >

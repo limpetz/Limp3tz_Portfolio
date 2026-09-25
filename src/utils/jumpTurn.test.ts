@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   AvatarAnimationController,
+  JUMP_TIMINGS,
   SPRITE_SPECS,
   TARGET_CONTENT_H,
   TURN_DURATION,
@@ -249,12 +250,58 @@ describe('AvatarAnimationController', () => {
     // landing pose — a held jump must relaunch from here, or the first stretch
     // of the next bounce renders stiff standing frames.
     ctrl.mode = 'landing';
-    expect(ctrl.startJump()).toBe(true);
-    expect(ctrl.mode).toBe('anticipation');
+    expect(ctrl.startJump({ immediate: true })).toBe(true);
+    expect(ctrl.mode).toBe('air');
+    expect(ctrl.seededAir).toBe(true);
 
     ctrl.mode = 'recovery';
+    expect(ctrl.startJump({ immediate: true })).toBe(true);
+    expect(ctrl.mode).toBe('air');
+  });
+
+  it('immediate bounces drive poses from the seeded clock, ignoring physics progress', () => {
+    const ctrl = new AvatarAnimationController({ facingDir: 1 });
+    ctrl.startJump({ immediate: true });
+    expect(ctrl.seededAir).toBe(true);
+
+    // Right after seeding, the arc is in RISING even though the physics vy is
+    // at full launch (which alone would read TAKEOFF).
+    const rising = ctrl.getCurrentPose({ walking: false, walkFrame: 0, jumpProgress: 0 });
+    expect(rising.sheet).toBe('jump');
+    expect(rising.column).toBe(3); // RISING
+
+    // As the seeded clock advances, the loop walks apex -> falling -> pre-landing.
+    // (+0.3s => p=0.55, inside the 0.38..0.62 APEX band.)
+    ctrl.update(JUMP_TIMINGS.AIRTIME * 0.3);
+    const apex = ctrl.getCurrentPose({ walking: false, walkFrame: 0, jumpProgress: 0 });
+    expect(apex.column).toBe(4); // APEX
+
+    ctrl.update(JUMP_TIMINGS.AIRTIME * 0.3);
+    const falling = ctrl.getCurrentPose({ walking: false, walkFrame: 0, jumpProgress: 0 });
+    expect(falling.column).toBe(5); // FALLING
+
+    ctrl.update(JUMP_TIMINGS.AIRTIME * 0.15);
+    const preLanding = ctrl.getCurrentPose({ walking: false, walkFrame: 0, jumpProgress: 0 });
+    expect(preLanding.column).toBe(6); // PRE_LANDING
+  });
+
+  it('clears the seeded-air flag when the controller returns to ground', () => {
+    const ctrl = new AvatarAnimationController({ facingDir: 1 });
+    ctrl.startJump({ immediate: true });
+    expect(ctrl.seededAir).toBe(true);
+    ctrl.mode = 'ground';
+    ctrl.update(0.016);
+    expect(ctrl.seededAir).toBe(false);
+    // and a fresh (non-immediate) jump keeps physics-driven poses. The fresh
+    // jump enters ANTICIPATION first (120ms of crouch), so at p=0.02 of air
+    // progress the controller has not yet reached the air phase — but if it
+    // did, the pose must come from physics, not a stale seeded clock.
     expect(ctrl.startJump()).toBe(true);
     expect(ctrl.mode).toBe('anticipation');
+    ctrl.mode = 'air'; // simulate the anticipation->air handoff for the pose check
+    ctrl.seededAir = false;
+    const takeoff = ctrl.getCurrentPose({ walking: false, walkFrame: 0, jumpProgress: 0.02 });
+    expect(takeoff.column).toBe(2); // TAKEOFF, from physics progress
   });
 
   it('swaps instantly with reduced motion', () => {
