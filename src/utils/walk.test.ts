@@ -86,8 +86,8 @@ describe('left-facing idle (row 1 anchor)', () => {
 
 describe('frameDurationMs', () => {
   it('uses the per-frame duration when the JSON declares one', () => {
-    // Walk frames declare durationMs: 100.
-    expect(frameDurationMs(F[WALK_RIGHT[0]], WALK_SHEET.defaultFps)).toBe(100);
+    // Contact frames hold 150ms so each footfall lands as a visible event.
+    expect(frameDurationMs(F[WALK_RIGHT[0]], WALK_SHEET.defaultFps)).toBe(150);
   });
 
   it('falls back to the default fps when durationMs is null (idle frame)', () => {
@@ -99,7 +99,8 @@ describe('frameDurationMs', () => {
 
 describe('animationLengthMs', () => {
   it('sums the frame durations of the walk cycle', () => {
-    expect(animationLengthMs(WALK_RIGHT, F, 10)).toBe(800); // 8 × 100ms
+    // 2 contact frames x 150ms + 6 passes x 100ms.
+    expect(animationLengthMs(WALK_RIGHT, F, 10)).toBe(900);
   });
 
   it('is zero-safe on an empty animation', () => {
@@ -112,17 +113,20 @@ describe('frameAtElapsed', () => {
     expect(frameAtElapsed(0, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[0]);
   });
 
-  it('advances one frame per 100ms', () => {
+  it('advances through the weighted frames', () => {
+    // f0 is a 150ms contact frame; passes hold 100ms.
     expect(frameAtElapsed(50, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[0]);
+    expect(frameAtElapsed(100, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[0]);
     expect(frameAtElapsed(150, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[1]);
-    expect(frameAtElapsed(750, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[7]);
+    expect(frameAtElapsed(700, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[6]);
+    expect(frameAtElapsed(850, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[7]);
   });
 
   it('wraps the loop instead of running off the end', () => {
     // Exactly one loop lands back on the first walk frame.
-    expect(frameAtElapsed(800, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[0]);
-    // 850ms = 50ms into the second loop: still the first walk frame.
-    expect(frameAtElapsed(850, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[0]);
+    expect(frameAtElapsed(900, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[0]);
+    // 950ms = 50ms into the second loop: still the first (contact) frame.
+    expect(frameAtElapsed(950, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[0]);
   });
 
   it('handles large elapsed times and negative input without leaving the animation', () => {
@@ -172,7 +176,8 @@ describe('integration: loop cadence at 60fps', () => {
   it('walks all 8 frames in order across one loop', () => {
     const seen: number[] = [];
     let last = -1;
-    for (let step = 0; step < 48; step++) {
+    // 53 steps ≈ 883ms: inside the 900ms loop, so each frame is seen once.
+    for (let step = 0; step < 53; step++) {
       t += 1000 / 60;
       const frame = frameAtElapsed(t, WALK_RIGHT, F, 10);
       if (frame !== last) {

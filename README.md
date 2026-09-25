@@ -274,6 +274,10 @@ knobs are independent:
   ~236 frantic steps/min at the tuned speed).
 - `MAX_SPEED` alone sets **footfalls per minute** = `150 × speed ÷ REF`
   (~185/min at 260/210).
+- The two footfall frames hold 150ms (JSON `durationMs`; passes hold 100ms),
+  so each step-down registers as a visible event — the ground probe
+  (`scripts/ground-probe.mjs`) confirmed both feet plant; unweighted playback
+  at high clock rates blurred the second footfall.
 
 Measure both live with `node scripts/cadence-probe.mjs [url]`.
 
