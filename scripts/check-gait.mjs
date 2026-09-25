@@ -133,5 +133,71 @@ for (let col = 1; col < columns; col++) {
 }
 if (!failed) ok(`foot-band structure correct on both rows (contacts at ${CONTACT_COLS.join(', ')}, mirror within ${MIRROR_TOLERANCE}px)`);
 
+// --- Jump / turn / air-turn sheets: cell bounds vs the pack manifest ---
+// animations.json declares a pixel bbox per used cell (half-open edges:
+// right = left + width, bottom = top + height, bottom = footY). A re-export
+// that shifts or resizes art breaks the renderer's anchoring silently, so we
+// re-measure every bounds-bearing cell and compare. Calibrated at threshold
+// 64 with scripts/calibrate-bounds.mjs: the pack art has no soft alpha, and
+// detected boxes match declarations exactly.
+const BOUNDS_TOLERANCE = 2; // px per edge
+const pack = JSON.parse(readFileSync(`${ASSETS}/animations.json`, 'utf8'));
+
+for (const sectionName of ['jump', 'turn', 'airTurn']) {
+  const section = pack[sectionName];
+  if (!section?.frames) {
+    fail(`animations.json has no ${sectionName} frames`);
+    continue;
+  }
+  // section.file (e.g. "assets/arshad-jump.png") is relative to the pack
+  // root, and ASSETS is that "assets" directory — so go one level up and let
+  // the declared prefix resolve naturally.
+  const pngPath = `${ASSETS}/../${section.file}`;
+  const fw = section.frameWidth;
+  const fh = section.frameHeight;
+  const cols = section.columns || 9;
+  let checked = 0;
+  for (let i = 0; i < section.frames.length; i++) {
+    const f = section.frames[i];
+    if (f.unused || !f.bounds) continue;
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const { data } = await sharp(pngPath)
+      .extract({ left: col * fw, top: row * fh, width: fw, height: fh })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    let l = fw, t = fh, r = -1, b = -1;
+    for (let y = 0; y < fh; y++) {
+      for (let x = 0; x < fw; x++) {
+        if (data[(y * fw + x) * 4 + 3] > 64) {
+          if (x < l) l = x;
+          if (x > r) r = x;
+          if (y < t) t = y;
+          if (y > b) b = y;
+        }
+      }
+    }
+    if (r < 0) {
+      fail(`${sectionName} f${i} declares bounds but the cell is empty`);
+      continue;
+    }
+    checked++;
+    const edges = [
+      ['left', l, f.bounds.left],
+      ['top', t, f.bounds.top],
+      ['right', r + 1, f.bounds.right],
+      ['bottom', b + 1, f.bounds.bottom],
+    ];
+    for (const [name, detected, declared] of edges) {
+      if (Math.abs(detected - declared) > BOUNDS_TOLERANCE) {
+        fail(`${sectionName} f${i} ${name}: pixels say ${detected}, JSON says ${declared}`);
+      }
+    }
+  }
+  if (checked > 0 && !failed) {
+    ok(`${sectionName}: ${checked} cell bounds match the JSON (±${BOUNDS_TOLERANCE}px)`);
+  }
+}
+
 console.log(failed ? '\nGAIT CHECK FAILED' : '\nGait check passed.');
 process.exit(failed ? 1 : 0);

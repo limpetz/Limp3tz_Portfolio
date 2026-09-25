@@ -1,5 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PORTFOLIO_CONFIG, MYSTERY_BLOCKS_DATA, IDLE_QUIPS } from '../data/portfolioData';
+import {
+  DEFAULT_BLOCK_ORDER_KEY,
+  loadBlockOrder,
+  saveBlockOrder,
+  applyBlockOrder,
+  rotateBlockOrder,
+} from '../utils/blockLayout';
 import { sound } from '../utils/soundEngine';
 import { ArcadeParticleSystem } from '../utils/particleSystem';
 import {
@@ -180,6 +187,23 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     jump: false,
   });
 
+  // --- Cadence debug overlay (C key): live speed/step readout for tuning ---
+  const [showCadence, setShowCadence] = useState(false);
+  const showCadenceRef = useRef(showCadence);
+  showCadenceRef.current = showCadence;
+  const [cadenceLive, setCadenceLive] = useState<
+    | { speed: number; stepPx: number; stepsPerMin: number; ref: number; maxSpeed: number }
+    | null
+  >(null);
+  const lastCadencePushRef = useRef(0);
+
+  // --- Mystery-block arranger (dev feature, L key / HUD-style toggle) ---
+  // The chosen arrangement persists to localStorage (see blockLayout.ts), so
+  // the stage keeps rendering it after this UI is removed.
+  const [arrangeMode, setArrangeMode] = useState(false);
+  const [blockOrder, setBlockOrder] = useState<string[]>(() => loadBlockOrder(DEFAULT_BLOCK_ORDER_KEY));
+  const dragBlockRef = useRef<number | null>(null);
+
   // Konami code buffer
   const konamiBuffer = useRef<string[]>([]);
   const konamiSequence = [
@@ -190,13 +214,14 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
   // Physics constants
   const GROUND_H = 92;
-  // Cadence pair with STRIDE_REFERENCE_PX_S (below). The two knobs are
-  // independent: travel per step = 0.4s × REF (84px at 210; the art's contact
-  // stride is ~66px, so the stance foot still slides ~18px/step), while
-  // footfalls/min = 150 × speed ÷ REF (≈185/min at 260/210). Zero slide would
-  // need REF 165, which pushes steps to ~236/min at this speed — accepted
-  // trade-off per live cadence-probe measurements.
+  // Cadence pair (STRIDE_REFERENCE_PX_S below). The two knobs are
+  // independent: travel per step = 0.4s × REF, while footfalls/min =
+  // 150 × speed ÷ REF. At 260/165 travel-per-step is 66px — exactly the art's
+  // contact stride (foot-pixel probe: spreads 59/73/66px) — so the stance
+  // foot plants with zero slide, at the cost of a brisk ~236 steps/min. If
+  // that beat reads frantic, raise REF (accepts slide) or lower speed with it.
   const MAX_SPEED = 260; // px/sec
+  const STRIDE_REFERENCE_PX_S = 165; // walk-clock reference; pairs with MAX_SPEED (see note)
   const ACCEL = 1800; // px/sec²
   const FRICTION = 2200; // px/sec²
   const SKID_DECEL = 3400; // px/sec²
@@ -524,6 +549,14 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         return;
       }
 
+      // Dev/debug toggles (data entry: no game keys are affected).
+      if (e.code === 'KeyC' && !e.repeat) {
+        setShowCadence((v) => !v);
+      }
+      if (e.code === 'KeyL' && !e.repeat) {
+        setArrangeMode((v) => !v);
+      }
+
       if (isLeftKey(e.code)) {
         keysRef.current.left = true;
       }
@@ -542,6 +575,22 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         });
         keysRef.current.jump = true;
         if (allow) doJump();
+      }
+
+      // Sample the cadence overlay at ~4Hz (no per-frame React churn).
+      if (showCadenceRef.current) {
+        const now = performance.now();
+        if (now - lastCadencePushRef.current > 250) {
+          lastCadencePushRef.current = now;
+          const speed = Math.abs(stateRef.current.vx);
+          setCadenceLive({
+            speed,
+            stepPx: 0.4 * STRIDE_REFERENCE_PX_S,
+            stepsPerMin: (speed / STRIDE_REFERENCE_PX_S) * 120, // 2 footfalls/cycle, 0.8s/cycle at REF
+            ref: STRIDE_REFERENCE_PX_S,
+            maxSpeed: MAX_SPEED,
+          });
+        }
       }
 
       // Konami buffer
@@ -921,7 +970,6 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         // art was authored for; lower = faster legs, higher = slower legs.
         // Pairing note: travel per step = 0.4s × this value ONLY (speed has no
         // effect on step length); footfalls/min = 150 × MAX_SPEED ÷ this value.
-        const STRIDE_REFERENCE_PX_S = 210;
         walkElapsedRef.current += dt * 1000 * (Math.abs(stateRef.current.vx) / STRIDE_REFERENCE_PX_S);
 
         // Smooth turn lean toward movement direction
@@ -1274,13 +1322,47 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         </div>
       </div>
 
+      {/* Dev: mystery-block arranger (toggle with L). Drag a ? block onto
+          another to move it, or use the per-block ◀ ▶ handles. The arrangement
+          persists to localStorage (blockLayout.ts); this UI can be removed
+          once the layout is final — the stage keeps honouring the saved
+          order, and RESET restores the data order. */}
+      {arrangeMode && (
+        <div className="absolute left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-3 py-1.5 border-2 border-[#ffd23f] bg-[#0a0620]/95 font-pixel text-[9px] text-[#ffd23f] shadow-[0_0_16px_rgba(255,210,63,0.45)] pointer-events-none">
+          <span>ARRANGE MODE · drag a ? block onto another, or use ◀ ▶</span>
+          <button
+            type="button"
+            className="pointer-events-auto px-2 py-1 border border-[#7d7aa3] text-[#7d7aa3] hover:text-[#00e5ff] hover:border-[#00e5ff] cursor-pointer"
+            onClick={() => {
+              setBlockOrder([]);
+              try {
+                window.localStorage.removeItem(DEFAULT_BLOCK_ORDER_KEY);
+              } catch {
+                // Storage disabled: clearing the session order is enough.
+              }
+            }}
+          >
+            RESET
+          </button>
+        </div>
+      )}
+
+      {/* Cadence overlay (C): live speed + step metrics for tuning. */}
+      {showCadence && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-40 px-3 py-1.5 border-2 border-[#3dffa2] bg-[#0a0620]/95 font-pixel text-[9px] text-[#3dffa2] leading-relaxed shadow-[0_0_16px_rgba(61,255,162,0.4)] pointer-events-none">
+          <div>SPEED {Math.round(cadenceLive?.speed ?? 0)} px/s (MAX {cadenceLive?.maxSpeed ?? MAX_SPEED})</div>
+          <div>STEP {Math.round(cadenceLive?.stepPx ?? 0.4 * STRIDE_REFERENCE_PX_S)} px · STRIDE_REF {cadenceLive?.ref ?? STRIDE_REFERENCE_PX_S}</div>
+          <div>STEPS/MIN {Math.round(cadenceLive?.stepsPerMin ?? 0)}</div>
+        </div>
+      )}
+
       {/* Overhead Mystery ? Blocks */}
       <div
         ref={blocksRowRef}
         className="absolute left-1/2 -translate-x-1/2 flex gap-4 sm:gap-6 z-30"
         style={{ bottom: `${GROUND_H + stateRef.current.blocksLift}px` }}
       >
-        {MYSTERY_BLOCKS_DATA.map((block, idx) => {
+        {applyBlockOrder(MYSTERY_BLOCKS_DATA, blockOrder).map((block, idx) => {
           const isUsed = collectedItems[block.key];
           const isBumped = bumpedBlockKey === block.key;
           // Attract hint: glow while the player stands under this block, so the
@@ -1295,6 +1377,33 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                   ? containerRef.current.clientWidth / 2
                   : 500;
                 openBlock(block.key, bLeft);
+              }}
+              draggable={arrangeMode || undefined}
+              onDragStart={(e) => {
+                if (!arrangeMode) return;
+                dragBlockRef.current = idx;
+                e.dataTransfer.effectAllowed = 'move';
+                try {
+                  e.dataTransfer.setData('text/plain', String(idx));
+                } catch {
+                  // Some engines disallow setData on synthetic drags; the
+                  // index rides in dragBlockRef anyway.
+                }
+              }}
+              onDragOver={(e) => {
+                if (arrangeMode && dragBlockRef.current !== null) e.preventDefault();
+              }}
+              onDrop={(e) => {
+                if (!arrangeMode || dragBlockRef.current === null) return;
+                e.preventDefault();
+                const from = dragBlockRef.current;
+                dragBlockRef.current = null;
+                if (from === idx) return;
+                const keys = applyBlockOrder(MYSTERY_BLOCKS_DATA, blockOrder).map((b) => b.key);
+                const next = rotateBlockOrder(keys, from, idx > from ? 1 : -1);
+                setBlockOrder(next);
+                saveBlockOrder(DEFAULT_BLOCK_ORDER_KEY, next);
+                sound.playBlip(880, 0.03, 0.06);
               }}
               className={`relative w-12 h-12 sm:w-14 sm:h-14 font-pixel text-xl sm:text-2xl transition-transform cursor-pointer select-none border-2 ${
                 isBumped ? '-translate-y-4 duration-150' : 'translate-y-0 duration-200'
@@ -1316,7 +1425,11 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                       color: isUsed ? '#7d7aa3' : block.color,
                     }
               }
-              title={`Mystery Block: ${block.title}`}
+              title={
+                arrangeMode
+                  ? `Arrange mode: drag onto another block or use ◀ ▶ (${block.title})`
+                  : `Mystery Block: ${block.title}`
+              }
               aria-label={`Mystery Block: ${block.title}`}
             >
               {/* Corner screws */}
@@ -1325,6 +1438,37 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               <span className="absolute bottom-1 left-1 w-1 h-1 bg-current opacity-70" />
               <span className="absolute bottom-1 right-1 w-1 h-1 bg-current opacity-70" />
               <span>{isUsed ? block.label : '?'}</span>
+              {/* Arrange-mode handles: tap to nudge the block one slot. */}
+              {arrangeMode && (
+                <>
+                  <span
+                    className="absolute -left-2 top-1/2 -translate-x-full -translate-y-1/2 px-1 py-0.5 border border-[#ffd23f] text-[#ffd23f] text-[8px] cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const keys = applyBlockOrder(MYSTERY_BLOCKS_DATA, blockOrder).map((b) => b.key);
+                      const next = rotateBlockOrder(keys, idx, -1);
+                      setBlockOrder(next);
+                      saveBlockOrder(DEFAULT_BLOCK_ORDER_KEY, next);
+                    }}
+                    title="Move block left"
+                  >
+                    ◀
+                  </span>
+                  <span
+                    className="absolute -right-2 top-1/2 translate-x-full -translate-y-1/2 px-1 py-0.5 border border-[#ffd23f] text-[#ffd23f] text-[8px] cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const keys = applyBlockOrder(MYSTERY_BLOCKS_DATA, blockOrder).map((b) => b.key);
+                      const next = rotateBlockOrder(keys, idx, 1);
+                      setBlockOrder(next);
+                      saveBlockOrder(DEFAULT_BLOCK_ORDER_KEY, next);
+                    }}
+                    title="Move block right"
+                  >
+                    ▶
+                  </span>
+                </>
+              )}
             </button>
           );
         })}
