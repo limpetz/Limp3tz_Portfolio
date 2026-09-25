@@ -3,6 +3,10 @@ import { PORTFOLIO_CONFIG, MYSTERY_BLOCKS_DATA, IDLE_QUIPS } from '../data/portf
 import {
   BLOCK_POSITIONS_KEY,
   loadBlockPositions,
+  saveBlockPositions,
+  withBlockPosition,
+  clampDxPct,
+  clampDyUpPct,
   type BlockPosition,
 } from '../utils/blockLayout';
 import { sound } from '../utils/soundEngine';
@@ -50,6 +54,7 @@ import jumpControlsImg from '../assets/images/jump.webp';
 import bumpBlocksImg from '../assets/images/bump-blocks.webp';
 import clickMeImg from '../assets/images/click-me.webp';
 import { PixelHeart } from './PixelHeart';
+import { MushroomMonster, type MushroomState } from './MushroomMonster';
 
 interface ArcadeStageProps {
   onAddScore: (amount: number) => void;
@@ -75,16 +80,17 @@ interface FallingHeart {
   vy: number;
 }
 
-interface GlitchHazard {
+interface MushroomHazard {
   id: number;
   x: number;
-  y: number; // ground clearance
+  y: number;
   vx: number;
+  facing: 1 | -1;
+  state: MushroomState;
+  frameIndex: number;
+  animTimer: number;
   width: number;
   height: number;
-  type: 'bug' | 'drone';
-  baseY?: number;
-  time?: number;
 }
 
 export const ArcadeStage: React.FC<ArcadeStageProps> = ({
@@ -128,17 +134,44 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   const fallingCoinsRef = useRef<FallingCoin[]>([]);
   const [fallingHearts, setFallingHearts] = useState<FallingHeart[]>([]);
   const fallingHeartsRef = useRef<FallingHeart[]>([]);
-  const [hazards, setHazards] = useState<GlitchHazard[]>([
-    { id: 1, x: 500, y: 18, vx: -55, width: 32, height: 28, type: 'bug' },
-    { id: 2, x: 750, y: 130, vx: -65, width: 36, height: 22, type: 'drone', baseY: 130, time: 0 },
+
+  // Mushroom Hazards replacing old drone/bug
+  const [mushrooms, setMushrooms] = useState<MushroomHazard[]>([
+    {
+      id: 1,
+      x: 620,
+      y: 0,
+      vx: -60,
+      facing: -1,
+      state: 'run',
+      frameIndex: 0,
+      animTimer: 0,
+      width: 44,
+      height: 48,
+    },
   ]);
-  const hazardsRef = useRef<GlitchHazard[]>([
-    { id: 1, x: 500, y: 18, vx: -55, width: 32, height: 28, type: 'bug' },
-    { id: 2, x: 750, y: 130, vx: -65, width: 36, height: 22, type: 'drone', baseY: 130, time: 0 },
+  const mushroomsRef = useRef<MushroomHazard[]>([
+    {
+      id: 1,
+      x: 620,
+      y: 0,
+      vx: -60,
+      facing: -1,
+      state: 'run',
+      frameIndex: 0,
+      animTimer: 0,
+      width: 44,
+      height: 48,
+    },
   ]);
+
   const [invulnerable, setInvulnerable] = useState(false);
   const invulnerableRef = useRef(false);
   const [partyMode, setPartyMode] = useState(false);
+
+  // Player Start Safe Zone: centered at initial actor position (200px ± 140px)
+  const SAFE_ZONE_MIN = 60;
+  const SAFE_ZONE_MAX = 340;
 
   // --- Off-screen pause -------------------------------------------------
   // The stage is a full-height section pinned to the top of the page, so once
@@ -224,10 +257,38 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     jump: false,
   });
 
-  // Mystery-block positions (persisted to localStorage; defaults to centred flex layout).
-  const [blockPositions] = useState<BlockPosition[]>(() =>
+  // Mystery-block arranger (toggle with 'L' or HUD button)
+  const [arrangeMode, setArrangeMode] = useState(false);
+  const [blockPositions, setBlockPositions] = useState<BlockPosition[]>(() =>
     loadBlockPositions(BLOCK_POSITIONS_KEY),
   );
+  const dragBlockRef = useRef<string | null>(null);
+
+  /** Stage-local x of a client-x (the container spans the viewport width). */
+  const rectLeft = () => containerRef.current?.getBoundingClientRect().left ?? 0;
+
+  /** Nudge a block by dirX/dirY (relocation arranger). */
+  const nudgeBlock = (blockKey: string, dirX: number, dirY: number) => {
+    const row = blocksRowRef.current;
+    const btn = row?.querySelector<HTMLButtonElement>(`[data-block-key="${blockKey}"]`);
+    const stageH = containerRef.current?.clientHeight ?? 0;
+    if (!row || !btn || !stageH) return;
+    const rowRect = row.getBoundingClientRect();
+    const bRect = btn.getBoundingClientRect();
+    const currentDx =
+      (bRect.left + bRect.width / 2 - (rowRect.left + rowRect.width / 2)) / rowRect.width;
+    const saved = blockPositions.find((p) => p.key === blockKey);
+    const next = withBlockPosition(
+      blockPositions,
+      blockKey,
+      clampDxPct(currentDx + dirX * 0.03, rowRect.width, BLOCK_SIZE),
+      dirY !== 0
+        ? clampDyUpPct((saved?.dyUpPct ?? 0) + (dirY * 16) / stageH, stageH, BLOCK_Y)
+        : saved?.dyUpPct,
+    );
+    setBlockPositions(next);
+    saveBlockPositions(BLOCK_POSITIONS_KEY, next);
+  };
 
   // Konami code buffer
   const konamiBuffer = useRef<string[]>([]);
@@ -593,6 +654,12 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         return;
       }
 
+      if (e.code === 'KeyL' && !e.repeat) {
+        setArrangeMode((prev) => !prev);
+        sound.playBlip(780, 0.04, 0.07);
+        return;
+      }
+
       if (isLeftKey(e.code)) {
         keysRef.current.left = true;
       }
@@ -907,15 +974,16 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         stateRef.current.vy -= GRAVITY * apexFactor * dt;
         stateRef.current.y += stateRef.current.vy * dt;
 
-        // Check head collision with mystery blocks while moving UP
-        if (stateRef.current.vy > 0) {
+        // Check head collision with mystery blocks while moving UP or near apex
+        if (stateRef.current.vy > -60) {
           const hit = findHeadBumpedBlock({
             actorCenterX: stateRef.current.x + stateRef.current.actorWidth / 2,
             actorHead: stateRef.current.y + stateRef.current.actorHeight,
             blockCentres: stateRef.current.blockCentres,
             blockLift: stateRef.current.blocksLift,
             blockBottoms: stateRef.current.blockBottoms,
-            radius: stateRef.current.blockHalfWidth + BLOCK_BUMP_GRACE,
+            radius: stateRef.current.blockHalfWidth + 10,
+            tolerance: 50,
           });
 
           if (hit) {
@@ -1214,88 +1282,122 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         setFallingHearts(remainingHearts);
       }
 
-      // Update cyber glitch hazards & collision detection (hazard damage or jump stomp)
-      const currentHazards = hazardsRef.current;
-      if (currentHazards.length > 0) {
+      // Update Mushroom Hazards & collision detection (hazard damage or jump stomp)
+      const currentMushrooms = mushroomsRef.current;
+      if (currentMushrooms.length > 0) {
         const stageW = stateRef.current.stageWidth || 1000;
-        const actorLeft = stateRef.current.x + 8;
-        const actorRight = stateRef.current.x + stateRef.current.actorWidth - 8;
+        const actorLeft = stateRef.current.x + 12;
+        const actorRight = stateRef.current.x + stateRef.current.actorWidth - 12;
         const actorBottom = GROUND_H + stateRef.current.y;
         const actorTop = actorBottom + stateRef.current.actorHeight;
         const stageH = containerRef.current?.clientHeight || 800;
 
-        const nextHazards: GlitchHazard[] = [];
+        const nextMushrooms: MushroomHazard[] = [];
 
-        for (let i = 0; i < currentHazards.length; i++) {
-          const hz = currentHazards[i];
-          let nextX = hz.x + hz.vx * dt;
-          let nextVx = hz.vx;
-          let nextY = hz.y;
-          const nextTime = (hz.time || 0) + dt;
+        for (let i = 0; i < currentMushrooms.length; i++) {
+          const m = currentMushrooms[i];
 
-          // Drone sine-wave hovering and periodic retro motor hum
-          if (hz.type === 'drone') {
-            const baseY = hz.baseY || 130;
-            nextY = baseY + Math.sin(nextTime * 3) * 16;
-            if (Math.random() < 0.015 && Math.abs(stateRef.current.x - hz.x) < 400) {
-              sound.playDroneHum();
+          // If dying, advance die animation frames and despawn
+          if (m.state === 'die') {
+            const nextTimer = m.animTimer + dt;
+            const nextFrame = Math.floor(nextTimer / 0.08);
+            if (nextFrame < 15) {
+              nextMushrooms.push({ ...m, animTimer: nextTimer, frameIndex: nextFrame });
+            }
+            continue;
+          }
+
+          // Advance running animation
+          const nextAnimTimer = m.animTimer + dt;
+          const nextFrame = Math.floor(nextAnimTimer / 0.1) % 8;
+
+          let nextX = m.x + m.vx * dt;
+          let nextVx = m.vx;
+          let facing = m.facing;
+
+          // Safe zone repulsion: monsters bounce back before entering the player's initial spawn zone (60px - 340px)
+          if (nextX <= SAFE_ZONE_MAX && nextX >= SAFE_ZONE_MIN) {
+            if (m.vx < 0) {
+              nextX = SAFE_ZONE_MAX;
+              nextVx = Math.abs(m.vx);
+              facing = 1;
+            } else {
+              nextX = SAFE_ZONE_MIN;
+              nextVx = -Math.abs(m.vx);
+              facing = -1;
             }
           }
 
-          if (nextX <= 20) {
-            nextX = 20;
-            nextVx = Math.abs(hz.vx);
-          } else if (nextX >= stageW - hz.width - 20) {
-            nextX = stageW - hz.width - 20;
-            nextVx = -Math.abs(hz.vx);
+          // Stage boundary bounce
+          if (nextX <= 24) {
+            nextX = 24;
+            nextVx = Math.abs(m.vx);
+            facing = 1;
+          } else if (nextX >= stageW - m.width - 24) {
+            nextX = stageW - m.width - 24;
+            nextVx = -Math.abs(m.vx);
+            facing = -1;
           }
 
-          const hzLeft = nextX;
-          const hzRight = nextX + hz.width;
-          const hzBottom = GROUND_H + hz.y;
-          const hzTop = hzBottom + hz.height;
+          const mLeft = nextX;
+          const mRight = nextX + m.width;
+          const mBottom = GROUND_H + m.y;
+          const mTop = mBottom + m.height;
 
-          const overlapsX = actorRight >= hzLeft && actorLeft <= hzRight;
-          const overlapsY = actorBottom <= hzTop && actorTop >= hzBottom;
+          const overlapsX = actorRight >= mLeft && actorLeft <= mRight;
+          const overlapsY = actorBottom <= mTop + 14 && actorTop >= mBottom;
 
           if (overlapsX && overlapsY) {
-            // Player stomped hazard from above while falling down
-            if (stateRef.current.vy < -50 && actorBottom >= hzTop - 18) {
+            // Player stomped mushroom from above while falling down
+            if (stateRef.current.vy < -40 && actorBottom >= mTop - 24) {
               sound.playBump();
               sound.playPower();
-              stateRef.current.vy = 850; // Bounce upward off bug stomp
+              stateRef.current.vy = 880; // High bounce upward off mushroom stomp
               stateRef.current.grounded = false;
-              onAddScore(300);
-              particleSys.current.triggerLandingDust(nextX + hz.width / 2, stageH - hzBottom);
-              say('BUG SQUASHED! +300 PTS!', 1600);
-              // Respawn bug after 3.5s delay
+              onAddScore(350);
+              particleSys.current.triggerLandingDust(nextX + m.width / 2, stageH - mBottom);
+              say('MUSHROOM STOMPED! +350 PTS!', 1600);
+
+              // Put into dying animation
+              nextMushrooms.push({
+                ...m,
+                x: nextX,
+                state: 'die',
+                frameIndex: 0,
+                animTimer: 0,
+              });
+
+              // Respawn mushroom after 5s delay on the opposite side of stage
               setTimeout(() => {
-                hazardsRef.current = [
-                  ...hazardsRef.current,
+                mushroomsRef.current = [
+                  ...mushroomsRef.current,
                   {
                     id: Math.random() + Date.now(),
-                    x: Math.random() > 0.5 ? 40 : (stateRef.current.stageWidth || 800) - 80,
-                    y: 18,
-                    vx: Math.random() > 0.5 ? 70 : -70,
-                    width: 32,
-                    height: 28,
-                    type: 'bug',
+                    x: Math.random() > 0.5 ? Math.max(SAFE_ZONE_MAX + 120, (stateRef.current.stageWidth || 800) - 120) : SAFE_ZONE_MAX + 80,
+                    y: 0,
+                    vx: Math.random() > 0.5 ? 60 : -60,
+                    facing: Math.random() > 0.5 ? 1 : -1,
+                    state: 'run',
+                    frameIndex: 0,
+                    animTimer: 0,
+                    width: 44,
+                    height: 48,
                   },
                 ];
-                setHazards(hazardsRef.current);
-              }, 3500);
+                setMushrooms(mushroomsRef.current);
+              }, 5000);
               continue;
             } else if (!invulnerableRef.current) {
-              // Player contact damage
+              // Player contact damage from mushroom
               if (onTakeDamage) {
                 onTakeDamage(1);
               }
               invulnerableRef.current = true;
               setInvulnerable(true);
-              stateRef.current.vx = nextVx > 0 ? 180 : -180; // Knocks back player
-              stateRef.current.vy = 350;
+              stateRef.current.vx = nextVx > 0 ? 200 : -200; // Knocks back player
+              stateRef.current.vy = 360;
               stateRef.current.grounded = false;
-              say('OUCH! GLITCH HAZARD!', 1800);
+              say('OUCH! MUSHROOM MONSTER!', 1800);
               setTimeout(() => {
                 invulnerableRef.current = false;
                 setInvulnerable(false);
@@ -1303,11 +1405,18 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             }
           }
 
-          nextHazards.push({ ...hz, x: nextX, vx: nextVx, y: nextY, time: nextTime });
+          nextMushrooms.push({
+            ...m,
+            x: nextX,
+            vx: nextVx,
+            facing,
+            frameIndex: nextFrame,
+            animTimer: nextAnimTimer,
+          });
         }
 
-        hazardsRef.current = nextHazards;
-        setHazards(nextHazards);
+        mushroomsRef.current = nextMushrooms;
+        setMushrooms(nextMushrooms);
       }
 
       // Update and render canvas particles
@@ -1347,6 +1456,22 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       className={`relative w-full h-[100svh] min-h-[660px] overflow-hidden select-none touch-manipulation bg-[#070512] ${
         partyMode ? 'party-mode' : ''
       }`}
+      onDragOver={(e) => {
+        if (arrangeMode && dragBlockRef.current !== null) e.preventDefault();
+      }}
+      onDrop={(e) => {
+        if (!arrangeMode || dragBlockRef.current === null) return;
+        e.preventDefault();
+        const key = dragBlockRef.current;
+        dragBlockRef.current = null;
+        const stageW = containerRef.current?.clientWidth ?? 0;
+        if (!stageW) return;
+        const dxPct = clampDxPct((e.clientX - rectLeft()) / stageW - 0.5, stageW, BLOCK_SIZE);
+        const next = withBlockPosition(blockPositions, key, dxPct);
+        setBlockPositions(next);
+        saveBlockPositions(BLOCK_POSITIONS_KEY, next);
+        sound.playBlip(880, 0.03, 0.06);
+      }}
     >
       {/* Hero Background Slideshow — full-bleed. An earlier inset "arcade
           bezel" framing was tried here and reverted: the frame line cut
@@ -1387,7 +1512,32 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         )}
       </div>
 
-      {/* Manual slideshow navigation */}
+      {/* Mystery-block arranger banner & control panel (toggle with 'L') */}
+      {arrangeMode && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2 border-2 border-[#ffd23f] bg-[#0a0620]/95 font-pixel text-[9px] text-[#ffd23f] shadow-[0_0_20px_rgba(255,210,63,0.5)]">
+          <span>ARRANGE MODE · Drag blocks or nudge ◀ ▶ ▲ ▼ to position</span>
+          <button
+            type="button"
+            className="px-2 py-1 border border-[#7d7aa3] text-[#7d7aa3] hover:text-[#00e5ff] hover:border-[#00e5ff] cursor-pointer"
+            onClick={() => {
+              setBlockPositions([]);
+              try {
+                window.localStorage.removeItem(BLOCK_POSITIONS_KEY);
+              } catch {}
+              sound.playBlip(440, 0.05, 0.06);
+            }}
+          >
+            RESET
+          </button>
+          <button
+            type="button"
+            className="px-2 py-1 border border-[#ffd23f] text-black bg-[#ffd23f] hover:brightness-110 cursor-pointer"
+            onClick={() => setArrangeMode(false)}
+          >
+            DONE
+          </button>
+        </div>
+      )}
       {hasMultipleBackgrounds && (
         <>
           <button
@@ -1538,6 +1688,15 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             <button
               key={block.key}
               type="button"
+              draggable={arrangeMode || undefined}
+              onDragStart={(e) => {
+                if (!arrangeMode) return;
+                dragBlockRef.current = block.key;
+                e.dataTransfer.effectAllowed = 'move';
+                try {
+                  e.dataTransfer.setData('text/plain', block.key);
+                } catch {}
+              }}
               onClick={() => {
                 const bLeft = containerRef.current
                   ? containerRef.current.clientWidth / 2
@@ -1583,7 +1742,11 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                     }
                   : {}),
               }}
-              title={`Mystery Block: ${block.title}`}
+              title={
+                arrangeMode
+                  ? `Arrange mode: drag anywhere, or nudge ◀ ▶ ▲ ▼ (${block.title})`
+                  : `Mystery Block: ${block.title}`
+              }
               aria-label={`Mystery Block: ${block.title}`}
             >
               {/* Corner screws */}
@@ -1618,6 +1781,52 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                 <span className="font-pixel text-xl sm:text-2xl animate-mystery-question inline-block">
                   ?
                 </span>
+              )}
+
+              {/* Arrange Mode Nudge Controls */}
+              {arrangeMode && (
+                <>
+                  <span
+                    className="absolute -left-2 top-1/2 -translate-x-full -translate-y-1/2 px-1 py-0.5 border border-[#ffd23f] bg-black text-[#ffd23f] text-[8px] cursor-pointer hover:bg-[#ffd23f] hover:text-black"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      nudgeBlock(block.key, -1, 0);
+                    }}
+                    title="Move block left"
+                  >
+                    ◀
+                  </span>
+                  <span
+                    className="absolute -right-2 top-1/2 translate-x-full -translate-y-1/2 px-1 py-0.5 border border-[#ffd23f] bg-black text-[#ffd23f] text-[8px] cursor-pointer hover:bg-[#ffd23f] hover:text-black"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      nudgeBlock(block.key, 1, 0);
+                    }}
+                    title="Move block right"
+                  >
+                    ▶
+                  </span>
+                  <span
+                    className="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full px-1 py-0.5 border border-[#ffd23f] bg-black text-[#ffd23f] text-[8px] cursor-pointer hover:bg-[#ffd23f] hover:text-black"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      nudgeBlock(block.key, 0, 1);
+                    }}
+                    title="Move block up"
+                  >
+                    ▲
+                  </span>
+                  <span
+                    className="absolute -bottom-2 left-1/2 -translate-x-1/2 translate-y-full px-1 py-0.5 border border-[#ffd23f] bg-black text-[#ffd23f] text-[8px] cursor-pointer hover:bg-[#ffd23f] hover:text-black"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      nudgeBlock(block.key, 0, -1);
+                    }}
+                    title="Move block down"
+                  >
+                    ▼
+                  </span>
+                </>
               )}
             </button>
           );
@@ -1714,63 +1923,16 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         </button>
       ))}
 
-      {/* Cyber Glitch Hazards (Floating Bugs & Flying Drones) */}
-      {hazards.map((hz) => (
-        <div
-          key={hz.id}
-          className="absolute z-20 pointer-events-none select-none flex items-center justify-center"
-          style={{
-            left: `${hz.x}px`,
-            bottom: `${GROUND_H + hz.y}px`,
-            width: `${hz.width}px`,
-            height: `${hz.height}px`,
-          }}
-          aria-label={hz.type === 'drone' ? 'Cyber Drone Hazard' : 'Cyber Glitch Bug Hazard'}
-        >
-          {hz.type === 'drone' ? (
-            /* Retro Flying Drone */
-            <div className="relative w-full h-full animate-bounce">
-              <svg viewBox="0 0 18 12" className="w-full h-full drop-shadow-[0_0_10px_rgba(0,229,255,0.9)]">
-                {/* Propellers */}
-                <rect x="0" y="1" width="5" height="1" fill="#00e5ff" />
-                <rect x="13" y="1" width="5" height="1" fill="#00e5ff" />
-                <rect x="2" y="2" width="1" height="2" fill="#7d7aa3" />
-                <rect x="15" y="2" width="1" height="2" fill="#7d7aa3" />
-                {/* Chassis */}
-                <rect x="4" y="4" width="10" height="5" fill="#110d24" stroke="#00e5ff" strokeWidth="0.5" />
-                {/* Laser Eye */}
-                <rect x="8" y="5" width="2" height="3" fill="#ff2d78" className="animate-pulse" />
-                {/* Antennas */}
-                <rect x="7" y="2" width="1" height="2" fill="#ffd23f" />
-                <rect x="10" y="2" width="1" height="2" fill="#ffd23f" />
-              </svg>
-            </div>
-          ) : (
-            /* Retro Pixel Bug Art */
-            <div className="relative w-full h-full animate-pulse">
-              <svg viewBox="0 0 16 14" className="w-full h-full drop-shadow-[0_0_8px_rgba(255,45,120,0.8)]">
-                {/* Antennae */}
-                <rect x="3" y="1" width="2" height="2" fill="#00e5ff" />
-                <rect x="11" y="1" width="2" height="2" fill="#00e5ff" />
-                <rect x="4" y="3" width="2" height="2" fill="#00e5ff" />
-                <rect x="10" y="3" width="2" height="2" fill="#00e5ff" />
-                {/* Body */}
-                <rect x="3" y="5" width="10" height="6" fill="#ff2d78" />
-                <rect x="5" y="4" width="6" height="8" fill="#ff5c98" />
-                {/* Eyes */}
-                <rect x="4" y="6" width="2" height="2" fill="#ffffff" />
-                <rect x="10" y="6" width="2" height="2" fill="#ffffff" />
-                <rect x="5" y="6" width="1" height="1" fill="#0a0817" />
-                <rect x="11" y="6" width="1" height="1" fill="#0a0817" />
-                {/* Legs */}
-                <rect x="1" y="8" width="2" height="2" fill="#00e5ff" />
-                <rect x="13" y="8" width="2" height="2" fill="#00e5ff" />
-                <rect x="2" y="11" width="2" height="2" fill="#00e5ff" />
-                <rect x="12" y="11" width="2" height="2" fill="#00e5ff" />
-              </svg>
-            </div>
-          )}
-        </div>
+      {/* Mushroom Monster Hazards */}
+      {mushrooms.map((m) => (
+        <MushroomMonster
+          key={m.id}
+          x={m.x}
+          y={GROUND_H + m.y}
+          facing={m.facing}
+          state={m.state}
+          frameIndex={m.frameIndex}
+        />
       ))}
 
       {/* High-Performance Canvas Particle System (Sparkles, Twinkles, Landing Dust Puffs) */}
