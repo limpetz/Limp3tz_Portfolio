@@ -45,16 +45,15 @@ describe('WALK_SHEET metadata', () => {
   });
 
   it('plays the artist gait so both footfalls land (regression)', () => {
-    // The sheet's cells hold art permuted by the mirror bake; the played order
-    // restores the artist's original contact → passes → second-contact gait.
-    // Footfall cells were identified with the foot-pixel probe
-    // (scripts/foot-probe.mjs): contact #1 = sheet col 4, second contact =
-    // col 5 mid-cycle. Playing columns 1..8 sequentially is the known-bad
-    // order that clumps the stride poses and drops the second step-down.
-    expect(WALK_RIGHT).toEqual([4, 8, 1, 5, 2, 6, 3, 7]);
-    expect(F[WALK_RIGHT[0]].x).toBe(688); // first footfall: feet planted apart
-    expect(F[WALK_RIGHT[3]].x).toBe(860); // second footfall, mid-cycle
-    expect(WALK_SHEET.animations.walkLeft).toEqual([13, 17, 10, 14, 11, 15, 12, 16]);
+    // The sheet was relaid out so column N holds the Nth gait pose and the
+    // JSON reads 1..8 sequentially. Footfall columns were identified with the
+    // foot-pixel probe (scripts/foot-probe.mjs) and are enforced in CI by
+    // scripts/check-gait.mjs: contact #1 = col 1, second contact = col 5,
+    // push-off contact = col 7.
+    expect(WALK_RIGHT).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(F[WALK_RIGHT[0]].x).toBe(172); // first footfall: feet planted apart
+    expect(F[WALK_RIGHT[4]].x).toBe(860); // second footfall, mid-cycle
+    expect(WALK_SHEET.animations.walkLeft).toEqual([10, 11, 12, 13, 14, 15, 16, 17]);
   });
 });
 
@@ -140,19 +139,19 @@ describe('frameAtElapsed', () => {
 
 describe('backgroundPositionFor', () => {
   it('maps a frame rectangle to a scaled negative offset', () => {
-    // The JSON is the source of truth. The walk plays the artist's gait order
-    // [4,8,1,5,2,6,3,7] (cells hold permuted art after the mirror bake), so
-    // WALK_RIGHT[1] is frame index 8, i.e. sheet column 8 at x = 1376.
+    // The JSON is the source of truth. The sheet is relaid out in true gait
+    // order, so walkRight = frame indices 1..8 and WALK_RIGHT[1] is frame
+    // index 2, i.e. sheet column 2 at x = 344.
     const frame = F[WALK_RIGHT[1]];
-    expect(frame.x).toBe(1376);
+    expect(frame.x).toBe(344);
     // Displayed at the same size as the cell -> 1:1, offset = -x.
-    expect(backgroundPositionFor(frame, WALK_SHEET, 172, 330)).toBe('-1376px 0px');
+    expect(backgroundPositionFor(frame, WALK_SHEET, 172, 330)).toBe('-344px 0px');
   });
 
   it('scales with the display size', () => {
-    const frame = F[WALK_RIGHT[1]]; // sheet x = 1376
+    const frame = F[WALK_RIGHT[1]]; // sheet x = 344
     // Half size: every sheet coordinate halves.
-    expect(backgroundPositionFor(frame, WALK_SHEET, 86, 165)).toBe('-688px 0px');
+    expect(backgroundPositionFor(frame, WALK_SHEET, 86, 165)).toBe('-172px 0px');
   });
 
   it('shifts rows for the left-facing animation', () => {

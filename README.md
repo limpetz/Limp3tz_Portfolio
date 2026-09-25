@@ -321,6 +321,13 @@ Add tests next to the module as `*.test.ts`. Keep new game logic in those pure
 helpers where practical — it's much easier to test than code inside the
 animation loop.
 
+Asset-level invariants are guarded too: `npm run gait:check` (also a CI step)
+analyses the walk sheet's foot pixels — contact columns, single-foot columns
+and the left-row mirror — so a re-baked sheet can't silently permute cells or
+break the gait. `scripts/foot-probe.mjs` prints the same data per cell for
+diagnosis, and `scripts/relayout-walk-sheet.mjs` documents how the sheet was
+restored to true gait order.
+
 ## Accessibility
 
 - **Reduced motion** — when the OS asks for less motion, the decorative loops

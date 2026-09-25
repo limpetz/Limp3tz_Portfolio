@@ -46,6 +46,11 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      # Foot-pixel analysis of the walk sheet: catches permuted cells or a
+      # broken left-row mirror that would silently wreck the gait.
+      - name: Gait check (walk sheet order)
+        run: node scripts/check-gait.mjs
+
       - name: Build
         run: npm run build
 
