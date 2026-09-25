@@ -161,7 +161,8 @@ describe('AvatarAnimationController', () => {
     expect(ctrl.facingDir).toBe(-1);
     const endPose = ctrl.getCurrentPose({ walking: false, walkFrame: 0 });
     expect(endPose.sheet).toBe('walk');
-    expect(endPose.flip).toBe(true); // left-facing: mirrored row-0 art
+    expect(endPose.row).toBe(1); // left-facing row (baked mirror art)
+    expect(endPose.flip).toBe(false);
   });
 
   it('reverses mid-turn without restarting', () => {
@@ -206,32 +207,34 @@ describe('AvatarAnimationController', () => {
     expect(pose.column).toBe(4); // Center tucked-knee frame
   });
 
-  it('renders left-facing poses from the lively right art, mirrored', () => {
-    // The pack's left-facing row ships with almost no limb movement, so
-    // left-facing ground poses reuse row 0 flipped. Facing must NOT change the
-    // sheet cell — only the flip flag.
+  it('renders left-facing poses from the baked left row (no runtime flip)', () => {
+    // The sheet's left row is a baked mirror of the right art (stride-identical,
+    // stride-first ordering), so facing selects the row and no flip flag is set.
     const ctrl = new AvatarAnimationController({ facingDir: -1 });
 
     const idlePose = ctrl.getCurrentPose({ walking: false, walkFrame: 9 });
     expect(idlePose.sheet).toBe('walk');
-    expect(idlePose.row).toBe(0);
-    expect(idlePose.flip).toBe(true);
-    expect(idlePose.backgroundPosition).toBe('0px 0px'); // row 0, col 0
+    expect(idlePose.row).toBe(1);
+    expect(idlePose.flip).toBe(false);
+    expect(idlePose.backgroundPosition).toBe('0px -330px'); // row 1, col 0
 
     const walkPose = ctrl.getCurrentPose({ walking: true, walkFrame: 10 });
     expect(walkPose.sheet).toBe('walk');
-    expect(walkPose.row).toBe(0);
-    expect(walkPose.flip).toBe(true);
-    // frame 10 is index 1 of the left walk group -> sheet column 1 (frame 0 is
-    // the left idle), still rendered from row 0.
+    expect(walkPose.row).toBe(1);
+    expect(walkPose.flip).toBe(false);
+    // frame 10 is index 1 of the left walk group -> sheet column 1
     expect(walkPose.column).toBe(1);
-    expect(walkPose.backgroundPosition).toBe('-172px 0px');
+    expect(walkPose.backgroundPosition).toBe('-172px -330px');
   });
 
-  it('never flips the right-facing poses', () => {
-    const ctrl = new AvatarAnimationController({ facingDir: 1 });
-    const walkPose = ctrl.getCurrentPose({ walking: true, walkFrame: 1 });
-    expect(walkPose.flip).toBe(false);
+  it('never flips any pose', () => {
+    // Baked art removed the need for runtime mirroring; the flag stays in the
+    // pose contract but must be false everywhere.
+    const ctrl = new AvatarAnimationController({ facingDir: -1 });
+    for (const wf of [0, 1, 5, 9, 12]) {
+      expect(ctrl.getCurrentPose({ walking: true, walkFrame: wf }).flip).toBe(false);
+      expect(ctrl.getCurrentPose({ walking: false, walkFrame: wf }).flip).toBe(false);
+    }
   });
 
   it('relaunches a held jump from landing and recovery, but not mid-air', () => {

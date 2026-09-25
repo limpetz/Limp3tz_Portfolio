@@ -405,11 +405,11 @@ export class AvatarAnimationController {
       return getRenderPose('jump', JUMP_COLUMNS.RECOVERY, row, actorW);
     }
 
-    // 3. Grounded: Walk or Idle. Both directions render from row 0 — the
-    // left-facing row ships with almost no limb movement — mirrored on the
-    // actor when facing left (the walk anchor is the cell centre, so the
-    // mirror keeps the feet planted).
+    // 3. Grounded: Walk or Idle. The sheet now carries a real mirrored left
+    // row (baked from the right art, stride-identical), so both rows render
+    // as-is — no runtime flip needed.
+    const walkRow = this.facingDir === 1 ? 0 : 1;
     const walkCol = options.walking ? (options.walkFrame % 9) : 0;
-    return getRenderPose('walk', walkCol, 0, actorW, this.facingDir === -1);
+    return getRenderPose('walk', walkCol, walkRow, actorW);
   }
 }
