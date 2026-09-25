@@ -265,10 +265,17 @@ node scripts/cadence-probe.mjs [url]  # live steps/min + travel per step
 
 If a future re-bake permutes or re-mirrors the cells, restore the layout with
 `node scripts/relayout-walk-sheet.mjs` (moves whole cells; pixels untouched)
-and re-run the gate. Cadence tuning lives in `ArcadeStage.tsx`:
-`STRIDE_REFERENCE_PX_S` sets travel-per-step (0.4s × value ≈ art stride 66px),
-`MAX_SPEED` sets footfalls-per-minute (2 × speed ÷ REF ÷ 0.8s ≈ 185/min at
-260/210).
+and re-run the gate. Cadence tuning lives in `ArcadeStage.tsx`, and the two
+knobs are independent:
+
+- `STRIDE_REFERENCE_PX_S` alone sets **travel per step** = `0.4s × value`
+  (84px at 210; the art's contact stride is ~66px, so the stance foot slides
+  ~18px/step — accepted trade-off, since zero slide at REF 165 would read as
+  ~236 frantic steps/min at the tuned speed).
+- `MAX_SPEED` alone sets **footfalls per minute** = `150 × speed ÷ REF`
+  (~185/min at 260/210).
+
+Measure both live with `node scripts/cadence-probe.mjs [url]`.
 
 Quality 82 is deliberate for the backgrounds — they're neon gradients that band
 badly below ~75. Once you're happy, the `.originals/` folders can be deleted.

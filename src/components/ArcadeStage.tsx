@@ -190,10 +190,12 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
   // Physics constants
   const GROUND_H = 92;
-  // Cadence pair with STRIDE_REFERENCE_PX_S (below): 260/210 ≈ 1.24× clock
-  // rate ⇒ ~185 footfalls/min and travel per step ≈ 66px — matching the walk
-  // art's contact stride (foot-pixel probe: spreads 59/73/66px), so the
-  // stance foot reads planted instead of skating.
+  // Cadence pair with STRIDE_REFERENCE_PX_S (below). The two knobs are
+  // independent: travel per step = 0.4s × REF (84px at 210; the art's contact
+  // stride is ~66px, so the stance foot still slides ~18px/step), while
+  // footfalls/min = 150 × speed ÷ REF (≈185/min at 260/210). Zero slide would
+  // need REF 165, which pushes steps to ~236/min at this speed — accepted
+  // trade-off per live cadence-probe measurements.
   const MAX_SPEED = 260; // px/sec
   const ACCEL = 1800; // px/sec²
   const FRICTION = 2200; // px/sec²
@@ -917,9 +919,8 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         // WALKING: advance the sheet's clock only while actually moving. The
         // cadence tracks ground speed relative to the STRIDE_REFERENCE rate the
         // art was authored for; lower = faster legs, higher = slower legs.
-        // Pairing note: travel per step = 0.4s × this value (art stride 66px),
-        // while footfalls/min = 2 × speed / this value ÷ 0.8s — tune MAX_SPEED
-        // for step rate, this for stride length.
+        // Pairing note: travel per step = 0.4s × this value ONLY (speed has no
+        // effect on step length); footfalls/min = 150 × MAX_SPEED ÷ this value.
         const STRIDE_REFERENCE_PX_S = 210;
         walkElapsedRef.current += dt * 1000 * (Math.abs(stateRef.current.vx) / STRIDE_REFERENCE_PX_S);
 
