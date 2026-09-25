@@ -949,8 +949,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           currentRenderPoseRef.current = pose;
           const spec = SPRITE_SPECS[pose.sheet];
 
-          spriteRef.current.style.width = `${spec.w}px`;
-          spriteRef.current.style.height = `${spec.h}px`;
+          // `pose` carries the *scaled* cell size — using the raw `spec.w/h`
+          // here would clip the sprite against its own background-size.
+          spriteRef.current.style.width = `${pose.width}px`;
+          spriteRef.current.style.height = `${pose.height}px`;
           spriteRef.current.style.left = `${pose.offsetX}px`;
           spriteRef.current.style.bottom = `${pose.offsetY}px`;
           spriteRef.current.style.backgroundImage = `url(${spec.src})`;
