@@ -186,40 +186,6 @@ export class ArcadeParticleSystem {
   }
 
   /**
-   * Trigger skid dust spray when changing direction rapidly or braking
-   * @param x Foot contact X
-   * @param y Foot contact Y
-   * @param skidDir Direction of skid spray
-   */
-  public triggerSkidDust(x: number, y: number, skidDir: number) {
-    const count = 7;
-    for (let i = 0; i < count; i++) {
-      const speed = 40 + Math.random() * 80;
-      const vx = skidDir * speed;
-      const vy = -12 - Math.random() * 30;
-      const initialSize = 3.5 + Math.random() * 4.5;
-
-      this.particles.push({
-        id: this.nextId++,
-        kind: 'dust_puff',
-        x: x + (Math.random() * 8 - 4),
-        y: y + (Math.random() * 4 - 2),
-        vx,
-        vy,
-        life: 0,
-        maxLife: 0.32 + Math.random() * 0.18,
-        color: DUST_PALETTE[Math.floor(Math.random() * DUST_PALETTE.length)],
-        size: initialSize,
-        maxSize: initialSize * 1.8,
-        alpha: 0.8,
-        rotation: Math.random() * Math.PI * 2,
-        rotSpeed: (Math.random() - 0.5) * 3,
-        drag: 0.9,
-      });
-    }
-  }
-
-  /**
    * Trigger radiant arcade sparkle effect when picking up coins
    * @param x Pickup center X
    * @param y Pickup center Y
