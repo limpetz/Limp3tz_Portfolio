@@ -57,7 +57,7 @@ export const STAGE_BACKGROUNDS: string[] = resolveStageBackgrounds(
 );
 
 /** How long each background stays on screen, in milliseconds. */
-export const SLIDESHOW_INTERVAL_MS = 4000;
+export const SLIDESHOW_INTERVAL_MS = 5000;
 
 /** Crossfade duration, in milliseconds. */
 export const SLIDESHOW_FADE_MS = 1000;

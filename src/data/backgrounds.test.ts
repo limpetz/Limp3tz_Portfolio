@@ -81,8 +81,8 @@ describe('stepBackgroundIndex', () => {
 });
 
 describe('slideshow configuration', () => {
-  it('holds each background for 4 seconds', () => {
-    expect(SLIDESHOW_INTERVAL_MS).toBe(4000);
+  it('holds each background for 5 seconds', () => {
+    expect(SLIDESHOW_INTERVAL_MS).toBe(5000);
   });
 
   it('crossfades faster than the hold time, so a slide never fades into itself', () => {

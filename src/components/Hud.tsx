@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { sound } from '../utils/soundEngine';
+import { PixelHeart } from './PixelHeart';
 
 /** Short display version (e.g. "v1.1.0"); full identity lives in the tooltip.
  *  Handles all describe shapes: "v1.1.0-6-gsha", "auto/v1.1.2+sha", bare sha. */
@@ -43,13 +44,27 @@ export const Hud: React.FC<HudProps> = ({
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-[58px] bg-[#070512]/95 border-b-2 border-[#00e5ff] font-pixel text-[9px] text-white flex items-center px-4 gap-4 backdrop-blur-sm">
       {/* Lives & P1 */}
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="flex gap-1" aria-label="3 lives">
-          <span className="w-2.5 h-2.5 bg-[#ff2d78] block" />
-          <span className="w-2.5 h-2.5 bg-[#ff2d78] block" />
-          <span className="w-2.5 h-2.5 bg-[#ff2d78] block" />
+      <div className="flex items-center gap-2.5 shrink-0">
+        <div
+          className="flex items-center gap-1.5 bg-[#110d24]/90 px-2 py-1 border border-[#ff2d78]/40 shadow-[0_0_8px_rgba(255,45,120,0.3)]"
+          aria-label="Health: 4 hearts"
+        >
+          <span className="text-[#ff2d78] font-bold text-[8px] mr-0.5">HP</span>
+          <div className="flex gap-1 items-center">
+            <PixelHeart size={13} delay={0} />
+            <PixelHeart size={13} delay={0.15} />
+            <PixelHeart size={13} delay={0.3} />
+            <PixelHeart size={13} delay={0.45} />
+          </div>
+          {/* Micro health meter on sm screens */}
+          <div className="hidden sm:block w-9 h-1.5 bg-[#0a0817] border border-[#ff2d78]/40 overflow-hidden ml-1">
+            <div
+              className="h-full bg-gradient-to-r from-[#ff2d78] via-[#ff5c98] to-[#3dffa2] animate-health-pulse"
+              style={{ width: '100%' }}
+            />
+          </div>
         </div>
-        <span className="text-[#ffd23f] tracking-wider hidden sm:inline-block">P1: LIMP3TZ</span>
+        <span className="text-[#ffd23f] tracking-wider hidden sm:inline-block">P1: ARSHAD</span>
         {/* Build badge: matches the boot-screen stamp, so a stale deploy is
             visible without leaving the game. Click opens the exact commit on
             GitHub; hover shows full build identity. */}

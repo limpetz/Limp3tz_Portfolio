@@ -280,8 +280,7 @@ measurements:
   visible event — the ground probe (`scripts/ground-probe.mjs`) confirmed
   both feet plant; unweighted playback at high clock rates blurred it.
 
-Measure live with `node scripts/cadence-probe.mjs [url]`; `[` / `]` tune the
-stride reference in-game while the C overlay is open.
+Measure live with `node scripts/cadence-probe.mjs [url]`.
 
 Quality 82 is deliberate for the backgrounds — they're neon gradients that band
 badly below ~75. Once you're happy, the `.originals/` folders can be deleted.

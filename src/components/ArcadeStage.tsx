@@ -3,12 +3,6 @@ import { PORTFOLIO_CONFIG, MYSTERY_BLOCKS_DATA, IDLE_QUIPS } from '../data/portf
 import {
   BLOCK_POSITIONS_KEY,
   loadBlockPositions,
-  saveBlockPositions,
-  blockDxPct,
-  withBlockPosition,
-  clampDxPct,
-  clampDyUpPct,
-  defaultDxPct,
   type BlockPosition,
 } from '../utils/blockLayout';
 import { sound } from '../utils/soundEngine';
@@ -192,57 +186,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     jump: false,
   });
 
-  // --- Cadence debug overlay (C key): live speed/step readout for tuning ---
-  const [showCadence, setShowCadence] = useState(false);
-  const showCadenceRef = useRef(showCadence);
-  showCadenceRef.current = showCadence;
-  const [cadenceLive, setCadenceLive] = useState<
-    | { speed: number; stepPx: number; stepsPerMin: number; ref: number; maxSpeed: number }
-    | null
-  >(null);
-  const lastCadencePushRef = useRef(0);
-  // Live tuning: while the overlay is open, [ / ] raise/lower the stride
-  // reference ([ = slower legs). Session-only; the settled value gets baked
-  // into the constant. Ref mirrors into state so the overlay re-renders.
-  const strideRefOverrideRef = useRef<number | null>(null);
-  const [strideOverride, setStrideOverride] = useState<number | null>(null);
-
-  // --- Mystery-block arranger (dev feature, L key / HUD-style toggle) ---
-  // The chosen arrangement persists to localStorage (see blockLayout.ts), so
-  // the stage keeps rendering it after this UI is removed.
-  const [arrangeMode, setArrangeMode] = useState(false);
-  const [blockPositions, setBlockPositions] = useState<BlockPosition[]>(() =>
+  // Mystery-block positions (persisted to localStorage; defaults to centred flex layout).
+  const [blockPositions] = useState<BlockPosition[]>(() =>
     loadBlockPositions(BLOCK_POSITIONS_KEY),
   );
-  const dragBlockRef = useRef<string | null>(null);
-
-  /** Stage-local x of a client-x (the container spans the viewport width). */
-  const rectLeft = () => containerRef.current?.getBoundingClientRect().left ?? 0;
-
-  /** Nudge a block by dirX/dirY (relocation arranger). Measured live so it
-   *  works for blocks still in the default flex flow too. dirX is a fraction
-   *  of stage width; dirY is ±16px expressed as a fraction of stage height. */
-  const nudgeBlock = (blockKey: string, dirX: number, dirY: number) => {
-    const row = blocksRowRef.current;
-    const btn = row?.querySelector<HTMLButtonElement>(`[data-block-key="${blockKey}"]`);
-    const stageH = containerRef.current?.clientHeight ?? 0;
-    if (!row || !btn || !stageH) return;
-    const rowRect = row.getBoundingClientRect();
-    const bRect = btn.getBoundingClientRect();
-    const currentDx =
-      (bRect.left + bRect.width / 2 - (rowRect.left + rowRect.width / 2)) / rowRect.width;
-    const saved = blockPositions.find((p) => p.key === blockKey);
-    const next = withBlockPosition(
-      blockPositions,
-      blockKey,
-      clampDxPct(currentDx + dirX * 0.03, rowRect.width, BLOCK_SIZE),
-      dirY !== 0
-        ? clampDyUpPct((saved?.dyUpPct ?? 0) + (dirY * 16) / stageH, stageH, BLOCK_Y)
-        : saved?.dyUpPct,
-    );
-    setBlockPositions(next);
-    saveBlockPositions(BLOCK_POSITIONS_KEY, next);
-  };
 
   // Konami code buffer
   const konamiBuffer = useRef<string[]>([]);
@@ -476,7 +423,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     if (!itemDef) return;
 
     setBumpedBlockKey(key);
-    setTimeout(() => setBumpedBlockKey(null), 300);
+    setTimeout(() => setBumpedBlockKey(null), 400);
 
     const result = collectBlock(collectedItemsRef.current, key, MYSTERY_BLOCKS_DATA.length);
     if (!result.isNew) {
@@ -604,22 +551,6 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         return;
       }
 
-      // Dev/debug toggles (data entry: no game keys are affected).
-      if (e.code === 'KeyC' && !e.repeat) {
-        setShowCadence((v) => !v);
-      }
-      if (showCadenceRef.current && (e.code === 'BracketLeft' || e.code === 'BracketRight') && !e.repeat) {
-        // [ = slower legs (raise the reference), ] = faster legs (lower it).
-        const step = e.code === 'BracketLeft' ? 15 : -15;
-        const base = strideRefOverrideRef.current ?? STRIDE_REFERENCE_PX_S;
-        const next = Math.min(260, Math.max(120, base + step));
-        strideRefOverrideRef.current = next;
-        setStrideOverride(next);
-      }
-      if (e.code === 'KeyL' && !e.repeat) {
-        setArrangeMode((v) => !v);
-      }
-
       if (isLeftKey(e.code)) {
         keysRef.current.left = true;
       }
@@ -638,23 +569,6 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         });
         keysRef.current.jump = true;
         if (allow) doJump();
-      }
-
-      // Sample the cadence overlay at ~4Hz (no per-frame React churn).
-      if (showCadenceRef.current) {
-        const now = performance.now();
-        if (now - lastCadencePushRef.current > 250) {
-          lastCadencePushRef.current = now;
-          const speed = Math.abs(stateRef.current.vx);
-          const refPx = strideRefOverrideRef.current ?? STRIDE_REFERENCE_PX_S;
-          setCadenceLive({
-            speed,
-            stepPx: 0.4 * refPx,
-            stepsPerMin: (speed / refPx) * 120, // 2 footfalls/cycle, 0.8s/cycle at REF
-            ref: refPx,
-            maxSpeed: MAX_SPEED,
-          });
-        }
       }
 
       // Konami buffer
@@ -1051,11 +965,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       } else if (Math.abs(stateRef.current.vx) > 15) {
         // WALKING: advance the sheet's clock only while actually moving. The
         // cadence tracks ground speed relative to the STRIDE_REFERENCE rate the
-        // art was authored for; lower = faster legs, higher = slower legs.
+        // art was authored for (210 px/s).
         // Pairing note: travel per step = 0.4s × this value ONLY (speed has no
         // effect on step length); footfalls/min = 150 × MAX_SPEED ÷ this value.
-        const activeStrideRef = strideRefOverrideRef.current ?? STRIDE_REFERENCE_PX_S;
-        walkElapsedRef.current += dt * 1000 * (Math.abs(stateRef.current.vx) / activeStrideRef);
+        walkElapsedRef.current += dt * 1000 * (Math.abs(stateRef.current.vx) / STRIDE_REFERENCE_PX_S);
 
         // Smooth turn lean toward movement direction
         const targetTilt = stateRef.current.turnAngle;
@@ -1241,25 +1154,6 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       className={`relative w-full h-[100svh] min-h-[660px] overflow-hidden select-none touch-manipulation bg-[#070512] ${
         partyMode ? 'party-mode' : ''
       }`}
-      onDragOver={(e) => {
-        // Arranger: allow dropping anywhere on the stage, not just on blocks.
-        if (arrangeMode && dragBlockRef.current !== null) e.preventDefault();
-      }}
-      onDrop={(e) => {
-        if (!arrangeMode || dragBlockRef.current === null) return;
-        e.preventDefault();
-        const key = dragBlockRef.current;
-        dragBlockRef.current = null;
-        const stageW = containerRef.current?.clientWidth ?? 0;
-        if (!stageW) return;
-        // The HTML5 drag image is offset by the grab point; for a 56px block
-        // that's close enough to the centre for a layout tool.
-        const dxPct = clampDxPct((e.clientX - rectLeft()) / stageW - 0.5, stageW, BLOCK_SIZE);
-        const next = withBlockPosition(blockPositions, key, dxPct);
-        setBlockPositions(next);
-        saveBlockPositions(BLOCK_POSITIONS_KEY, next);
-        sound.playBlip(880, 0.03, 0.06);
-      }}
     >
       {/* Hero Background Slideshow — full-bleed. An earlier inset "arcade
           bezel" framing was tried here and reverted: the frame line cut
@@ -1307,9 +1201,9 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             type="button"
             aria-label="Previous background"
             onClick={() => stepBackground(-1)}
-            className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-sm border-2 border-[#00e5ff] bg-[#070512]/60 text-[#00e5ff] backdrop-blur-[2px] transition-all hover:bg-[#00e5ff]/20 hover:shadow-[0_0_16px_rgba(0,229,255,0.8)] active:scale-95"
+            className="absolute left-2.5 sm:left-5 top-1/2 -translate-y-1/2 z-30 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-sm border-2 border-[#00e5ff] bg-[#070512]/60 text-[#00e5ff] backdrop-blur-[2px] transition-all hover:bg-[#00e5ff]/20 hover:shadow-[0_0_12px_rgba(0,229,255,0.7)] active:scale-95"
           >
-            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
@@ -1317,9 +1211,9 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             type="button"
             aria-label="Next background"
             onClick={() => stepBackground(1)}
-            className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-sm border-2 border-[#00e5ff] bg-[#070512]/60 text-[#00e5ff] backdrop-blur-[2px] transition-all hover:bg-[#00e5ff]/20 hover:shadow-[0_0_16px_rgba(0,229,255,0.8)] active:scale-95"
+            className="absolute right-2.5 sm:right-5 top-1/2 -translate-y-1/2 z-30 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-sm border-2 border-[#00e5ff] bg-[#070512]/60 text-[#00e5ff] backdrop-blur-[2px] transition-all hover:bg-[#00e5ff]/20 hover:shadow-[0_0_12px_rgba(0,229,255,0.7)] active:scale-95"
           >
-            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </button>
@@ -1413,56 +1307,21 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               <div
                 key={item.key}
                 title={`${item.title} block`}
-                className={`w-8 h-8 border-2 flex items-center justify-center text-[10px] font-pixel transition-all ${
+                className={`w-8 h-8 border-2 flex items-center justify-center font-pixel transition-all ${
                   hasItem
                     ? 'border-black bg-white text-black font-bold shadow-[0_0_10px_rgba(255,255,255,0.8)] scale-105'
                     : 'border-dashed border-[#7d7aa3]/50 bg-[#070512]/80 text-[#7d7aa3]/50'
                 }`}
                 style={hasItem ? { backgroundColor: item.color } : {}}
               >
-                {item.label}
+                <span className="text-[7px] font-pixel leading-none text-center font-bold">
+                  {hasItem ? item.shortLabel || item.label : '?'}
+                </span>
               </div>
             );
           })}
         </div>
       </div>
-
-      {/* Dev: mystery-block arranger (toggle with L). Drag a ? block anywhere
-          along the stage, or nudge it with the ◀ ▶ handles. Positions persist
-          to localStorage (blockLayout.ts, dx from stage centre); blocks with
-          no saved position keep the default centred flex layout. This UI can
-          be removed once the layout is final — the stage keeps honouring the
-          saved positions, and RESET restores the default spread. */}
-      {arrangeMode && (
-        <div className="absolute left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-3 py-1.5 border-2 border-[#ffd23f] bg-[#0a0620]/95 font-pixel text-[9px] text-[#ffd23f] shadow-[0_0_16px_rgba(255,210,63,0.45)] pointer-events-none">
-          <span>ARRANGE MODE · drag a ? block anywhere, or nudge ◀ ▶ ▲ ▼ (▼ lowers into bumpable range)</span>
-          <button
-            type="button"
-            className="pointer-events-auto px-2 py-1 border border-[#7d7aa3] text-[#7d7aa3] hover:text-[#00e5ff] hover:border-[#00e5ff] cursor-pointer"
-            onClick={() => {
-              setBlockPositions([]);
-              try {
-                window.localStorage.removeItem(BLOCK_POSITIONS_KEY);
-              } catch {
-                // Storage disabled: clearing the session layout is enough.
-              }
-            }}
-          >
-            RESET
-          </button>
-        </div>
-      )}
-
-      {/* Cadence overlay (C): live speed + step metrics. [ / ] tune the
-          stride reference live (session-only) for feel calibration. */}
-      {showCadence && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-40 px-3 py-1.5 border-2 border-[#3dffa2] bg-[#0a0620]/95 font-pixel text-[9px] text-[#3dffa2] leading-relaxed shadow-[0_0_16px_rgba(61,255,162,0.4)] pointer-events-none">
-          <div>SPEED {Math.round(cadenceLive?.speed ?? 0)} px/s (MAX {cadenceLive?.maxSpeed ?? MAX_SPEED})</div>
-          <div>STEP {Math.round(cadenceLive?.stepPx ?? 0.4 * STRIDE_REFERENCE_PX_S)} px · STRIDE_REF {strideOverride ?? cadenceLive?.ref ?? STRIDE_REFERENCE_PX_S}</div>
-          <div>STEPS/MIN {Math.round(cadenceLive?.stepsPerMin ?? 0)}</div>
-          <div className="text-[#7d7aa3]">[ slower · ] faster (session only)</div>
-        </div>
-      )}
 
       {/* Overhead Mystery ? Blocks. The row spans the full stage width so a
           block can be absolutely positioned anywhere along it; blocks without
@@ -1478,7 +1337,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           // Attract hint: glow while the player stands under this block, so the
           // "jump to bump" affordance is discoverable without a tutorial.
           const isHinted = hintedBlock === idx && !isUsed;
-          // Relocation (dev): a saved dxPct places the block absolutely within
+          // Relocation: a saved dxPct places the block absolutely within
           // the full-width row; blocks without one keep the centred flex flow.
           const savedPos = blockPositions.find((p) => p.key === block.key);
           const savedDx = savedPos;
@@ -1493,58 +1352,45 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                 openBlock(block.key, bLeft);
               }}
               data-block-key={block.key}
-              draggable={arrangeMode || undefined}
-              onDragStart={(e) => {
-                if (!arrangeMode) return;
-                dragBlockRef.current = block.key;
-                e.dataTransfer.effectAllowed = 'move';
-                try {
-                  e.dataTransfer.setData('text/plain', block.key);
-                } catch {
-                  // Some engines disallow setData on synthetic drags; the
-                  // key rides in dragBlockRef anyway.
-                }
-              }}
-              className={`${savedDx ? 'absolute' : 'relative'} w-12 h-12 sm:w-14 sm:h-14 font-pixel text-xl sm:text-2xl transition-transform cursor-pointer select-none border-2 ${
-                isBumped ? '-translate-y-4 duration-150' : 'translate-y-0 duration-200'
+              className={`${savedDx ? 'absolute' : 'relative'} w-12 h-12 sm:w-14 sm:h-14 font-pixel transition-all cursor-pointer select-none border-2 flex items-center justify-center ${
+                isBumped
+                  ? 'animate-mystery-bump z-40'
+                  : !isUsed
+                  ? 'animate-mystery-idle'
+                  : ''
               } ${
                 isUsed
-                  ? 'bg-[#0c0a18] border-[#241c42] text-[#7d7aa3]'
+                  ? 'bg-[#0c0a18] border-[#241c42] text-[#7d7aa3] shadow-[0_4px_10px_rgba(0,0,0,0.6)]'
                   : 'bg-[#0a0817] border-[#00e5ff] text-[#ff2d78] shadow-[0_0_12px_rgba(0,229,255,0.4),inset_0_0_10px_rgba(0,229,255,0.2)] hover:bg-[#0d1b2e]'
-              } ${isHinted ? 'animate-pulse' : ''}`}
-              style={
-                {
-                  ...(isHinted
-                    ? {
-                        borderColor: '#ffd23f',
-                        color: '#ffd23f',
-                        boxShadow:
-                          '0 0 18px rgba(255,210,63,0.75), inset 0 0 12px rgba(255,210,63,0.3)',
-                      }
-                    : {
-                        borderColor: isUsed ? '#241c42' : block.color,
-                        color: isUsed ? '#7d7aa3' : block.color,
-                      }),
-                  // Centre the block on its saved fraction of the row width
-                  // (the -1.75rem half-block offset is tuned for the sm size).
-                  // dyUpPct raises/lowers the block from the default row height
-                  // via bottom (positive = up). Row height ≈ BLOCK_SIZE, so a
-                  // moved block's bottom is the row bottom + dy px.
-                  ...(savedDx
-                    ? {
-                        left: `calc(${50 + savedDx.dxPct * 100}% - 1.75rem)`,
-                        ...(savedDx.dyUpPct
-                          ? { bottom: `calc(${savedDx.dyUpPct * 100} * var(--stage-h, 100svh) / 100)` }
-                          : {}),
-                      }
-                    : {}),
-                }
-              }
-              title={
-                arrangeMode
-                  ? `Arrange mode: drag anywhere, or nudge ◀ ▶ ▲ ▼ (${block.title})`
-                  : `Mystery Block: ${block.title}`
-              }
+              } ${isHinted ? 'ring-2 ring-[#ffd23f] shadow-[0_0_20px_rgba(255,210,63,0.85)]' : ''}`}
+              style={{
+                ...(!isBumped && !isUsed ? { animationDelay: `${idx * 0.28}s` } : {}),
+                ...(isHinted
+                  ? {
+                      borderColor: '#ffd23f',
+                      color: '#ffd23f',
+                      boxShadow:
+                        '0 0 18px rgba(255,210,63,0.75), inset 0 0 12px rgba(255,210,63,0.3)',
+                    }
+                  : {
+                      borderColor: isUsed ? '#241c42' : block.color,
+                      color: isUsed ? block.color : block.color,
+                    }),
+                // Centre the block on its saved fraction of the row width
+                // (the -1.75rem half-block offset is tuned for the sm size).
+                // dyUpPct raises/lowers the block from the default row height
+                // via bottom (positive = up). Row height ≈ BLOCK_SIZE, so a
+                // moved block's bottom is the row bottom + dy px.
+                ...(savedDx
+                  ? {
+                      left: `calc(${50 + savedDx.dxPct * 100}% - 1.75rem)`,
+                      ...(savedDx.dyUpPct
+                        ? { bottom: `calc(${savedDx.dyUpPct * 100} * var(--stage-h, 100svh) / 100)` }
+                        : {}),
+                    }
+                  : {}),
+              }}
+              title={`Mystery Block: ${block.title}`}
               aria-label={`Mystery Block: ${block.title}`}
             >
               {/* Corner screws */}
@@ -1552,51 +1398,25 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               <span className="absolute top-1 right-1 w-1 h-1 bg-current opacity-70" />
               <span className="absolute bottom-1 left-1 w-1 h-1 bg-current opacity-70" />
               <span className="absolute bottom-1 right-1 w-1 h-1 bg-current opacity-70" />
-              <span>{isUsed ? block.label : '?'}</span>
-              {/* Arrange-mode handles: tap to nudge the block one slot. */}
-              {arrangeMode && (
-                <>
-                  <span
-                    className="absolute -left-2 top-1/2 -translate-x-full -translate-y-1/2 px-1 py-0.5 border border-[#ffd23f] text-[#ffd23f] text-[8px] cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      nudgeBlock(block.key, -1, 0);
-                    }}
-                    title="Move block left"
-                  >
-                    ◀
-                  </span>
-                  <span
-                    className="absolute -right-2 top-1/2 translate-x-full -translate-y-1/2 px-1 py-0.5 border border-[#ffd23f] text-[#ffd23f] text-[8px] cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      nudgeBlock(block.key, 1, 0);
-                    }}
-                    title="Move block right"
-                  >
-                    ▶
-                  </span>
-                  <span
-                    className="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full px-1 py-0.5 border border-[#ffd23f] text-[#ffd23f] text-[8px] cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      nudgeBlock(block.key, 0, 1);
-                    }}
-                    title="Move block up"
-                  >
-                    ▲
-                  </span>
-                  <span
-                    className="absolute -bottom-2 left-1/2 -translate-x-1/2 translate-y-full px-1 py-0.5 border border-[#ffd23f] text-[#ffd23f] text-[8px] cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      nudgeBlock(block.key, 0, -1);
-                    }}
-                    title="Move block down"
-                  >
-                    ▼
-                  </span>
-                </>
+
+              {/* Block Content: Animated '?' when idle, Word label when revealed */}
+              {isUsed ? (
+                <span
+                  className={`font-pixel font-bold tracking-tight uppercase leading-none block px-0.5 text-center ${
+                    block.label.length >= 8
+                      ? 'text-[6.5px] sm:text-[7.5px]'
+                      : block.label.length >= 6
+                      ? 'text-[7.5px] sm:text-[8.5px]'
+                      : 'text-[9px] sm:text-[10px]'
+                  }`}
+                  style={{ color: block.color }}
+                >
+                  {block.label}
+                </span>
+              ) : (
+                <span className="font-pixel text-xl sm:text-2xl animate-mystery-question inline-block">
+                  ?
+                </span>
               )}
             </button>
           );

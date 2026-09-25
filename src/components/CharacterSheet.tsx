@@ -2,6 +2,7 @@ import React from 'react';
 import { PORTFOLIO_CONFIG } from '../data/portfolioData';
 import { spriteCanvasSize } from '../data/sprite';
 import { GitHubActivity } from './GitHubActivity';
+import { PixelHeart } from './PixelHeart';
 
 interface CharacterSheetProps {
   spriteUrl: string;
@@ -53,10 +54,22 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({ spriteUrl, onAdd
             P1 — READY FOR NEXT QUEST!
           </p>
 
-          <div className="flex gap-1.5 justify-center mt-3" aria-label="3 lives">
-            <span className="w-3.5 h-3.5 bg-[#ff2d78] shadow-[0_0_6px_rgba(255,45,120,0.7)] block" />
-            <span className="w-3.5 h-3.5 bg-[#ff2d78] shadow-[0_0_6px_rgba(255,45,120,0.7)] block" />
-            <span className="w-3.5 h-3.5 bg-[#ff2d78] shadow-[0_0_6px_rgba(255,45,120,0.7)] block" />
+          {/* Animated 4 Pixel Hearts */}
+          <div className="mt-3 flex items-center justify-center gap-1.5" aria-label="Health: 4 hearts">
+            <b className="font-pixel text-[8px] text-[#ff2d78] tracking-widest font-bold mr-0.5 not-italic">HP</b>
+            <span className="inline-flex cursor-pointer hover:scale-125 transition-transform" title="Heart 1">
+              <PixelHeart size={16} delay={0} />
+            </span>
+            <span className="inline-flex cursor-pointer hover:scale-125 transition-transform" title="Heart 2">
+              <PixelHeart size={16} delay={0.15} />
+            </span>
+            <span className="inline-flex cursor-pointer hover:scale-125 transition-transform" title="Heart 3">
+              <PixelHeart size={16} delay={0.3} />
+            </span>
+            <span className="inline-flex cursor-pointer hover:scale-125 transition-transform" title="Heart 4">
+              <PixelHeart size={16} delay={0.45} />
+            </span>
+            <b className="font-pixel text-[8px] text-[#3dffa2] tracking-wider ml-0.5 not-italic">MAX</b>
           </div>
 
           <div className="mt-4 pt-3 border-t border-[#241c42] font-pixel text-[8px] text-[#7d7aa3] space-y-1">
