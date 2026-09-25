@@ -55,6 +55,7 @@ interface ArcadeStageProps {
   onAddScore: (amount: number) => void;
   onAddCoin: (amount: number) => void;
   onHeal?: (amount?: number) => void;
+  onTakeDamage?: (amount?: number) => void;
   health?: number;
   spriteUrl: string;
   useProceduralBackground?: boolean;
@@ -74,10 +75,20 @@ interface FallingHeart {
   vy: number;
 }
 
+interface GlitchHazard {
+  id: number;
+  x: number;
+  y: number; // ground clearance
+  vx: number;
+  width: number;
+  height: number;
+}
+
 export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   onAddScore,
   onAddCoin,
   onHeal,
+  onTakeDamage,
   health = 4,
   spriteUrl,
   useProceduralBackground,
@@ -114,6 +125,14 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   const fallingCoinsRef = useRef<FallingCoin[]>([]);
   const [fallingHearts, setFallingHearts] = useState<FallingHeart[]>([]);
   const fallingHeartsRef = useRef<FallingHeart[]>([]);
+  const [hazards, setHazards] = useState<GlitchHazard[]>([
+    { id: 1, x: 500, y: 18, vx: -65, width: 32, height: 28 },
+  ]);
+  const hazardsRef = useRef<GlitchHazard[]>([
+    { id: 1, x: 500, y: 18, vx: -65, width: 32, height: 28 },
+  ]);
+  const [invulnerable, setInvulnerable] = useState(false);
+  const invulnerableRef = useRef(false);
   const [partyMode, setPartyMode] = useState(false);
 
   // --- Off-screen pause -------------------------------------------------
@@ -1190,6 +1209,90 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         setFallingHearts(remainingHearts);
       }
 
+      // Update cyber glitch hazards & collision detection (hazard damage or jump stomp)
+      const currentHazards = hazardsRef.current;
+      if (currentHazards.length > 0) {
+        const stageW = stateRef.current.stageWidth || 1000;
+        const actorLeft = stateRef.current.x + 8;
+        const actorRight = stateRef.current.x + stateRef.current.actorWidth - 8;
+        const actorBottom = GROUND_H + stateRef.current.y;
+        const actorTop = actorBottom + stateRef.current.actorHeight;
+        const stageH = containerRef.current?.clientHeight || 800;
+
+        const nextHazards: GlitchHazard[] = [];
+
+        for (let i = 0; i < currentHazards.length; i++) {
+          const hz = currentHazards[i];
+          let nextX = hz.x + hz.vx * dt;
+          let nextVx = hz.vx;
+
+          if (nextX <= 20) {
+            nextX = 20;
+            nextVx = Math.abs(hz.vx);
+          } else if (nextX >= stageW - hz.width - 20) {
+            nextX = stageW - hz.width - 20;
+            nextVx = -Math.abs(hz.vx);
+          }
+
+          const hzLeft = nextX;
+          const hzRight = nextX + hz.width;
+          const hzBottom = GROUND_H + hz.y;
+          const hzTop = hzBottom + hz.height;
+
+          const overlapsX = actorRight >= hzLeft && actorLeft <= hzRight;
+          const overlapsY = actorBottom <= hzTop && actorTop >= hzBottom;
+
+          if (overlapsX && overlapsY) {
+            // Player stomped hazard from above while falling down
+            if (stateRef.current.vy < -50 && actorBottom >= hzTop - 18) {
+              sound.playBump();
+              sound.playPower();
+              stateRef.current.vy = 850; // Bounce upward off bug stomp
+              stateRef.current.grounded = false;
+              onAddScore(300);
+              particleSys.current.triggerLandingDust(nextX + hz.width / 2, stageH - hzBottom);
+              say('BUG SQUASHED! +300 PTS!', 1600);
+              // Respawn bug after 3.5s delay
+              setTimeout(() => {
+                hazardsRef.current = [
+                  ...hazardsRef.current,
+                  {
+                    id: Math.random() + Date.now(),
+                    x: Math.random() > 0.5 ? 40 : (stateRef.current.stageWidth || 800) - 80,
+                    y: 18,
+                    vx: Math.random() > 0.5 ? 70 : -70,
+                    width: 32,
+                    height: 28,
+                  },
+                ];
+                setHazards(hazardsRef.current);
+              }, 3500);
+              continue;
+            } else if (!invulnerableRef.current) {
+              // Player contact damage
+              if (onTakeDamage) {
+                onTakeDamage(1);
+              }
+              invulnerableRef.current = true;
+              setInvulnerable(true);
+              stateRef.current.vx = nextVx > 0 ? 180 : -180; // Knocks back player
+              stateRef.current.vy = 350;
+              stateRef.current.grounded = false;
+              say('OUCH! GLITCH HAZARD!', 1800);
+              setTimeout(() => {
+                invulnerableRef.current = false;
+                setInvulnerable(false);
+              }, 1200);
+            }
+          }
+
+          nextHazards.push({ ...hz, x: nextX, vx: nextVx });
+        }
+
+        hazardsRef.current = nextHazards;
+        setHazards(nextHazards);
+      }
+
       // Update and render canvas particles
       particleSys.current.updateAndRender(dt);
 
@@ -1586,6 +1689,45 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         </button>
       ))}
 
+      {/* Cyber Glitch Hazards (Floating Bugs) */}
+      {hazards.map((hz) => (
+        <div
+          key={hz.id}
+          className="absolute z-20 pointer-events-none select-none flex items-center justify-center"
+          style={{
+            left: `${hz.x}px`,
+            bottom: `${GROUND_H + hz.y}px`,
+            width: `${hz.width}px`,
+            height: `${hz.height}px`,
+          }}
+          aria-label="Cyber Glitch Bug Hazard"
+        >
+          {/* Retro Pixel Bug Art */}
+          <div className="relative w-full h-full animate-pulse">
+            <svg viewBox="0 0 16 14" className="w-full h-full drop-shadow-[0_0_8px_rgba(255,45,120,0.8)]">
+              {/* Antennae */}
+              <rect x="3" y="1" width="2" height="2" fill="#00e5ff" />
+              <rect x="11" y="1" width="2" height="2" fill="#00e5ff" />
+              <rect x="4" y="3" width="2" height="2" fill="#00e5ff" />
+              <rect x="10" y="3" width="2" height="2" fill="#00e5ff" />
+              {/* Body */}
+              <rect x="3" y="5" width="10" height="6" fill="#ff2d78" />
+              <rect x="5" y="4" width="6" height="8" fill="#ff5c98" />
+              {/* Eyes */}
+              <rect x="4" y="6" width="2" height="2" fill="#ffffff" />
+              <rect x="10" y="6" width="2" height="2" fill="#ffffff" />
+              <rect x="5" y="6" width="1" height="1" fill="#0a0817" />
+              <rect x="11" y="6" width="1" height="1" fill="#0a0817" />
+              {/* Legs */}
+              <rect x="1" y="8" width="2" height="2" fill="#00e5ff" />
+              <rect x="13" y="8" width="2" height="2" fill="#00e5ff" />
+              <rect x="2" y="11" width="2" height="2" fill="#00e5ff" />
+              <rect x="12" y="11" width="2" height="2" fill="#00e5ff" />
+            </svg>
+          </div>
+        </div>
+      ))}
+
       {/* High-Performance Canvas Particle System (Sparkles, Twinkles, Landing Dust Puffs) */}
       <canvas
         ref={canvasRef}
@@ -1637,7 +1779,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         title="That's me! Click to jump or bump mystery blocks!"
         className={`absolute z-40 cursor-pointer select-none ${
           isCheering ? 'animate-bounce' : ''
-        }`}
+        } ${invulnerable ? 'opacity-60 animate-pulse' : ''}`}
         style={{
           left: `${posX}px`,
           bottom: `${GROUND_H + posY}px`,
