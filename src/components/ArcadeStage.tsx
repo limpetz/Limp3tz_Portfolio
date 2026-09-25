@@ -82,7 +82,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   const [bumpedBlockKey, setBumpedBlockKey] = useState<string | null>(null);
 
   // Speech bubble
-  const [bubbleText, setBubbleText] = useState("HI, I'M LIMP3TZ! CLICK OR MOVE ME!");
+  const [bubbleText, setBubbleText] = useState("HI, I'M ARSHAD! CLICK OR MOVE ME!");
   const [bubbleVisible, setBubbleVisible] = useState(true);
   const typingTimerRef = useRef<number | null>(null);
   const bubbleHideTimerRef = useRef<number | null>(null);
@@ -1426,7 +1426,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             imageRendering: 'pixelated',
           }}
           role="img"
-          aria-label="Pixel character of LIMP3TZ"
+          aria-label="Pixel character of Arshad Mohemed"
         />
       </div>
 

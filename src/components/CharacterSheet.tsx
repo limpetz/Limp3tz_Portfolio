@@ -43,7 +43,7 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({ spriteUrl, onAdd
                 portrait shrinks without distorting when the panel narrows. */}
             <img
               src={spriteUrl}
-              alt="LIMP3TZ pixel character portrait"
+              alt="Arshad Mohemed pixel character portrait"
               className="h-auto max-w-full object-contain pixel-art drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)] animate-idle-breathe"
               style={{ width: `${PORTRAIT.width}px` }}
             />

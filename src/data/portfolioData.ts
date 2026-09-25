@@ -25,7 +25,7 @@ export interface PortfolioConfig {
 }
 
 export const PORTFOLIO_CONFIG: PortfolioConfig = {
-  name: "LIMP3TZ",
+  name: "ARSHAD MOHEMED",
   ign: "LIMP3TZ",
   role: "SENIOR SPECIALIST TRAINER — AD OPS",
   company: "MARKETSTAR",
@@ -45,7 +45,7 @@ export const PORTFOLIO_CONFIG: PortfolioConfig = {
 export interface ContactLink {
   id: 'email' | 'linkedin' | 'github' | 'discord' | 'steam';
   label: string;
-  /** Full instruction for screen readers, e.g. "Email LIMP3TZ". */
+  /** Full instruction for screen readers, e.g. "Email Arshad". */
   ariaLabel: string;
   href: string;
   icon: string;
@@ -456,7 +456,7 @@ export const MYSTERY_BLOCKS_DATA = [
     label: "N",
     color: "#00e5ff",
     title: "IDENTIFIER",
-    getLine: () => `I'M ${PORTFOLIO_CONFIG.ign} · ONLINE`,
+    getLine: () => `I'M ARSHAD · AKA ${PORTFOLIO_CONFIG.ign}`,
   },
   {
     key: "role",

@@ -1,6 +1,6 @@
 # LIMP3TZ // Neon Pixel Arcade Portfolio
 
-An interactive neon-cyberpunk arcade portfolio for **LIMP3TZ** —
+An interactive neon-cyberpunk arcade portfolio for **Arshad Mohemed (LIMP3TZ)** —
 Senior Specialist Trainer, Ad Ops @ MarketStar, ex-NVIDIA QA.
 
 Instead of a static page it opens as a playable 2D platformer: a pixel character
@@ -340,8 +340,8 @@ full notice.
 
 The name and wordmark **LIMP3TZ**, its logo, the pixel-art character likeness
 and the arcade look-and-feel (trade dress) are unregistered trademarks and
-trade dress of LIMP3TZ. They may not be used for any product, service or
-derivative work. The owner holds common-law rights from use; a formal
+trade dress of **Arshad Mohemed**. They may not be used for any product, service
+or derivative work. The owner holds common-law rights from use; a formal
 registration (e.g. with the USPTO) is a separate legal process and is not
 granted or implied by anything here.
 
