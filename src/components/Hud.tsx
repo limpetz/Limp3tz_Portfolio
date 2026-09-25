@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { sound } from '../utils/soundEngine';
 
+/** Short display version (e.g. "v1.1.0"); full identity lives in the tooltip. */
+const BUILD_SHORT = __APP_VERSION__.split('-')[0];
+const BUILD_TOOLTIP = `BUILD ${__APP_VERSION__} · ${__BUILD_DATE__} · ${__BUILD_SHA__.toUpperCase()}`;
+
 interface HudProps {
   score: number;
   coins: number;
@@ -43,6 +47,14 @@ export const Hud: React.FC<HudProps> = ({
           <span className="w-2.5 h-2.5 bg-[#ff2d78] block" />
         </div>
         <span className="text-[#ffd23f] tracking-wider hidden sm:inline-block">P1: LIMP3TZ</span>
+        {/* Build badge: matches the boot-screen stamp, so a stale deploy is
+            visible without leaving the game. Details on hover. */}
+        <span
+          className="hidden md:inline-block text-[8px] text-[#7d7aa3]/60 tracking-wider"
+          title={BUILD_TOOLTIP}
+        >
+          {BUILD_SHORT}
+        </span>
       </div>
 
       {/* Desktop Navigation */}
