@@ -244,6 +244,32 @@ npx sharp-cli -i src/assets/images/.originals/pixel_arshad_sprite.png \
   -o tmp -f webp -q 88 resize 284
 ```
 
+### Walk-sheet pipeline (probe → relayout → gate)
+
+The walk sheet must keep three invariants, and CI enforces all three
+(`npm run gait:check`, run in both workflows):
+
+1. **Gait order** — column N holds the Nth pose of the walk cycle; footfall
+   contacts (both feet planted, ≥40px apart) sit at columns 1, 5 and 7.
+2. **Mirror parity** — row 1 is an exact horizontal mirror of row 0
+   (foot-cluster centers at `172 − x`), so left/right strides match.
+3. **Sequential playback** — `walkRight` reads `1..8`, `walkLeft` reads
+   `10..17`; the animation arrays never encode a scramble to compensate for
+   permuted cells.
+
+```bash
+npm run gait:check            # CI gate: assert the three invariants
+node scripts/foot-probe.mjs   # diagnosis: foot clusters per cell (both rows)
+node scripts/cadence-probe.mjs [url]  # live steps/min + travel per step
+```
+
+If a future re-bake permutes or re-mirrors the cells, restore the layout with
+`node scripts/relayout-walk-sheet.mjs` (moves whole cells; pixels untouched)
+and re-run the gate. Cadence tuning lives in `ArcadeStage.tsx`:
+`STRIDE_REFERENCE_PX_S` sets travel-per-step (0.4s × value ≈ art stride 66px),
+`MAX_SPEED` sets footfalls-per-minute (2 × speed ÷ REF ÷ 0.8s ≈ 185/min at
+260/210).
+
 Quality 82 is deliberate for the backgrounds — they're neon gradients that band
 badly below ~75. Once you're happy, the `.originals/` folders can be deleted.
 
