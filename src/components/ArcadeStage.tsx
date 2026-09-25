@@ -907,10 +907,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         }
       } else if (Math.abs(stateRef.current.vx) > 15) {
         // WALKING: advance the sheet's clock only while actually moving. The
-        // cadence tracks ground speed (frames are drawn for ~150px/s strides, we
-        // sprint at 280px/s), so the legs don't slide against the ground. Frame
-        // advance happens below in the sprite-update block; here we keep the lean.
-        walkElapsedRef.current += dt * 1000 * (Math.abs(stateRef.current.vx) / 150);
+        // cadence tracks ground speed relative to the STRIDE_REFERENCE rate the
+        // art was authored for; lower = faster legs, higher = slower legs.
+        const STRIDE_REFERENCE_PX_S = 190;
+        walkElapsedRef.current += dt * 1000 * (Math.abs(stateRef.current.vx) / STRIDE_REFERENCE_PX_S);
 
         // Smooth turn lean toward movement direction
         const targetTilt = stateRef.current.turnAngle;
