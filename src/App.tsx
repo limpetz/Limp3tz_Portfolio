@@ -15,6 +15,7 @@ import { QuestLog } from './components/QuestLog';
 import { ProjectLibrary } from './components/ProjectLibrary';
 import { ArcadeContact } from './components/ArcadeContact';
 import { ArcadeFooter } from './components/ArcadeFooter';
+import { GameOverModal } from './components/GameOverModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { clampScore } from './utils/physics';
 
@@ -100,6 +101,20 @@ export default function App() {
     });
   }, []);
 
+  const handleContinueGame = useCallback(() => {
+    setHealth(4);
+    if (coins > 0) {
+      setCoins((prev) => Math.max(0, prev - 1));
+    }
+    sound.playPower();
+  }, [coins]);
+
+  const handleRestartStage = useCallback(() => {
+    setHealth(4);
+    setScore(0);
+    sound.playStart();
+  }, []);
+
   // Persist score & coins whenever they change. This is deliberately kept out
   // of the state updaters: React may invoke an updater more than once
   // (StrictMode, batching), which would double-write to localStorage there.
@@ -177,6 +192,7 @@ export default function App() {
             onAddScore={handleAddScore}
             onAddCoin={handleAddCoin}
             onHeal={handleHeal}
+            onTakeDamage={handleTakeDamage}
             health={health}
             spriteUrl={spriteUrl}
           />
@@ -213,6 +229,15 @@ export default function App() {
           <ArcadeContact onAddScore={handleAddScore} />
         </ErrorBoundary>
       </main>
+
+      {/* Retro Game Over Modal when HP is depleted */}
+      {health === 0 && (
+        <GameOverModal
+          coins={coins}
+          onContinue={handleContinueGame}
+          onRestart={handleRestartStage}
+        />
+      )}
 
       {/* Retro Arcade Footer */}
       <ArcadeFooter />
