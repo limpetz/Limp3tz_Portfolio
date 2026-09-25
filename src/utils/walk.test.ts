@@ -11,11 +11,11 @@ const F = WALK_SHEET.frames;
 const WALK_RIGHT = WALK_SHEET.animations.walkRight;
 
 describe('WALK_SHEET metadata', () => {
-  it('declares the compact 88x170 sheet', () => {
-    expect(WALK_SHEET.frameWidth).toBe(88);
-    expect(WALK_SHEET.frameHeight).toBe(170);
-    expect(WALK_SHEET.imageWidth).toBe(792);
-    expect(WALK_SHEET.imageHeight).toBe(340);
+  it('declares the 240px-pack walk sheet', () => {
+    expect(WALK_SHEET.frameWidth).toBe(172);
+    expect(WALK_SHEET.frameHeight).toBe(330);
+    expect(WALK_SHEET.imageWidth).toBe(1548);
+    expect(WALK_SHEET.imageHeight).toBe(660);
   });
 
   it('has idle and walk animations for both directions', () => {
@@ -35,7 +35,7 @@ describe('WALK_SHEET metadata', () => {
   });
 
   it('places each animation row in its own half of the sheet', () => {
-    // Row 0 (y=0) faces right, row 1 (y=170) faces left.
+    // Row 0 (y=0) faces right, row 1 (y=330) faces left.
     for (const i of WALK_SHEET.animations.walkRight) {
       expect(F[i].y).toBe(0);
     }
@@ -50,25 +50,25 @@ describe('left-facing idle (row 1 anchor)', () => {
 
   it('sits at column 0 of the left-facing row, a full cell', () => {
     expect(LEFT_IDLE.x).toBe(0);
-    expect(LEFT_IDLE.y).toBe(WALK_SHEET.frameHeight); // row 1 starts at y=170
+    expect(LEFT_IDLE.y).toBe(WALK_SHEET.frameHeight); // row 1 starts at y=330
     expect(LEFT_IDLE.width).toBe(WALK_SHEET.frameWidth);
     expect(LEFT_IDLE.height).toBe(WALK_SHEET.frameHeight);
   });
 
   it('anchors both rows on the same feet/pelvis point, so flipping direction never drifts', () => {
     // The JSON declares a single anchor for the whole sheet: pelvis centred
-    // horizontally, feet 6px above the cell bottom. Row 1 is mirrored art of
+    // horizontally, feet 12px above the cell bottom. Row 1 is mirrored art of
     // row 0, so the same anchor has to hold for the left-facing idle.
-    expect(WALK_SHEET.anchorX).toBe(WALK_SHEET.frameWidth / 2); // 44
-    expect(WALK_SHEET.footY).toBe(164);
-    expect(WALK_SHEET.frameHeight - WALK_SHEET.footY).toBe(6);
+    expect(WALK_SHEET.anchorX).toBe(WALK_SHEET.frameWidth / 2); // 86
+    expect(WALK_SHEET.footY).toBe(318);
+    expect(WALK_SHEET.frameHeight - WALK_SHEET.footY).toBe(12);
   });
 
   it('renders the row-1 cell by shifting the sheet up exactly one cell height', () => {
-    // At 1:1 the left idle shows sheet column 0, row 1: offset (0, -170).
+    // At 1:1 the left idle shows sheet column 0, row 1: offset (0, -330).
     // This is the exact background-position the stage renders while idle
     // facing left.
-    expect(backgroundPositionFor(LEFT_IDLE, WALK_SHEET, 88, 170)).toBe('0px -170px');
+    expect(backgroundPositionFor(LEFT_IDLE, WALK_SHEET, 172, 330)).toBe('0px -330px');
   });
 });
 
@@ -127,23 +127,24 @@ describe('frameAtElapsed', () => {
 
 describe('backgroundPositionFor', () => {
   it('maps a frame rectangle to a scaled negative offset', () => {
-    // The JSON is the source of truth: walkRight[1] lives at sheet x=176
-    // (column 2 — column 1 is the idle frame).
+    // The JSON is the source of truth. walkRight = frame indices 1..8, which map
+    // to sheet columns 1..8 on the 240px pack — so WALK_RIGHT[1] is frame index
+    // 2, i.e. sheet column 2 at x = 344.
     const frame = F[WALK_RIGHT[1]];
-    expect(frame.x).toBe(176);
+    expect(frame.x).toBe(344);
     // Displayed at the same size as the cell -> 1:1, offset = -x.
-    expect(backgroundPositionFor(frame, WALK_SHEET, 88, 170)).toBe('-176px 0px');
+    expect(backgroundPositionFor(frame, WALK_SHEET, 172, 330)).toBe('-344px 0px');
   });
 
   it('scales with the display size', () => {
-    const frame = F[WALK_RIGHT[1]];
+    const frame = F[WALK_RIGHT[1]]; // sheet x = 344
     // Half size: every sheet coordinate halves.
-    expect(backgroundPositionFor(frame, WALK_SHEET, 44, 85)).toBe('-88px 0px');
+    expect(backgroundPositionFor(frame, WALK_SHEET, 86, 165)).toBe('-172px 0px');
   });
 
   it('shifts rows for the left-facing animation', () => {
-    const frame = F[WALK_SHEET.animations.walkLeft[0]]; // row 1, y = 170
-    expect(backgroundPositionFor(frame, WALK_SHEET, 88, 170)).toContain('-170px');
+    const frame = F[WALK_SHEET.animations.walkLeft[0]]; // row 1, y = 330
+    expect(backgroundPositionFor(frame, WALK_SHEET, 172, 330)).toContain('-330px');
   });
 });
 

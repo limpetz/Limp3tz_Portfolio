@@ -11,8 +11,9 @@ coverage/
 # The app ships the compressed .webp versions sitting next to them.
 .originals/
 
-# Walk-pack sources: individual frames, previews, demo files, full-size sheets.
-# The app ships only sprite/walk/arshad-walk.png + .json (compact sheet).
+# Sprite-pack sources: individual frames, previews, demo files, WebP twins and
+# generation metadata. The app ships only the four indexed-PNG sheets plus the
+# walk JSON (240px pack), and the compact legacy walk sheet.
 src/assets/images/sprite/.originals/
 
 # Freebuff agent workspace

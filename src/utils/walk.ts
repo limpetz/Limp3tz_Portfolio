@@ -5,12 +5,12 @@
  * declares the cell size, the animation index groups and the per-frame
  * durations, so nothing here hard-codes frame counts or positions.
  *
- * The renderer only ever changes a CSS `background-position` on the actor's
- * sprite element — frame selection runs inside the existing physics loop, so
- * there is no React state churn per frame.
+ * The renderer only ever changes CSS `background-position`/`background-size` on
+ * the actor's sprite element — frame selection runs inside the existing physics
+ * loop, so there is no React state churn per frame.
  */
-import sheetPng from '../assets/images/sprite/walk/arshad-walk.png';
-import sheetJson from '../assets/images/sprite/walk/arshad-walk.json';
+import sheetPng from '../assets/images/arshad-sprites-240px/assets/arshad-walk.png';
+import sheetJson from '../assets/images/arshad-sprites-240px/assets/arshad-walk.json';
 
 export interface WalkFrameRect {
   x: number;

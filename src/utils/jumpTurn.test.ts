@@ -40,10 +40,12 @@ describe('renderScale — one on-screen size for every sheet', () => {
   // art or the target changes, re-measure and update here.
   it('records the measured standing heights and the shared target', () => {
     expect(TARGET_CONTENT_H).toBe(240);
-    expect(SPRITE_SPECS.walk.contentH).toBe(124);
-    expect(SPRITE_SPECS.jump.contentH).toBe(155);
-    expect(SPRITE_SPECS.turn.contentH).toBe(155);
-    expect(SPRITE_SPECS.airTurn.contentH).toBe(155);
+    // The 240px pack is drawn at scale 1.0: every sheet's standing character is
+    // exactly TARGET_CONTENT_H tall in its own sheet pixels.
+    expect(SPRITE_SPECS.walk.contentH).toBe(240);
+    expect(SPRITE_SPECS.jump.contentH).toBe(240);
+    expect(SPRITE_SPECS.turn.contentH).toBe(240);
+    expect(SPRITE_SPECS.airTurn.contentH).toBe(240);
   });
 
   it('scales each sheet by the target over its measured height', () => {
@@ -53,12 +55,19 @@ describe('renderScale — one on-screen size for every sheet', () => {
     }
   });
 
-  it('scales the smaller walk art up harder than the jump/turn art', () => {
-    expect(renderScale(SPRITE_SPECS.walk)).toBeGreaterThan(1);
-    expect(renderScale(SPRITE_SPECS.walk)).toBeGreaterThan(renderScale(SPRITE_SPECS.jump));
-    // Jump, turn and air-turn share one art scale.
-    expect(renderScale(SPRITE_SPECS.jump)).toBeCloseTo(renderScale(SPRITE_SPECS.turn), 6);
-    expect(renderScale(SPRITE_SPECS.jump)).toBeCloseTo(renderScale(SPRITE_SPECS.airTurn), 6);
+  it('renders the native pack at scale 1.0, uniformly across sheets', () => {
+    for (const key of SHEET_KEYS) {
+      expect(renderScale(SPRITE_SPECS[key])).toBe(1);
+    }
+  });
+
+  it('matches the metadata the 240px pack ships', () => {
+    // Deliberate tripwire tied to arshad-sprites-240px/assets/animations.json.
+    // If the pack changes, update these numbers from its metadata.
+    expect(SPRITE_SPECS.walk).toMatchObject({ w: 172, h: 330, ax: 86, fy: 318 });
+    expect(SPRITE_SPECS.jump).toMatchObject({ w: 224, h: 330, ax: 112, fy: 318 });
+    expect(SPRITE_SPECS.turn).toMatchObject({ w: 176, h: 330, ax: 88, fy: 318 });
+    expect(SPRITE_SPECS.airTurn).toMatchObject({ w: 224, h: 330, ax: 112, fy: 318 });
   });
 
   it('lands every sheet at the same on-screen standing height', () => {
@@ -120,8 +129,8 @@ describe('getRenderPose alignment and anchors', () => {
       // offsetY places the cell so its foot baseline (fy from the cell top)
       // lands on the box bottom; the only overhang is the art below the feet.
       expect(-pose.offsetY).toBeCloseTo((spec.h - spec.fy) * scale, 5);
-      // ...and that overhang stays a small slice of the cell.
-      expect(-pose.offsetY).toBeLessThanOrEqual(pose.height * 0.05);
+      // ...and that overhang stays the pack's 12px transparent foot padding.
+      expect(-pose.offsetY).toBe(12);
     }
   });
 });

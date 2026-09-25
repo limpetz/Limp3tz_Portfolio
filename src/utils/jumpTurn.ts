@@ -9,10 +9,10 @@
  * - Mid-turn reversal, easing, reduced-motion compatibility, and sharp pixel rendering.
  */
 
-import walkPng from '../assets/images/sprite/walk/arshad-walk.png';
-import jumpPng from '../assets/images/sprite/jump-turn/arshad-jump.png';
-import turnPng from '../assets/images/sprite/jump-turn/arshad-turn.png';
-import airTurnPng from '../assets/images/sprite/jump-turn/arshad-air-turn.png';
+import walkPng from '../assets/images/arshad-sprites-240px/assets/arshad-walk.png';
+import jumpPng from '../assets/images/arshad-sprites-240px/assets/arshad-jump.png';
+import turnPng from '../assets/images/arshad-sprites-240px/assets/arshad-turn.png';
+import airTurnPng from '../assets/images/arshad-sprites-240px/assets/arshad-air-turn.png';
 
 export type SpriteSheetKey = 'walk' | 'jump' | 'turn' | 'airTurn';
 
@@ -39,53 +39,55 @@ export interface SheetSpec {
 export const SPRITE_SPECS: Record<SpriteSheetKey, SheetSpec> = {
   walk: {
     src: walkPng,
-    w: 88,
-    h: 170,
+    w: 172,
+    h: 330,
     cols: 9,
     rows: 2,
-    ax: 44,
-    fy: 164,
-    contentH: 124,
+    ax: 86,
+    fy: 318,
+    contentH: 240,
   },
   jump: {
     src: jumpPng,
-    w: 144,
-    h: 208,
+    w: 224,
+    h: 330,
     cols: 9,
     rows: 2,
-    ax: 72,
-    fy: 202,
-    contentH: 155,
+    ax: 112,
+    fy: 318,
+    contentH: 240,
   },
   turn: {
     src: turnPng,
-    w: 112,
-    h: 170,
+    w: 176,
+    h: 330,
     cols: 9,
     rows: 1,
-    ax: 56,
-    fy: 164,
-    contentH: 155,
+    ax: 88,
+    fy: 318,
+    contentH: 240,
   },
   airTurn: {
     src: airTurnPng,
-    w: 144,
-    h: 208,
+    w: 224,
+    h: 330,
     cols: 9,
     rows: 1,
-    ax: 72,
-    fy: 202,
-    contentH: 155,
+    ax: 112,
+    fy: 318,
+    // Tucked mid-air poses sit ~207px tall in this pack; the sheet otherwise
+    // shares the jump canvas, so it keeps the same normalised scale.
+    contentH: 240,
   },
 };
 
 /**
  * On-screen height the standing character renders at, in CSS px.
  *
- * Every sheet is scaled so its standing character lands here, which is what
- * stops the character changing size between idle, walking and jumping. Bumping
- * this number scales the whole character uniformly (all sheets together), so
- * the size stays consistent while he reads larger against the backdrop.
+ * Every sheet is drawn to this standing height at scale 1.0 (the 240px sprite
+ * pack), so the character reads identically whether idling, walking, turning or
+ * jumping. The `renderScale` plumbing stays because the whole point is that a
+ * future art swap must not change size mid-animation again.
  *
  * Ceiling: the standing head must clear the overhead block band (BLOCK_Y) and
  * the head must still fit the stage at the top of a jump, so this cannot grow
