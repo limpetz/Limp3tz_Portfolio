@@ -28,6 +28,11 @@ export default function App() {
     const saved = localStorage.getItem('limp3tz_coins');
     return saved ? parseInt(saved, 10) : 0;
   });
+  const [health, setHealth] = useState<number>(() => {
+    const saved = localStorage.getItem('limp3tz_health');
+    const parsed = saved ? parseInt(saved, 10) : 4;
+    return Number.isFinite(parsed) && parsed >= 0 && parsed <= 4 ? parsed : 4;
+  });
   const [scorePopping, setScorePopping] = useState(false);
 
   // Audio toggles (music ON by default)
@@ -75,6 +80,26 @@ export default function App() {
     setCoins((prev) => prev + amount);
   }, []);
 
+  const handleTakeDamage = useCallback((amount: number = 1) => {
+    setHealth((prev) => {
+      const next = Math.max(0, prev - amount);
+      if (next < prev) {
+        sound.playHurt();
+      }
+      return next;
+    });
+  }, []);
+
+  const handleHeal = useCallback((amount: number = 1) => {
+    setHealth((prev) => {
+      const next = Math.min(4, prev + amount);
+      if (next > prev) {
+        sound.playHeal();
+      }
+      return next;
+    });
+  }, []);
+
   // Persist score & coins whenever they change. This is deliberately kept out
   // of the state updaters: React may invoke an updater more than once
   // (StrictMode, batching), which would double-write to localStorage there.
@@ -85,6 +110,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('limp3tz_coins', String(coins));
   }, [coins]);
+
+  useEffect(() => {
+    localStorage.setItem('limp3tz_health', String(health));
+  }, [health]);
 
   // Audio toggles
   const handleToggleMusic = useCallback(() => {
@@ -130,6 +159,9 @@ export default function App() {
       <Hud
         score={score}
         coins={coins}
+        health={health}
+        onTakeDamage={handleTakeDamage}
+        onHeal={handleHeal}
         scorePopping={scorePopping}
         musicOn={musicOn}
         sfxOn={sfxOn}
@@ -144,13 +176,21 @@ export default function App() {
           <ArcadeStage
             onAddScore={handleAddScore}
             onAddCoin={handleAddCoin}
+            onHeal={handleHeal}
+            health={health}
             spriteUrl={spriteUrl}
           />
         </ErrorBoundary>
 
         {/* Level 1: Character Sheet & Lore */}
         <ErrorBoundary label="CHARACTER SHEET">
-          <CharacterSheet spriteUrl={spriteUrl} onAddScore={handleAddScore} />
+          <CharacterSheet
+            spriteUrl={spriteUrl}
+            health={health}
+            onAddScore={handleAddScore}
+            onTakeDamage={handleTakeDamage}
+            onHeal={handleHeal}
+          />
         </ErrorBoundary>
 
         {/* Level 2: Skill Tree & 44-Item Inventory */}

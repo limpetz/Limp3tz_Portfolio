@@ -25,7 +25,7 @@ describe('PixelHeart', () => {
     expect(html).toContain('animation-delay:0.4s');
   });
 
-  it('renders pixel outline, neon body, glint and shading layers', () => {
+  it('renders pixel outline, neon body, glint and shading layers when filled', () => {
     const html = renderToStaticMarkup(<PixelHeart />);
     // Neon magenta body fill
     expect(html).toContain('fill="#ff2d78"');
@@ -37,5 +37,14 @@ describe('PixelHeart', () => {
     expect(html).toContain('fill="#ff7ea8"');
     // Shading edge
     expect(html).toContain('fill="#88002d"');
+  });
+
+  it('renders depleted grayscale hollow heart when filled is false', () => {
+    const html = renderToStaticMarkup(<PixelHeart filled={false} />);
+    expect(html).toContain('grayscale');
+    expect(html).toContain('fill="#1c1829"');
+    expect(html).toContain('fill="#2b2342"');
+    expect(html).not.toContain('animate-heart-beat');
+    expect(html).not.toContain('fill="#ff2d78"');
   });
 });

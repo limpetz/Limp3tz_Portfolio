@@ -6,7 +6,10 @@ import { PixelHeart } from './PixelHeart';
 
 interface CharacterSheetProps {
   spriteUrl: string;
+  health: number;
   onAddScore: (amount: number) => void;
+  onTakeDamage?: (amount?: number) => void;
+  onHeal?: (amount?: number) => void;
 }
 
 // The portrait is sized by its *visible* character, since the sprite canvas is
@@ -15,7 +18,13 @@ interface CharacterSheetProps {
 // and shrinks together on narrow screens.
 const PORTRAIT = spriteCanvasSize(301);
 
-export const CharacterSheet: React.FC<CharacterSheetProps> = ({ spriteUrl, onAddScore }) => {
+export const CharacterSheet: React.FC<CharacterSheetProps> = ({
+  spriteUrl,
+  health,
+  onAddScore,
+  onTakeDamage,
+  onHeal,
+}) => {
   return (
     <section id="about" className="py-24 px-4 sm:px-8 max-w-6xl mx-auto scroll-mt-16">
       {/* Header */}
@@ -55,21 +64,36 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({ spriteUrl, onAdd
           </p>
 
           {/* Animated 4 Pixel Hearts */}
-          <div className="mt-3 flex items-center justify-center gap-1.5" aria-label="Health: 4 hearts">
+          <div className="mt-3 flex items-center justify-center gap-1.5" aria-label={`Health: ${health} of 4 hearts`}>
             <b className="font-pixel text-[8px] text-[#ff2d78] tracking-widest font-bold mr-0.5 not-italic">HP</b>
-            <span className="inline-flex cursor-pointer hover:scale-125 transition-transform" title="Heart 1">
-              <PixelHeart size={16} delay={0} />
-            </span>
-            <span className="inline-flex cursor-pointer hover:scale-125 transition-transform" title="Heart 2">
-              <PixelHeart size={16} delay={0.15} />
-            </span>
-            <span className="inline-flex cursor-pointer hover:scale-125 transition-transform" title="Heart 3">
-              <PixelHeart size={16} delay={0.3} />
-            </span>
-            <span className="inline-flex cursor-pointer hover:scale-125 transition-transform" title="Heart 4">
-              <PixelHeart size={16} delay={0.45} />
-            </span>
-            <b className="font-pixel text-[8px] text-[#3dffa2] tracking-wider ml-0.5 not-italic">MAX</b>
+            {[0, 1, 2, 3].map((i) => {
+              const isFilled = i < health;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    if (isFilled && onTakeDamage) onTakeDamage(1);
+                    else if (!isFilled && onHeal) onHeal(1);
+                  }}
+                  className="inline-flex cursor-pointer hover:scale-125 transition-transform"
+                  title={isFilled ? `Heart ${i + 1} (Click to take damage)` : `Heart ${i + 1} empty (Click to heal)`}
+                >
+                  <PixelHeart
+                    size={16}
+                    delay={i * 0.15}
+                    filled={isFilled}
+                  />
+                </button>
+              );
+            })}
+            <b
+              className={`font-pixel text-[8px] tracking-wider ml-0.5 not-italic ${
+                health === 4 ? 'text-[#3dffa2]' : health > 1 ? 'text-[#ffd23f]' : 'text-[#ff2d78] animate-pulse'
+              }`}
+            >
+              {health === 4 ? 'MAX' : `${health}/4`}
+            </b>
           </div>
 
           <div className="mt-4 pt-3 border-t border-[#241c42] font-pixel text-[8px] text-[#7d7aa3] space-y-1">

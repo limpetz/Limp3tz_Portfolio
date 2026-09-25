@@ -49,10 +49,13 @@ import moveControlsImg from '../assets/images/move.webp';
 import jumpControlsImg from '../assets/images/jump.webp';
 import bumpBlocksImg from '../assets/images/bump-blocks.webp';
 import clickMeImg from '../assets/images/click-me.webp';
+import { PixelHeart } from './PixelHeart';
 
 interface ArcadeStageProps {
   onAddScore: (amount: number) => void;
   onAddCoin: (amount: number) => void;
+  onHeal?: (amount?: number) => void;
+  health?: number;
   spriteUrl: string;
   useProceduralBackground?: boolean;
 }
@@ -64,9 +67,18 @@ interface FallingCoin {
   vy: number;
 }
 
+interface FallingHeart {
+  id: number;
+  x: number;
+  y: number;
+  vy: number;
+}
+
 export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   onAddScore,
   onAddCoin,
+  onHeal,
+  health = 4,
   spriteUrl,
   useProceduralBackground,
 }) => {
@@ -97,9 +109,11 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particleSys = useRef<ArcadeParticleSystem>(new ArcadeParticleSystem());
 
-  // Falling Coins
+  // Falling Coins & Hearts
   const [fallingCoins, setFallingCoins] = useState<FallingCoin[]>([]);
   const fallingCoinsRef = useRef<FallingCoin[]>([]);
+  const [fallingHearts, setFallingHearts] = useState<FallingHeart[]>([]);
+  const fallingHeartsRef = useRef<FallingHeart[]>([]);
   const [partyMode, setPartyMode] = useState(false);
 
   // --- Off-screen pause -------------------------------------------------
@@ -437,8 +451,12 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
     sound.playPower();
     sound.playCoin();
+    sound.playItemPickup();
     onAddScore(BLOCK_SCORE);
     onAddCoin(BLOCK_COIN);
+    if (onHeal && health < 4) {
+      onHeal(1);
+    }
 
     // Burst golden sparkles and stars at block location
     const stageH = containerRef.current?.clientHeight || 800;
@@ -645,10 +663,22 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         fallingCoinsRef.current = [...fallingCoinsRef.current, newCoin];
         setFallingCoins(fallingCoinsRef.current);
       }
+
+      // Occasional falling 1UP heart pickup if player is not at max health
+      if (health < 4 && fallingHeartsRef.current.length < 2 && Math.random() < 0.35) {
+        const newHeart: FallingHeart = {
+          id: Math.random() + Date.now(),
+          x: 40 + Math.random() * (stateRef.current.stageWidth - 80),
+          y: -20,
+          vy: 110 + Math.random() * 60,
+        };
+        fallingHeartsRef.current = [...fallingHeartsRef.current, newHeart];
+        setFallingHearts(fallingHeartsRef.current);
+      }
     }, 3800);
 
     return () => clearInterval(coinInterval);
-  }, []);
+  }, [health]);
 
   // Periodic quip generator
   useEffect(() => {
@@ -1117,6 +1147,49 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         setFallingCoins(remainingCoins);
       }
 
+      // Update falling hearts & detect collisions with player
+      const currentHearts = fallingHeartsRef.current;
+      if (currentHearts.length > 0) {
+        const remainingHearts: FallingHeart[] = [];
+        let heartsToHeal = 0;
+        const burstsToSpawn: { x: number; y: number }[] = [];
+
+        const actorLeft = stateRef.current.x;
+        const actorRight = stateRef.current.x + stateRef.current.actorWidth;
+        const actorBottom = GROUND_H + stateRef.current.y;
+        const actorTop = actorBottom + stateRef.current.actorHeight;
+        const stageH = containerRef.current?.clientHeight || 800;
+
+        for (let i = 0; i < currentHearts.length; i++) {
+          const h = currentHearts[i];
+          const nextY = h.y + h.vy * dt;
+          const heartScreenY = stageH - nextY;
+
+          if (
+            h.x >= actorLeft - 10 &&
+            h.x <= actorRight + 10 &&
+            heartScreenY >= actorBottom &&
+            heartScreenY <= actorTop
+          ) {
+            heartsToHeal += 1;
+            burstsToSpawn.push({ x: h.x + 8, y: nextY + 8 });
+          } else if (nextY < stageH) {
+            remainingHearts.push({ ...h, y: nextY });
+          }
+        }
+
+        if (heartsToHeal > 0) {
+          if (onHeal) onHeal(heartsToHeal);
+          onAddScore(250 * heartsToHeal);
+          for (const b of burstsToSpawn) {
+            particleSys.current.triggerCoinSparkle(b.x, b.y, 28, true);
+          }
+        }
+
+        fallingHeartsRef.current = remainingHearts;
+        setFallingHearts(remainingHearts);
+      }
+
       // Update and render canvas particles
       particleSys.current.updateAndRender(dt);
 
@@ -1485,6 +1558,31 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           aria-label="Collect Coin"
         >
           <span className="sr-only">Coin</span>
+        </button>
+      ))}
+
+      {/* Falling Hearts (1UP Health Recovery) */}
+      {fallingHearts.map((heart) => (
+        <button
+          key={heart.id}
+          type="button"
+          onClick={() => {
+            if (onHeal) onHeal(1);
+            onAddScore(250);
+            particleSys.current.triggerCoinSparkle(heart.x + 8, heart.y + 8, 28, true);
+            const remaining = fallingHeartsRef.current.filter((h) => h.id !== heart.id);
+            fallingHeartsRef.current = remaining;
+            setFallingHearts(remaining);
+          }}
+          className="absolute z-20 cursor-pointer hover:scale-125 transition-transform p-1 bg-[#110d24]/80 border border-[#ff2d78] shadow-[0_0_12px_rgba(255,45,120,0.6)]"
+          style={{
+            left: `${heart.x}px`,
+            top: `${heart.y}px`,
+          }}
+          title="1UP Heart: Recover Health (+250 pts)"
+          aria-label="1UP Heart: Recover Health"
+        >
+          <PixelHeart size={16} />
         </button>
       ))}
 

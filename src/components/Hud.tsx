@@ -12,6 +12,9 @@ const COMMIT_URL = `https://github.com/limpetz/Limp3tz_Portfolio/commit/${__BUIL
 interface HudProps {
   score: number;
   coins: number;
+  health: number;
+  onTakeDamage?: (amount?: number) => void;
+  onHeal?: (amount?: number) => void;
   scorePopping: boolean;
   musicOn: boolean;
   sfxOn: boolean;
@@ -23,6 +26,9 @@ interface HudProps {
 export const Hud: React.FC<HudProps> = ({
   score,
   coins,
+  health,
+  onTakeDamage,
+  onHeal,
   scorePopping,
   musicOn,
   sfxOn,
@@ -46,21 +52,47 @@ export const Hud: React.FC<HudProps> = ({
       {/* Lives & P1 */}
       <div className="flex items-center gap-2.5 shrink-0">
         <div
-          className="flex items-center gap-1.5 bg-[#110d24]/90 px-2 py-1 border border-[#ff2d78]/40 shadow-[0_0_8px_rgba(255,45,120,0.3)]"
-          aria-label="Health: 4 hearts"
+          className="flex items-center gap-1.5 bg-[#110d24]/90 px-2 py-1 border border-[#ff2d78]/40 shadow-[0_0_8px_rgba(255,45,120,0.3)] select-none"
+          aria-label={`Health: ${health} of 4 hearts`}
         >
-          <span className="text-[#ff2d78] font-bold text-[8px] mr-0.5">HP</span>
+          <button
+            type="button"
+            onClick={() => {
+              if (health > 0 && onTakeDamage) onTakeDamage(1);
+            }}
+            title="Click HP to test damage (-1 heart)"
+            className="text-[#ff2d78] font-bold text-[8px] mr-0.5 cursor-pointer hover:brightness-125 transition-transform active:scale-90"
+          >
+            HP
+          </button>
           <div className="flex gap-1 items-center">
-            <PixelHeart size={13} delay={0} />
-            <PixelHeart size={13} delay={0.15} />
-            <PixelHeart size={13} delay={0.3} />
-            <PixelHeart size={13} delay={0.45} />
+            {[0, 1, 2, 3].map((i) => {
+              const isFilled = i < health;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    if (isFilled && onTakeDamage) onTakeDamage(1);
+                    else if (!isFilled && onHeal) onHeal(1);
+                  }}
+                  className="cursor-pointer hover:scale-125 transition-transform"
+                  title={isFilled ? `Heart ${i + 1} (Click to take damage)` : `Heart ${i + 1} empty (Click to heal)`}
+                >
+                  <PixelHeart
+                    size={13}
+                    delay={i * 0.15}
+                    filled={isFilled}
+                  />
+                </button>
+              );
+            })}
           </div>
           {/* Micro health meter on sm screens */}
           <div className="hidden sm:block w-9 h-1.5 bg-[#0a0817] border border-[#ff2d78]/40 overflow-hidden ml-1">
             <div
-              className="h-full bg-gradient-to-r from-[#ff2d78] via-[#ff5c98] to-[#3dffa2] animate-health-pulse"
-              style={{ width: '100%' }}
+              className="h-full bg-gradient-to-r from-[#ff2d78] via-[#ff5c98] to-[#3dffa2] transition-all duration-300"
+              style={{ width: `${(health / 4) * 100}%` }}
             />
           </div>
         </div>

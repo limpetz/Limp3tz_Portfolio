@@ -187,6 +187,51 @@ class RetroSoundEngine {
     });
   }
 
+  public playHurt() {
+    if (!this.sfxEnabled) return;
+    const ctx = this.getContext();
+    if (!ctx || !this.masterGain) return;
+    try {
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(180, t);
+      osc.frequency.exponentialRampToValueAtTime(60, t + 0.18);
+
+      gain.gain.setValueAtTime(0.12, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+
+      osc.start(t);
+      osc.stop(t + 0.22);
+    } catch {
+      // Audio safety catch
+    }
+  }
+
+  public playHeal() {
+    if (!this.sfxEnabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    [440, 554.37, 659.25, 880].forEach((f, i) => {
+      this.playTone(f, t + i * 0.06, 0.1, 'triangle', 0.09);
+    });
+  }
+
+  public playItemPickup() {
+    if (!this.sfxEnabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    this.playTone(587.33, t, 0.06, 'square', 0.08);
+    this.playTone(880, t + 0.06, 0.15, 'square', 0.09);
+  }
+
   public playStart() {
     if (!this.sfxEnabled) return;
     const ctx = this.getContext();
