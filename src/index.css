@@ -131,14 +131,39 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Slideshow progress
+
+   The hero slideshow's neon sweep: it fills the 3px bar across the current
+   background's hold time, then the next slide crossfades in. Driven from JS
+   (`animation-duration` = SLIDESHOW_INTERVAL_MS) and re-keyed on every slide
+   change so it restarts. It is only rendered while auto-advance is on, so it
+   needs no reduced-motion override.
+   --------------------------------------------------------------------------- */
+@keyframes slideProgress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.animate-slide-progress {
+  animation-name: slideProgress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+/* ---------------------------------------------------------------------------
    Reduced motion
 
    Visitors who ask their OS for less motion keep the full retro look but lose
    the decorative loops: glitch text, score pops, the Konami rainbow, idle
    breathing, twinkling stars and the pixel rain. Physics-driven feedback
    (walking, jumping, landing squash) is left alone because it only moves in
-   response to input. The hero slideshow is handled in JS instead — it stops
-   auto-advancing and swaps instantly.
+   response to input. The hero slideshow is handled in JS instead — it keeps
+   auto-advancing (a deliberate product choice) but swaps instantly instead of
+   crossfading, and its progress bar is the same thin sweep either way.
    --------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   .animate-glitch,

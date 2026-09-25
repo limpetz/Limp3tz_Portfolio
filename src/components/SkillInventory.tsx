@@ -157,7 +157,7 @@ export const SkillInventory: React.FC<SkillInventoryProps> = ({ onAddScore }) =>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-t-2 border-dashed border-[#241c42] pt-8">
           <div>
             <span className="font-pixel text-xs text-[#ffd23f] tracking-wide">
-              FULL INVENTORY (SKILLS.CSV)
+              FULL INVENTORY (SKILLS)
             </span>
             <div className="flex items-center gap-3 mt-1 font-pixel text-[9px]">
               <span className="text-[#3dffa2]">{totalSkills} REPERTOIRE NODES</span>

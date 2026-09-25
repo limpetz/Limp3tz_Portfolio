@@ -47,6 +47,8 @@ npm run dev      # http://localhost:3000
 | Bump blocks | Jump into them from below | — |
 | Interact | Click the character | Tap the character |
 | Walk to a spot | Click the ground | Tap the ground |
+| Turn around | Hold the opposite direction | Tap the opposite D-pad button |
+| Cancel a walk or turn | `Esc` | — |
 
 Holding jump bounces continuously — each bounce is gated on landing, so
 mid-air double jumps are impossible. There's also a **Konami code**
@@ -69,14 +71,76 @@ live there, so `src/utils/walk.ts` hard-codes nothing.
   React state churn per frame
 - The clock advances only while actually moving, freezes on idle, and resets
   when a new walk starts
-- Frames render at the native 88×170 cell size — the sheet is scaled via
-  `background-size`, never the frame element
+- The walk sheet is drawn ~25% smaller than the jump/turn art, so it is scaled
+  up (1.25×) to land the standing character at the shared target height — see
+  **Jump & 3D turning**. Scaling goes through `background-size`, never by
+  resizing the frame element
 - Click-to-walk: tapping the ground walks the character there at 100 px/s (the
   on-screen D-pad and keyboard move at full sprint speed). Clicking the
   character, hiding the tab or losing window focus cancels the walk
 
 New game logic in `walk.ts` is pure and unit tested (`walk.test.ts`), like the
 other helpers.
+
+## Jump & 3D turning
+
+Walking flips the character instantly; changing *direction* plays a proper 3D
+rotation instead. `src/utils/jumpTurn.ts` owns this — a small
+`AvatarAnimationController` state machine plus pure mapping helpers, all unit
+tested in `jumpTurn.test.ts`.
+
+Three further sheets sit in `src/assets/images/sprite/jump-turn/`:
+
+| Sheet | Size | Cells | Use |
+| --- | --- | --- | --- |
+| `arshad-jump.png` | 1296×416 | 144×208, 9×2 | Jump lifecycle — row 0 faces right, row 1 left |
+| `arshad-turn.png` | 1008×170 | 112×170, 9×1 | Grounded turn — left profile → front → right profile |
+| `arshad-air-turn.png` | 1296×208 | 144×208, 9×1 | Tucked mid-air turn |
+
+`animations.json` beside them is reference metadata (cell sizes, anchors and
+nominal angles); `SPRITE_SPECS` in `jumpTurn.ts` is what the renderer actually
+uses.
+
+- **Turning** lasts `TURN_DURATION` (250ms) and eases linearly across the
+  sheet's 3/4-left → front → 3/4-right columns. Rotating *on the ground* pauses
+  horizontal movement, so the turn reads as a beat; in mid-air you keep full
+  horizontal control and get the tucked air-turn frames instead
+- **Reversal is free**: tapping the opposite key mid-turn continues from the
+  current rotation rather than snapping back or restarting, and holding a
+  direction never restarts an in-flight turn
+- **Jumping** runs anticipation (0.12s) → airtime → landing (0.12s) → recovery
+  (0.12s). The airborne frame is chosen from the physics vertical velocity, so
+  a short hop, a full jump and a block bump each show the right pose;
+  `JUMP_TIMINGS.AIRTIME` (0.8s) is only a fallback for callers that don't pass a
+  progress value
+- **One character size across every sheet**: each sheet normalises its art
+  scale so the standing character is the same on-screen height
+  (`TARGET_CONTENT_H`, 155px) and anchors its feet on the actor box bottom — so
+  switching walk ↔ jump ↔ turn neither resizes nor shifts the character. The
+  walk art is the odd one out and gets scaled up 1.25×
+- While rotating, the squash/stretch and lean transforms are neutralised so the
+  pixel art stays sharp instead of smearing through the rotation
+- Each turn emits a short `sound.playTurn()` blip
+- `prefers-reduced-motion` swaps directions instantly and skips the turn
+  animation; `Esc` cancels a walk or turn and resets the controller
+
+## Contact channels
+
+The FINAL LEVEL section renders five pixel-art icon buttons — Email, LinkedIn,
+GitHub, Discord and Steam. They are driven by `CONTACT_LINKS` in
+`src/data/portfolioData.ts`: each entry carries its own icon, accent colour and
+accessible label, so adding, removing or reordering a channel is a data edit
+rather than a component change. The component passes the accent through a single
+CSS custom property, which keeps the border, label and hover fill in sync
+without per-link markup.
+
+Profile URLs live in `PORTFOLIO_CONFIG` (`linkedin`, `github`, `discord`,
+`steam`); the `mailto:` target is derived from `email` at module load. Discord
+deep-links to the user profile (`discord.com/users/<id>`) and Steam uses the
+vanity URL. Every channel except email opens in a new tab with
+`rel="noopener noreferrer"`.
+
+Icons are 128px WebP cuts of the full-size art — see the asset workflow above.
 
 ## Project structure
 
@@ -106,6 +170,7 @@ src/
     blocks.ts             # Pure block bump detection + collection scoring
     motion.ts             # Reduced-motion preference + helpers
     walk.ts               # Walk-cycle frame selection from the sprite-sheet JSON
+    jumpTurn.ts           # Jump lifecycle + 3D turn state machine and anchors
     shadow.ts             # Ground shadow sizing helpers
     soundEngine.ts        # Web Audio chiptune synthesis
     particleSystem.ts     # Canvas particle effects
@@ -125,8 +190,15 @@ in and it joins the rotation, no code change required.
 - Prev/next chevrons on the stage step through manually; clicking one restarts
   the auto-advance timer instead of fighting it
 - The slideshow pauses when the stage is scrolled out of view or the tab is hidden
-- It respects `prefers-reduced-motion`: auto-advance stops and the crossfade
-  becomes instant, while the chevrons keep working
+- A neon progress bar runs along the base of the stage, sweeping across as the
+  current background's 4-second hold elapses; it restarts on every change (auto
+  or manual) and is hidden from assistive tech, since the chevrons are the
+  accessible control
+- Under `prefers-reduced-motion` the crossfade becomes instant. Auto-advance
+  deliberately keeps running so the backdrop still rotates — a product call,
+  not an oversight (see `shouldAutoAdvance` in `src/utils/motion.ts`)
+- The artwork is drawn inset from the stage edges (`BACKGROUND_ZOOM`) so the
+  world reads smaller next to the character; lower it to zoom further out
 - Supported formats: `.jpg` `.jpeg` `.png` `.webp` `.avif`
 - If the folder is empty, the single fallback backdrop is used
 
@@ -142,12 +214,18 @@ Full-resolution sources are **not committed** — they live in `git`-ignored
 | --- | --- |
 | `backgrounds/.originals/*.png` (~15 MB) | `backgrounds/*.webp` (1.9 MB) + fallback `cyberpunk…webp` (242 KB) |
 | `images/.originals/pixel_arshad_sprite.png` (949 KB) | `images/pixel_arshad_sprite.webp` (42 KB) |
+| `images/.originals/Contact_*.png` (~3.4 MB) | `images/Contact_*.webp` (21 KB total, 128px) |
 
 Regenerate any of them with `sharp-cli`:
 
 ```bash
 # Hero backgrounds
 npx sharp-cli -i src/assets/images/backgrounds/*.png -o tmp -f webp -q 82
+
+# Contact-channel icons. Source art is 1254px (email 512px); the buttons render
+# them at 40–48px, so a 128px cut covers 2× displays with room to spare.
+npx sharp-cli -i src/assets/images/.originals/Contact_*.png \
+  -o src/assets/images -f webp -q 88 resize 128
 
 # Character sprite. It renders 77x190 in the stage and 135x333 in the
 # character sheet, so a 284x699 export leaves ~2x headroom for retina.
@@ -218,10 +296,11 @@ animation loop.
 
 - **Reduced motion** — when the OS asks for less motion, the decorative loops
   stop (glitch text, score pops, Konami rainbow, idle breathing, twinkling
-  stars, pixel rain), the hero slideshow stops auto-advancing and swaps without
-  a crossfade. Feedback that only moves in response to input — walking,
-  jumping, landing squash, footstep dust — is deliberately kept, since
-  suppressing it would remove the response to the player's own action.
+  stars, pixel rain) and the hero slideshow swaps without a crossfade. It keeps
+  its auto-advance by design, so the backdrop still rotates. Feedback that only
+  moves in response to input — walking, jumping, landing squash, footstep dust
+  — is deliberately kept, since suppressing it would remove the response to the
+  player's own action.
 - **Keyboard** — the stage is fully playable without a mouse (`←` `→` `A` `D`,
   `Space` `W` `↑`), and the on-screen control hints are real `<kbd>` elements
   rather than styled divs. Note the character itself is click/tap-only for the

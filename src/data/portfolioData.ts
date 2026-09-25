@@ -1,5 +1,10 @@
 import defaultSpriteImg from '../assets/images/pixel_arshad_sprite.webp';
 import defaultBgImg from '../assets/images/cyberpunk_pixel_city_backdrop_1790255056354.webp';
+import contactDiscordIcon from '../assets/images/Contact_discord.webp';
+import contactEmailIcon from '../assets/images/Contact_email.webp';
+import contactGithubIcon from '../assets/images/Contact_github.webp';
+import contactLinkedinIcon from '../assets/images/Contact_linkedin.webp';
+import contactSteamIcon from '../assets/images/Contact_steam.webp';
 
 export interface PortfolioConfig {
   name: string;
@@ -13,6 +18,8 @@ export interface PortfolioConfig {
   email: string;
   linkedin: string;
   github: string;
+  discord: string;
+  steam: string;
   defaultSprite: string;
   defaultBackground: string;
 }
@@ -29,9 +36,77 @@ export const PORTFOLIO_CONFIG: PortfolioConfig = {
   email: "limpetz2000@gmail.com",
   linkedin: "https://www.linkedin.com/in/limpetz",
   github: "https://github.com/limpetz",
+  discord: "https://discord.com/users/454348790237757461",
+  steam: "https://steamcommunity.com/id/limp3tz/",
   defaultSprite: defaultSpriteImg,
   defaultBackground: defaultBgImg,
 };
+
+export interface ContactLink {
+  id: 'email' | 'linkedin' | 'github' | 'discord' | 'steam';
+  label: string;
+  /** Full instruction for screen readers, e.g. "Email Arshad". */
+  ariaLabel: string;
+  href: string;
+  icon: string;
+  /** Neon accent used for the border, label and hover fill. */
+  color: string;
+  /** Opens in a new tab (everything except mailto:). */
+  external: boolean;
+}
+
+/**
+ * The five arcade contact channels, in display order. Icons are the shipped
+ * 128px WebP cuts (see the asset workflow in the README); full-size PNGs live
+ * in the git-ignored `images/.originals/` folder.
+ */
+export const CONTACT_LINKS: ContactLink[] = [
+  {
+    id: "email",
+    label: "EMAIL",
+    ariaLabel: `Email ${PORTFOLIO_CONFIG.name}`,
+    href: `mailto:${PORTFOLIO_CONFIG.email}`,
+    icon: contactEmailIcon,
+    color: "#3dffa2",
+    external: false,
+  },
+  {
+    id: "linkedin",
+    label: "LINKEDIN",
+    ariaLabel: `${PORTFOLIO_CONFIG.name} on LinkedIn`,
+    href: PORTFOLIO_CONFIG.linkedin,
+    icon: contactLinkedinIcon,
+    color: "#00e5ff",
+    external: true,
+  },
+  {
+    id: "github",
+    label: "GITHUB",
+    ariaLabel: `${PORTFOLIO_CONFIG.name} on GitHub`,
+    href: PORTFOLIO_CONFIG.github,
+    icon: contactGithubIcon,
+    color: "#ffd23f",
+    external: true,
+  },
+  {
+    id: "discord",
+    label: "DISCORD",
+    ariaLabel: `${PORTFOLIO_CONFIG.name} on Discord`,
+    href: PORTFOLIO_CONFIG.discord,
+    icon: contactDiscordIcon,
+    color: "#8f6cff",
+    external: true,
+  },
+  {
+    id: "steam",
+    label: "STEAM",
+    ariaLabel: `${PORTFOLIO_CONFIG.name} on Steam`,
+    href: PORTFOLIO_CONFIG.steam,
+    icon: contactSteamIcon,
+    color: "#ff9e3d",
+    external: true,
+  },
+];
 
 export interface SkillItem {
   name: string;

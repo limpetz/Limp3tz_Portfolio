@@ -150,6 +150,33 @@ class RetroSoundEngine {
     this.playTone(150, ctx.currentTime, 0.04, 'triangle', 0.06);
   }
 
+  public playTurn() {
+    if (!this.sfxEnabled) return;
+    const ctx = this.getContext();
+    if (!ctx || !this.masterGain) return;
+    try {
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      // Subtle retro swoosh: quick soft pitch drop
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(420, t);
+      osc.frequency.exponentialRampToValueAtTime(260, t + 0.08);
+
+      gain.gain.setValueAtTime(0.04, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+
+      osc.start(t);
+      osc.stop(t + 0.1);
+    } catch {
+      // Audio safety catch
+    }
+  }
+
   public playPower() {
     if (!this.sfxEnabled) return;
     const ctx = this.getContext();

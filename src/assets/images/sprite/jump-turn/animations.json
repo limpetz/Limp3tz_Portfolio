@@ -1,0 +1,473 @@
+{
+  "version": 1,
+  "walk": {
+    "file": "assets/arshad-walk.png",
+    "frameWidth": 112,
+    "frameHeight": 170,
+    "columns": 9,
+    "rows": 2,
+    "anchorX": 56,
+    "footY": 164
+  },
+  "jump": {
+    "file": "assets/arshad-jump.png",
+    "frameWidth": 144,
+    "frameHeight": 208,
+    "columns": 9,
+    "rows": 2,
+    "anchorX": 72,
+    "footY": 202,
+    "rowsMeaning": [
+      "right",
+      "left"
+    ],
+    "poseNames": [
+      "idle",
+      "anticipation",
+      "takeoff",
+      "rising",
+      "apex",
+      "falling",
+      "pre-landing",
+      "landing",
+      "recovery"
+    ]
+  },
+  "turn": {
+    "file": "assets/arshad-turn.png",
+    "frameWidth": 112,
+    "frameHeight": 170,
+    "columns": 9,
+    "rows": 1,
+    "anchorX": 56,
+    "footY": 164,
+    "order": "left profile through front to right profile",
+    "nominalAngles": [
+      -90,
+      -67.5,
+      -45,
+      -22.5,
+      0,
+      22.5,
+      45,
+      67.5,
+      90
+    ]
+  },
+  "airTurn": {
+    "file": "assets/arshad-air-turn.png",
+    "frameWidth": 144,
+    "frameHeight": 208,
+    "columns": 9,
+    "rows": 1,
+    "anchorX": 72,
+    "footY": 202,
+    "order": "left profile through front to right profile"
+  },
+  "timing": {
+    "walkFps": 10,
+    "turnDurationSeconds": 0.4,
+    "anticipationSeconds": 0.12,
+    "airtimeSeconds": 0.8,
+    "landingSeconds": 0.12,
+    "recoverySeconds": 0.12
+  },
+  "frameSets": {
+    "jump-right": {
+      "frameWidth": 144,
+      "frameHeight": 208,
+      "anchorX": 72,
+      "footY": 202,
+      "frames": [
+        {
+          "index": 0,
+          "file": "frames/jump-right/00.png",
+          "sourceIndex": 0,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": null
+        },
+        {
+          "index": 1,
+          "file": "frames/jump-right/01.png",
+          "sourceIndex": 1,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": null
+        },
+        {
+          "index": 2,
+          "file": "frames/jump-right/02.png",
+          "sourceIndex": 2,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": null
+        },
+        {
+          "index": 3,
+          "file": "frames/jump-right/03.png",
+          "sourceIndex": 3,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        },
+        {
+          "index": 4,
+          "file": "frames/jump-right/04.png",
+          "sourceIndex": 4,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        },
+        {
+          "index": 5,
+          "file": "frames/jump-right/05.png",
+          "sourceIndex": 5,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        },
+        {
+          "index": 6,
+          "file": "frames/jump-right/06.png",
+          "sourceIndex": 6,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        },
+        {
+          "index": 7,
+          "file": "frames/jump-right/07.png",
+          "sourceIndex": 7,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": null
+        },
+        {
+          "index": 8,
+          "file": "frames/jump-right/08.png",
+          "sourceIndex": 8,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": null
+        }
+      ],
+      "scale": 0.4339622641509434
+    },
+    "jump-left": {
+      "frameWidth": 144,
+      "frameHeight": 208,
+      "anchorX": 72,
+      "footY": 202,
+      "frames": [
+        {
+          "index": 0,
+          "file": "frames/jump-left/00.png",
+          "sourceIndex": 0,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": null
+        },
+        {
+          "index": 1,
+          "file": "frames/jump-left/01.png",
+          "sourceIndex": 1,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": null
+        },
+        {
+          "index": 2,
+          "file": "frames/jump-left/02.png",
+          "sourceIndex": 2,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": null
+        },
+        {
+          "index": 3,
+          "file": "frames/jump-left/03.png",
+          "sourceIndex": 3,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        },
+        {
+          "index": 4,
+          "file": "frames/jump-left/04.png",
+          "sourceIndex": 4,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        },
+        {
+          "index": 5,
+          "file": "frames/jump-left/05.png",
+          "sourceIndex": 5,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        },
+        {
+          "index": 6,
+          "file": "frames/jump-left/06.png",
+          "sourceIndex": 6,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        },
+        {
+          "index": 7,
+          "file": "frames/jump-left/07.png",
+          "sourceIndex": 7,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": null
+        },
+        {
+          "index": 8,
+          "file": "frames/jump-left/08.png",
+          "sourceIndex": 8,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": null
+        }
+      ],
+      "scale": 0.421195652173913
+    },
+    "turn": {
+      "frameWidth": 112,
+      "frameHeight": 170,
+      "anchorX": 56,
+      "footY": 164,
+      "frames": [
+        {
+          "index": 0,
+          "file": "frames/turn/00.png",
+          "sourceIndex": 0,
+          "width": 112,
+          "height": 170,
+          "anchorX": 56,
+          "footY": 164,
+          "pelvisY": null
+        },
+        {
+          "index": 1,
+          "file": "frames/turn/01.png",
+          "sourceIndex": 1,
+          "width": 112,
+          "height": 170,
+          "anchorX": 56,
+          "footY": 164,
+          "pelvisY": null
+        },
+        {
+          "index": 2,
+          "file": "frames/turn/02.png",
+          "sourceIndex": 2,
+          "width": 112,
+          "height": 170,
+          "anchorX": 56,
+          "footY": 164,
+          "pelvisY": null
+        },
+        {
+          "index": 3,
+          "file": "frames/turn/03.png",
+          "sourceIndex": 3,
+          "width": 112,
+          "height": 170,
+          "anchorX": 56,
+          "footY": 164,
+          "pelvisY": null
+        },
+        {
+          "index": 4,
+          "file": "frames/turn/04.png",
+          "sourceIndex": 4,
+          "width": 112,
+          "height": 170,
+          "anchorX": 56,
+          "footY": 164,
+          "pelvisY": null
+        },
+        {
+          "index": 5,
+          "file": "frames/turn/05.png",
+          "sourceIndex": 5,
+          "width": 112,
+          "height": 170,
+          "anchorX": 56,
+          "footY": 164,
+          "pelvisY": null
+        },
+        {
+          "index": 6,
+          "file": "frames/turn/06.png",
+          "sourceIndex": 6,
+          "width": 112,
+          "height": 170,
+          "anchorX": 56,
+          "footY": 164,
+          "pelvisY": null
+        },
+        {
+          "index": 7,
+          "file": "frames/turn/07.png",
+          "sourceIndex": 7,
+          "width": 112,
+          "height": 170,
+          "anchorX": 56,
+          "footY": 164,
+          "pelvisY": null
+        },
+        {
+          "index": 8,
+          "file": "frames/turn/08.png",
+          "sourceIndex": 8,
+          "width": 112,
+          "height": 170,
+          "anchorX": 56,
+          "footY": 164,
+          "pelvisY": null
+        }
+      ],
+      "scale": 0.4144385026737968
+    },
+    "air-turn": {
+      "frameWidth": 144,
+      "frameHeight": 208,
+      "anchorX": 72,
+      "footY": 202,
+      "frames": [
+        {
+          "index": 0,
+          "file": "frames/air-turn/00.png",
+          "sourceIndex": 0,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        },
+        {
+          "index": 1,
+          "file": "frames/air-turn/01.png",
+          "sourceIndex": 1,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        },
+        {
+          "index": 2,
+          "file": "frames/air-turn/02.png",
+          "sourceIndex": 2,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        },
+        {
+          "index": 3,
+          "file": "frames/air-turn/03.png",
+          "sourceIndex": 5,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        },
+        {
+          "index": 4,
+          "file": "frames/air-turn/04.png",
+          "sourceIndex": 4,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        },
+        {
+          "index": 5,
+          "file": "frames/air-turn/05.png",
+          "sourceIndex": 3,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        },
+        {
+          "index": 6,
+          "file": "frames/air-turn/06.png",
+          "sourceIndex": 6,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        },
+        {
+          "index": 7,
+          "file": "frames/air-turn/07.png",
+          "sourceIndex": 7,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        },
+        {
+          "index": 8,
+          "file": "frames/air-turn/08.png",
+          "sourceIndex": 8,
+          "width": 144,
+          "height": 208,
+          "anchorX": 72,
+          "footY": 202,
+          "pelvisY": 146
+        }
+      ],
+      "scale": 0.32764150690481014
+    }
+  }
+}

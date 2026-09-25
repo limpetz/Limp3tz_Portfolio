@@ -2,18 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { REDUCED_MOTION_QUERY, crossfadeMs, shouldAutoAdvance } from './motion';
 
 describe('shouldAutoAdvance', () => {
-  it('auto-advances a multi-image slideshow by default', () => {
-    expect(shouldAutoAdvance(false, 6)).toBe(true);
+  it('auto-advances a multi-image slideshow', () => {
+    expect(shouldAutoAdvance(6)).toBe(true);
   });
 
-  it('stops auto-advancing when motion is reduced', () => {
-    expect(shouldAutoAdvance(true, 6)).toBe(false);
+  it('keeps advancing regardless of the motion preference', () => {
+    // Deliberate product call: only the crossfade reacts to reduced motion, so
+    // the backdrop still rotates every SLIDESHOW_INTERVAL_MS.
+    expect(shouldAutoAdvance(2)).toBe(true);
+    expect(shouldAutoAdvance(6)).toBe(true);
   });
 
   it('never auto-advances a slideshow with nothing to advance to', () => {
-    expect(shouldAutoAdvance(false, 1)).toBe(false);
-    expect(shouldAutoAdvance(false, 0)).toBe(false);
-    expect(shouldAutoAdvance(true, 1)).toBe(false);
+    expect(shouldAutoAdvance(1)).toBe(false);
+    expect(shouldAutoAdvance(0)).toBe(false);
   });
 });
 

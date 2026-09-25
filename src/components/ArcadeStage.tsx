@@ -31,11 +31,13 @@ import {
 import { crossfadeMs, shouldAutoAdvance, usePrefersReducedMotion } from '../utils/motion';
 import { spritePlacement } from '../data/sprite';
 import { shadowForHeight } from '../utils/shadow';
+import { WALK_SHEET, frameAtElapsed } from '../utils/walk';
 import {
-  WALK_SHEET,
-  backgroundPositionFor,
-  frameAtElapsed,
-} from '../utils/walk';
+  AvatarAnimationController,
+  CharacterRenderPose,
+  SPRITE_SPECS,
+  getRenderPose,
+} from '../utils/jumpTurn';
 import moveControlsImg from '../assets/images/move.webp';
 import jumpControlsImg from '../assets/images/jump.webp';
 import bumpBlocksImg from '../assets/images/bump-blocks.webp';
@@ -68,7 +70,6 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
   const [posX, setPosX] = useState(200);
   const [posY, setPosY] = useState(0); // height above ground
-  const [facingDir, setFacingDir] = useState<1 | -1>(1);
   const [isWalking, setIsWalking] = useState(false);
   const [isAirborne, setIsAirborne] = useState(false);
   const [isLanding, setIsLanding] = useState(false);
@@ -131,22 +132,30 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
   // Hero background slideshow (auto-discovers images in assets/images/backgrounds)
   const hasMultipleBackgrounds = STAGE_BACKGROUNDS.length > 1;
+  // The artwork is drawn inset from the stage edges so the world reads smaller
+  // next to the character (the stage's dark base fills the surround). Lower
+  // this to zoom the wallpaper further out.
+  const BACKGROUND_ZOOM = 0.9;
   const [bgIndex, setBgIndex] = useState(0);
   // Bumped on manual navigation so the auto-advance timer restarts
   const [slideEpoch, setSlideEpoch] = useState(0);
 
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  // Advance to the next background on an interval. Skipped entirely when the
-  // visitor asked for reduced motion — the chevrons still step manually.
+  // Whether the slideshow may advance on its own. It runs regardless of the
+  // motion preference (only the crossfade reacts to that); the chevrons always
+  // step through manually too.
+  const autoAdvance = shouldAutoAdvance(STAGE_BACKGROUNDS.length);
+
+  // Advance to the next background on an interval.
   useEffect(() => {
-    if (!shouldAutoAdvance(prefersReducedMotion, STAGE_BACKGROUNDS.length)) return;
+    if (!autoAdvance) return;
     const id = window.setInterval(() => {
       if (!stageVisibleRef.current) return;
       setBgIndex((i) => stepBackgroundIndex(i, 1, STAGE_BACKGROUNDS.length));
     }, SLIDESHOW_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [prefersReducedMotion, slideEpoch]);
+  }, [autoAdvance, slideEpoch]);
 
   // Manual step through the backgrounds (wraps around) and restart the timer
   const stepBackground = useCallback(
@@ -223,19 +232,27 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   const SHADOW_LEFT = (ACTOR_W - SHADOW_W) / 2;
 
   // --- Walk cycle ---
-  // The sprite sheet replaces the old single still. Per the asset spec:
-  // frames render at NATIVE size (88×170), the horizontal centre of the cell
-  // is the character's position, and the feet sit on a baseline 164px from the
-  // cell top. The physics loop pokes a background-position on the sprite
-  // element, so frames never touch React state.
-  const WALK_RENDER_W = WALK_SHEET.frameWidth; // 88 — native, do not scale
-  const WALK_RENDER_H = WALK_SHEET.frameHeight; // 170
-  const WALK_BASELINE_Y = WALK_SHEET.footY; // 164px from cell top
+  // Frames come from the shared sprite poses (utils/jumpTurn.ts), which
+  // normalise every sheet onto the same on-screen character height and place
+  // the cell from its foot anchor — walk, jump and turn all read the same size.
+  // The physics loop only pokes style properties on the sprite element, so
+  // frames never touch React state.
+  const IDLE_POSE = getRenderPose('walk', 0, 0, ACTOR_W);
   const WALK_SPEED = 100; // CSS px/s (spec: start at 100)
+
+  // 3D Jump and Turn Animation Controller
+  const animCtrlRef = useRef<AvatarAnimationController>(
+    new AvatarAnimationController({ facingDir: 1, reducedMotion: prefersReducedMotion }),
+  );
+
+  // Sync reduced-motion preference live
+  useEffect(() => {
+    animCtrlRef.current.reducedMotion = prefersReducedMotion;
+  }, [prefersReducedMotion]);
 
   // Refs the loop mutates without re-rendering.
   const walkElapsedRef = useRef(0);
-  const walkFrameRef = useRef<number | null>(null);
+  const currentRenderPoseRef = useRef<CharacterRenderPose | null>(null);
   // Click-to-move destination (centre X). Null = no destination.
   const clickDestRef = useRef<number | null>(null);
 
@@ -417,6 +434,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     stateRef.current.y = 2;
     stateRef.current.vy = JUMP_V;
     stateRef.current.landingTimer = 0;
+    animCtrlRef.current.startJump();
     setIsAirborne(true);
     setIsLanding(false);
     sound.playJump();
@@ -478,6 +496,15 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       // Don't capture when typing in inputs
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
 
+      if (e.code === 'Escape') {
+        keysRef.current.left = false;
+        keysRef.current.right = false;
+        keysRef.current.jump = false;
+        clickDestRef.current = null;
+        animCtrlRef.current.reset();
+        return;
+      }
+
       if (isLeftKey(e.code)) {
         keysRef.current.left = true;
       }
@@ -530,6 +557,8 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       keysRef.current.left = false;
       keysRef.current.right = false;
       keysRef.current.jump = false;
+      clickDestRef.current = null;
+      animCtrlRef.current.reset();
     };
 
     window.addEventListener('keydown', onKeyDown);
@@ -630,12 +659,22 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         stateRef.current.vx = 0;
       }
 
-      // Face the direction of travel (classic platformer flip). This is
-      // instant, but the lean below smooths the *feel* of changing direction.
-      if (moveDir !== 0 && facingDirRef.current !== moveDir) {
-        facingDirRef.current = moveDir as 1 | -1;
-        setFacingDir(moveDir as 1 | -1);
+      // Face the direction of travel via 3D turn poses.
+      // Changing direction triggers the smooth 3D rotation sequence.
+      if (moveDir !== 0) {
+        const wasTurning = animCtrlRef.current.turnState.isTurning;
+        const prevTarget = animCtrlRef.current.turnState.targetDir;
+        animCtrlRef.current.requestDirection(moveDir as 1 | -1);
+        if (
+          animCtrlRef.current.turnState.isTurning &&
+          (!wasTurning || prevTarget !== (moveDir as 1 | -1))
+        ) {
+          sound.playTurn();
+        }
       }
+
+      // Sync facingDirRef with the animation controller's current direction
+      facingDirRef.current = animCtrlRef.current.facingDir;
 
       // Lean angle (degrees) springs toward the movement direction, so the
       // body rolls into a turn rather than snapping flat.
@@ -645,12 +684,20 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         (targetTurn - stateRef.current.turnAngle) * Math.min(1, dt * TURN_SPEED);
 
       // Smooth speed ramp: accelerate toward the target velocity at ACCEL,
-      // and decelerate with friction when there's no input. Click-to-move
-      // walks at the spec's 100px/s; keyboard walks at full sprint speed.
+      // and decelerate with friction when there's no input.
+      // When turning on the ground, pause horizontal movement per spec.
+      // In mid-air, maintain horizontal control while turning.
+      const isGroundTurning =
+        stateRef.current.grounded && animCtrlRef.current.turnState.isTurning;
+      const effectiveMoveDir = isGroundTurning ? 0 : moveDir;
+
       const targetVx =
-        moveDir * (clickDestRef.current != null && moveDirection(keysRef.current.left, keysRef.current.right) === 0 ? WALK_SPEED : MAX_SPEED);
+        effectiveMoveDir *
+        (clickDestRef.current != null && moveDirection(keysRef.current.left, keysRef.current.right) === 0
+          ? WALK_SPEED
+          : MAX_SPEED);
       stateRef.current.vx =
-        moveDir !== 0
+        effectiveMoveDir !== 0
           ? rampVelocity(stateRef.current.vx, targetVx, ACCEL, dt)
           : applyFriction(stateRef.current.vx, FRICTION, dt);
 
@@ -762,6 +809,8 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           stateRef.current.y = 0;
           stateRef.current.vy = 0;
           stateRef.current.grounded = true;
+          animCtrlRef.current.mode = 'landing';
+          animCtrlRef.current.elapsed = 0;
           setIsAirborne(false);
           setIsLanding(true);
           stateRef.current.landingTimer = 0.22;
@@ -857,35 +906,61 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         isIdle = true;
       }
 
-      // Update character sprite element.
-      // The sheet frame is selected from real elapsed time (refresh-rate
-      // independent) and applied as a background-position — no React state.
-      if (spriteRef.current) {
-        const walkingNow = !isIdle && !isCheering && Math.abs(stateRef.current.vx) > 15;
-        const animName =
-          facingDirRef.current === 1
-            ? walkingNow
-              ? 'walkRight'
-              : 'idleRight'
-            : walkingNow
-              ? 'walkLeft'
-              : 'idleLeft';
-        const indices = WALK_SHEET.animations[animName];
-        const frameIdx = walkingNow
-          ? frameAtElapsed(walkElapsedRef.current, indices, WALK_SHEET.frames, WALK_SHEET.defaultFps)
-          : indices[0];
+      // Update animation controller clock
+      animCtrlRef.current.update(dt);
 
-        if (walkFrameRef.current !== frameIdx) {
-          walkFrameRef.current = frameIdx;
-          spriteRef.current.style.backgroundPosition = backgroundPositionFor(
-            WALK_SHEET.frames[frameIdx],
-            WALK_SHEET,
-            WALK_RENDER_W,
-            WALK_RENDER_H,
-          );
+      // Update character sprite element with multi-phase jumping, 3D turning & walking.
+      // Position and background-position are applied directly to avoid React state re-renders.
+      if (spriteRef.current) {
+        const walkingNow =
+          !isIdle &&
+          !isCheering &&
+          Math.abs(stateRef.current.vx) > 15 &&
+          stateRef.current.grounded &&
+          !animCtrlRef.current.turnState.isTurning;
+
+        const walkAnimName = animCtrlRef.current.facingDir === 1 ? 'walkRight' : 'walkLeft';
+        const walkIndices = WALK_SHEET.animations[walkAnimName];
+        const walkFrameIdx = walkingNow
+          ? frameAtElapsed(walkElapsedRef.current, walkIndices, WALK_SHEET.frames, WALK_SHEET.defaultFps)
+          : walkIndices[0];
+
+        // Jump progress (0..1) estimated from vertical velocity / height when in air
+        const jumpProgress = !stateRef.current.grounded
+          ? (stateRef.current.vy > 0
+              ? 0.5 * (1 - stateRef.current.vy / JUMP_V)
+              : 0.5 + 0.5 * Math.min(1, Math.abs(stateRef.current.vy) / JUMP_V))
+          : undefined;
+
+        const pose = animCtrlRef.current.getCurrentPose({
+          walking: walkingNow,
+          walkFrame: walkFrameIdx,
+          actorWidth: ACTOR_W,
+          jumpProgress,
+        });
+
+        const prevPose = currentRenderPoseRef.current;
+        if (
+          !prevPose ||
+          prevPose.sheet !== pose.sheet ||
+          prevPose.column !== pose.column ||
+          prevPose.row !== pose.row
+        ) {
+          currentRenderPoseRef.current = pose;
+          const spec = SPRITE_SPECS[pose.sheet];
+
+          spriteRef.current.style.width = `${spec.w}px`;
+          spriteRef.current.style.height = `${spec.h}px`;
+          spriteRef.current.style.left = `${pose.offsetX}px`;
+          spriteRef.current.style.bottom = `${pose.offsetY}px`;
+          spriteRef.current.style.backgroundImage = `url(${spec.src})`;
+          spriteRef.current.style.backgroundSize = pose.backgroundSize;
+          spriteRef.current.style.backgroundPosition = pose.backgroundPosition;
         }
 
-        if (isIdle && !isCheering) {
+        // Apply idle breathing when fully standing idle, or physics squash/tilt otherwise
+        const isTurning = animCtrlRef.current.turnState.isTurning;
+        if (isIdle && !isCheering && !isTurning) {
           if (!spriteRef.current.classList.contains('animate-idle-breathe')) {
             spriteRef.current.classList.add('animate-idle-breathe');
           }
@@ -894,7 +969,12 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           if (spriteRef.current.classList.contains('animate-idle-breathe')) {
             spriteRef.current.classList.remove('animate-idle-breathe');
           }
-          spriteRef.current.style.transform = `scale(${squashX.toFixed(3)}, ${squashY.toFixed(3)}) rotate(${tilt.toFixed(2)}deg) translateY(${bobY.toFixed(2)}px)`;
+          // Do not squash or tilt while rotating in 3D to keep true volume and sharp pixel rotation
+          const appliedSquashX = isTurning ? 1 : squashX;
+          const appliedSquashY = isTurning ? 1 : squashY;
+          const appliedTilt = isTurning ? 0 : tilt;
+          const appliedBobY = isTurning ? 0 : bobY;
+          spriteRef.current.style.transform = `scale(${appliedSquashX.toFixed(3)}, ${appliedSquashY.toFixed(3)}) rotate(${appliedTilt.toFixed(2)}deg) translateY(${appliedBobY.toFixed(2)}px)`;
         }
       }
 
@@ -999,6 +1079,8 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               style={{
                 backgroundImage: `url('${url}')`,
                 opacity: i === bgIndex ? 1 : 0,
+                transform: `scale(${BACKGROUND_ZOOM})`,
+                transformOrigin: 'center',
                 transition: `opacity ${crossfadeMs(prefersReducedMotion, SLIDESHOW_FADE_MS)}ms ease-in-out`,
               }}
             />
@@ -1042,6 +1124,24 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             </svg>
           </button>
         </>
+      )}
+
+      {/* Slide-change progress bar — a neon pulse that sweeps across the base
+          of the stage as the current background's hold time elapses, then the
+          next one crossfades in. Keyed on the slide index so the sweep restarts
+          on every change (auto or manual). Decorative: the chevrons remain the
+          accessible control, so this is hidden from assistive tech. */}
+      {hasMultipleBackgrounds && autoAdvance && (
+        <div
+          aria-hidden="true"
+          className="absolute bottom-0 left-0 right-0 z-30 h-[3px] overflow-hidden bg-[#241c42]/60 pointer-events-none"
+        >
+          <div
+            key={bgIndex}
+            className="h-full w-0 animate-slide-progress bg-gradient-to-r from-[#00e5ff] via-[#3dffa2] to-[#ff2d78] shadow-[0_0_10px_rgba(0,229,255,0.9)]"
+            style={{ animationDuration: `${SLIDESHOW_INTERVAL_MS}ms` }}
+          />
+        </div>
       )}
 
       {/* Stars Background */}
@@ -1277,7 +1377,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         ref={actorRef}
         onClick={handleActorClick}
         title="That's me! Click to jump or bump mystery blocks!"
-        className={`absolute z-20 cursor-pointer select-none transition-transform duration-100 ease-out ${
+        className={`absolute z-20 cursor-pointer select-none ${
           isCheering ? 'animate-bounce' : ''
         }`}
         style={{
@@ -1287,42 +1387,39 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           // The box is the visible character: it's the click target and the
           // squash/stretch origin sits at his feet. The sprite frame overflows it.
           height: `${SPRITE_VISIBLE_H}px`,
-          transform: `scaleX(${facingDir})`,
           transformOrigin: 'bottom center',
         }}
       >
-        {/* Walk-cycle sheet. Native cell size, centred on the collision box;
-            the feet baseline (164px into the cell) sits on the box bottom. */}
+        {/* Character Sprite Sheet container.
+            Rendered with pixelated smoothing, native scale, and positioned cleanly
+            using the shared anchor baseline without card flips or scaleX mirroring. */}
         <div
           ref={spriteRef}
           className="absolute pixel-art drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]"
           style={{
-            left: `${(ACTOR_W - WALK_RENDER_W) / 2}px`,
-            bottom: `${-(WALK_RENDER_H - WALK_BASELINE_Y)}px`,
-            width: `${WALK_RENDER_W}px`,
-            height: `${WALK_RENDER_H}px`,
-            backgroundImage: `url(${WALK_SHEET.src})`,
+            left: `${IDLE_POSE.offsetX}px`,
+            bottom: `${IDLE_POSE.offsetY}px`,
+            width: `${IDLE_POSE.width}px`,
+            height: `${IDLE_POSE.height}px`,
+            backgroundImage: `url(${SPRITE_SPECS.walk.src})`,
             backgroundRepeat: 'no-repeat',
-            // Row 0, column 0 = standing, facing right (matches initial state).
-            backgroundPosition: backgroundPositionFor(
-              WALK_SHEET.frames[WALK_SHEET.animations.idleRight[0]],
-              WALK_SHEET,
-              WALK_RENDER_W,
-              WALK_RENDER_H,
-            ),
+            backgroundSize: IDLE_POSE.backgroundSize,
+            backgroundPosition: IDLE_POSE.backgroundPosition,
             transformOrigin: 'bottom center',
+            imageRendering: 'pixelated',
           }}
           role="img"
           aria-label="Pixel character of Arshad Mohemed"
         />
       </div>
 
-      {/* Controls Hint — the four sign panels, centred mid-screen. Rendered from
-          the sliced artwork (2x source, so crisp at this size). Decorative:
+      {/* Controls Hint — the four sign panels, sitting on the ground strip at
+          bottom-centre, just below the character. Rendered from the sliced
+          artwork (2x source, so crisp at this size). Decorative:
           pointer-events-none so it never blocks stage clicks. */}
       <div
         aria-label="Character controls"
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 hidden md:flex items-center gap-3 lg:gap-4 pointer-events-none"
+        className="absolute left-1/2 bottom-5 lg:bottom-6 -translate-x-1/2 z-20 hidden md:flex items-center gap-3 lg:gap-4 pointer-events-none"
       >
         <img src={moveControlsImg} alt="Move: left, right arrows or A and D" className="h-12 lg:h-14 w-auto" />
         <img src={jumpControlsImg} alt="Jump: Space or W" className="h-12 lg:h-14 w-auto" />

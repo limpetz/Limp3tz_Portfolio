@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PORTFOLIO_CONFIG } from '../data/portfolioData';
+import { CONTACT_LINKS, PORTFOLIO_CONFIG } from '../data/portfolioData';
 import { sound } from '../utils/soundEngine';
 
 interface ArcadeContactProps {
@@ -86,36 +86,32 @@ export const ArcadeContact: React.FC<ArcadeContactProps> = ({ onAddScore }) => {
         INSERT COIN TO CONNECT WITH ARSHAD
       </p>
 
-      {/* Main Action Links */}
-      <div className="flex flex-wrap gap-4 justify-center mb-8">
-        <a
-          href={`mailto:${PORTFOLIO_CONFIG.email}`}
-          onClick={() => sound.playPower()}
-          className="font-pixel text-xs px-6 py-4 bg-[#0a0817] border-2 border-[#3dffa2] text-[#3dffa2] hover:bg-[#3dffa2] hover:text-[#001016] transition-all shadow-[0_5px_0_#000] active:translate-y-1 active:shadow-none"
-        >
-          SEND EMAIL DIRECTLY
-        </a>
-
-        <a
-          href={PORTFOLIO_CONFIG.linkedin}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => sound.playCoin()}
-          className="font-pixel text-xs px-6 py-4 bg-[#0a0817] border-2 border-[#00e5ff] text-[#00e5ff] hover:bg-[#00e5ff] hover:text-[#001016] transition-all shadow-[0_5px_0_#000] active:translate-y-1 active:shadow-none"
-        >
-          LINKEDIN PROFILE
-        </a>
-
-        <a
-          href={PORTFOLIO_CONFIG.github}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => sound.playCoin()}
-          className="font-pixel text-xs px-6 py-4 bg-[#0a0817] border-2 border-[#ffd23f] text-[#ffd23f] hover:bg-[#ffd23f] hover:text-[#001016] transition-all shadow-[0_5px_0_#000] active:translate-y-1 active:shadow-none"
-        >
-          GITHUB LABS
-        </a>
-      </div>
+      {/* Main Action Links — pixel-art contact icons, one per channel. The
+          accent colour is passed as a CSS variable so the border, label and
+          hover fill all stay in sync per link without five duplicated blocks. */}
+      <ul className="flex flex-wrap gap-3 sm:gap-4 justify-center mb-8 list-none">
+        {CONTACT_LINKS.map((link) => (
+          <li key={link.id}>
+            <a
+              href={link.href}
+              aria-label={link.ariaLabel}
+              {...(link.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+              onClick={() => (link.id === 'email' ? sound.playPower() : sound.playCoin())}
+              style={{ '--accent': link.color } as React.CSSProperties}
+              className="group flex w-20 sm:w-24 flex-col items-center gap-2 px-2 py-3 bg-[#0a0817] border-2 border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[#001016] transition-all shadow-[0_5px_0_#000] active:translate-y-1 active:shadow-none"
+            >
+              <img
+                src={link.icon}
+                alt=""
+                aria-hidden="true"
+                loading="lazy"
+                className="w-10 h-10 sm:w-12 sm:h-12 select-none [image-rendering:pixelated] transition-transform duration-100 group-hover:scale-110"
+              />
+              <span className="font-pixel text-[8px] tracking-wide">{link.label}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
 
       <p className="font-retro text-xl text-[#7d7aa3] mb-8">
         Direct Email Transmission: <span className="text-[#00e5ff]">{PORTFOLIO_CONFIG.email}</span>

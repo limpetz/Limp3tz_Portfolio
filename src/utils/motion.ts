@@ -13,12 +13,14 @@ export const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 /**
  * Whether the slideshow should advance on its own.
  *
- * Auto-advancing content is the main thing reduced-motion users ask to stop, so
- * it is disabled entirely — the prev/next chevrons still work, which also means
- * the rotation is always under the visitor's control.
+ * Auto-advance is a deliberate product choice and keeps running regardless of
+ * the visitor's motion preference — the backdrop rotating is the point of the
+ * hero. Only the crossfade length reacts to that preference (`crossfadeMs`), so
+ * reduced-motion visitors get hard cuts instead of fades. A single-image
+ * slideshow has nothing to advance to.
  */
-export function shouldAutoAdvance(reducedMotion: boolean, slideCount: number): boolean {
-  return slideCount > 1 && !reducedMotion;
+export function shouldAutoAdvance(slideCount: number): boolean {
+  return slideCount > 1;
 }
 
 /** Crossfade length in ms — instant when motion is reduced. */
