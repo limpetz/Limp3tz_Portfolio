@@ -1,5 +1,5 @@
 import defaultSpriteImg from '../assets/images/pixel_arshad_sprite.webp';
-import defaultBgImg from '../assets/images/cyberpunk_pixel_city_backdrop_1790255056354.jpg';
+import defaultBgImg from '../assets/images/cyberpunk_pixel_city_backdrop_1790255056354.webp';
 
 export interface PortfolioConfig {
   name: string;

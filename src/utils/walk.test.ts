@@ -45,6 +45,33 @@ describe('WALK_SHEET metadata', () => {
   });
 });
 
+describe('left-facing idle (row 1 anchor)', () => {
+  const LEFT_IDLE = F[WALK_SHEET.animations.idleLeft[0]];
+
+  it('sits at column 0 of the left-facing row, a full cell', () => {
+    expect(LEFT_IDLE.x).toBe(0);
+    expect(LEFT_IDLE.y).toBe(WALK_SHEET.frameHeight); // row 1 starts at y=170
+    expect(LEFT_IDLE.width).toBe(WALK_SHEET.frameWidth);
+    expect(LEFT_IDLE.height).toBe(WALK_SHEET.frameHeight);
+  });
+
+  it('anchors both rows on the same feet/pelvis point, so flipping direction never drifts', () => {
+    // The JSON declares a single anchor for the whole sheet: pelvis centred
+    // horizontally, feet 6px above the cell bottom. Row 1 is mirrored art of
+    // row 0, so the same anchor has to hold for the left-facing idle.
+    expect(WALK_SHEET.anchorX).toBe(WALK_SHEET.frameWidth / 2); // 44
+    expect(WALK_SHEET.footY).toBe(164);
+    expect(WALK_SHEET.frameHeight - WALK_SHEET.footY).toBe(6);
+  });
+
+  it('renders the row-1 cell by shifting the sheet up exactly one cell height', () => {
+    // At 1:1 the left idle shows sheet column 0, row 1: offset (0, -170).
+    // This is the exact background-position the stage renders while idle
+    // facing left.
+    expect(backgroundPositionFor(LEFT_IDLE, WALK_SHEET, 88, 170)).toBe('0px -170px');
+  });
+});
+
 describe('frameDurationMs', () => {
   it('uses the per-frame duration when the JSON declares one', () => {
     // Walk frames declare durationMs: 100.

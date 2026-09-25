@@ -140,7 +140,7 @@ Full-resolution sources are **not committed** — they live in `git`-ignored
 
 | Original | Shipped |
 | --- | --- |
-| `backgrounds/.originals/*.png` (~15 MB) | `backgrounds/*.webp` (1.9 MB) |
+| `backgrounds/.originals/*.png` (~15 MB) | `backgrounds/*.webp` (1.9 MB) + fallback `cyberpunk…webp` (242 KB) |
 | `images/.originals/pixel_arshad_sprite.png` (949 KB) | `images/pixel_arshad_sprite.webp` (42 KB) |
 
 Regenerate any of them with `sharp-cli`:
