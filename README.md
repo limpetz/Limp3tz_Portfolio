@@ -1,7 +1,6 @@
 # LIMP3TZ // Neon Pixel Arcade Portfolio
 
-An interactive neon-cyberpunk arcade portfolio for **Arshad Mohemed (LIMP3TZ)** —
-Senior Specialist Trainer, Ad Ops @ MarketStar, ex-NVIDIA QA.
+An interactive neon-cyberpunk arcade portfolio for **(LIMP3TZ)** —
 
 Instead of a static page it opens as a playable 2D platformer: a pixel character
 you can walk, jump, and bump mystery blocks with, plus a synth-generated
