@@ -12,6 +12,18 @@
  *   they guard against regressions (pose sequences, cadence parity), not exact
  *   frame timings.
  *
+ * Determinism notes (learned from CI flakiness):
+ *   - Headless rAF throttles (~300ms frames), so absolute timings wobble ±20%.
+ *     We assert pose SETS and cadence, never exact first frames.
+ *   - The boot click parks a walk target at stage centre. The hero must be
+ *     measurably clear of the mystery-block band before bounce assertions,
+ *     otherwise head-bumps truncate the arc. We poll the actor's x until
+ *     outside [blocksLeft - 40, blocksRight + 40] (never more than 8s),
+ *     instead of relying on blind key-hold durations.
+ *   - Turn poses (3D turn sheet) play row-0 frames for BOTH directions while
+ *     the sprite is rotating. Walk parity checks must therefore ignore row-0
+ *     frames entirely when validating the left walk row.
+ *
  * Exit code 0 = all assertions passed; nonzero = the site's animation regressed.
  */
 import puppeteer from 'puppeteer-core';
@@ -51,6 +63,38 @@ try {
       return el ? { bg: el.style.backgroundPosition, tr: el.style.transform } : null;
     }, SEL);
 
+  // Walk toward `dir` (-1 | 1) until the actor's box leaves the mystery-block
+  // band by a 40px margin, or `maxMs` elapses. Returns true when clear.
+  async function walkClearOfBlocks(dir, maxMs = 8000) {
+    const key = dir < 0 ? 'ArrowLeft' : 'ArrowRight';
+    await page.keyboard.down(key);
+    const t0 = Date.now();
+    let clear = false;
+    while (Date.now() - t0 < maxMs) {
+      clear = await page.evaluate(() => {
+        const actor = document.querySelector('[title*="Click to jump"]');
+        const blocks = document.querySelectorAll('[aria-label^="Mystery Block:"]');
+        if (!actor || blocks.length === 0) return false;
+        const a = actor.getBoundingClientRect();
+        let left = Infinity;
+        let right = -Infinity;
+        for (const b of blocks) {
+          const r = b.getBoundingClientRect();
+          left = Math.min(left, r.left);
+          right = Math.max(right, r.right);
+        }
+        return a.left > right + 40 || a.right < left - 40;
+      });
+      if (clear) break;
+      await sleep(60);
+      // Nudge the key so headless throttling can't starve a held key.
+      await page.keyboard.up(key);
+      await page.keyboard.down(key);
+    }
+    await page.keyboard.up(key);
+    return clear;
+  }
+
   async function holdAndSample(key, ms) {
     const seen = [];
     await page.keyboard.down(key);
@@ -67,6 +111,12 @@ try {
   }
 
   const WALK_COLS = ['-172', '-344', '-516', '-688', '-860', '-1032', '-1204', '-1376'];
+
+  // --- 0. Get the hero measurably clear of the mystery blocks (walk right) ---
+  console.log('clear the block band:');
+  const cleared = await walkClearOfBlocks(1);
+  assert(cleared, 'hero walked measurably clear of the mystery-block band');
+  await sleep(400);
 
   // --- 1. Walk pose sequence: 8 distinct stride poses ---
   console.log('walk pose sequence:');
@@ -89,8 +139,12 @@ try {
   // --- 2. Left/right parity: baked left row, same cadence ---
   console.log('left/right parity:');
   const left = await holdAndSample('ArrowLeft', 1600);
-  const leftWalk = left.map((s) => s.bg).filter((bg) => bg !== '0px 0px' && bg !== '0px -330px');
-  assert(leftWalk.length >= 8, `left walk shows >=8 distinct poses (got ${leftWalk.length})`);
+  // Row 0 (y=0px) frames seen while walking left belong to the 3D turn sheet
+  // (turn cells 176px, a different x grid) — exclude them from walk-row checks.
+  const leftWalk = left
+    .map((s) => s.bg)
+    .filter((bg) => bg.endsWith('-330px') && bg !== '0px -330px');
+  assert(leftWalk.length >= 8, `left walk shows >=8 distinct row-1 poses (got ${leftWalk.length})`);
   assert(leftWalk.every((p) => p.endsWith('-330px')),
     'left walk renders from the baked left row');
   const leftStrideSoon = leftWalk
@@ -134,23 +188,21 @@ try {
   assert(latL !== null && latL <= 80, `left stride latency ${latL}ms <= 80ms`);
 
   // --- 4. Held bounce: immediate relaunch, flowing air cycle ---
-  // The boot click parks a walk target near stage centre; walking left first
-  // moves the hero clear of the mystery blocks, whose head-bumps would else
-  // interrupt the arc and truncate the pose cycle.
+  // The hero is already measurably clear of the blocks (section 0), so held
+  // arcs run uninterrupted and the full air cycle can play out.
   console.log('held bounce:');
-  await page.keyboard.down('ArrowLeft');
-  await sleep(700);
-  await page.keyboard.up('ArrowLeft');
-  await sleep(400);
   await page.keyboard.down('ArrowUp');
   const t0 = Date.now();
-  let above = false, launches = 0;
+  let above = false;
+  let launches = 0;
   const airPoses = new Set();
   while (Date.now() - t0 < 2400) {
     const s = await page.evaluate((sel) => {
       const el = document.querySelector(sel);
       const actor = document.querySelector('[title*="Click to jump"]');
-      return el ? { bg: el.style.backgroundPosition, b: actor ? parseFloat(actor.style.bottom) : null } : null;
+      return el
+        ? { bg: el.style.backgroundPosition, b: actor ? parseFloat(actor.style.bottom) : null }
+        : null;
     }, SEL);
     if (s && s.b !== null) {
       const air = s.b > 93;
@@ -167,8 +219,9 @@ try {
   // whichever row the facing dictates (jump cells 224px; row 0 right, row 1 left).
   const expected = [3, 4, 5, 6].map((c) => [`${-c * 224}px 0px`, `${-c * 224}px -330px`]);
   for (const [rightPose, leftPose] of expected) {
+    const col = parseInt(rightPose.split('px')[0].slice(1), 10) / 224;
     assert(airPoses.has(rightPose) || airPoses.has(leftPose),
-      `held bounce shows air pose col ${rightPose.split('px')[0].slice(1) / 224}`);
+      `held bounce shows air pose col ${col}`);
   }
   // The takeoff snap (col 2) must NOT dominate: with the immediate relaunch the
   // rising pose (col 3) must appear alongside apex/falling.
