@@ -46,6 +46,7 @@ npm run dev      # http://localhost:3000
 | Jump | `Space`, `W`, or `↑` | `JUMP` button |
 | Bump blocks | Jump into them from below | — |
 | Interact | Click the character | Tap the character |
+| Walk to a spot | Click the ground | Tap the ground |
 
 Holding jump bounces continuously — each bounce is gated on landing, so
 mid-air double jumps are impossible. There's also a **Konami code**
@@ -53,6 +54,29 @@ mid-air double jumps are impossible. There's also a **Konami code**
 
 Score and coins persist to `localStorage` under `limp3tz_score` and
 `limp3tz_coins`.
+
+## Walk-cycle sprite sheet
+
+The character animates with a 2-row sprite sheet,
+`src/assets/images/sprite/walk/arshad-walk.png` (792×340, 88×170 cells): row 0
+faces right (idle + 8 walk frames), row 1 mirrors it facing left. The sheet's
+companion `arshad-walk.json` is the single source of truth — cell size, frame
+rectangles, per-frame durations, animation index groups and the foot anchor all
+live there, so `src/utils/walk.ts` hard-codes nothing.
+
+- While moving, the physics loop advances a walk clock and `frameAtElapsed()`
+  picks the frame; the renderer only updates a CSS `background-position`, so no
+  React state churn per frame
+- The clock advances only while actually moving, freezes on idle, and resets
+  when a new walk starts
+- Frames render at the native 88×170 cell size — the sheet is scaled via
+  `background-size`, never the frame element
+- Click-to-walk: tapping the ground walks the character there at 100 px/s (the
+  on-screen D-pad and keyboard move at full sprint speed). Clicking the
+  character, hiding the tab or losing window focus cancels the walk
+
+New game logic in `walk.ts` is pure and unit tested (`walk.test.ts`), like the
+other helpers.
 
 ## Project structure
 
@@ -81,6 +105,8 @@ src/
     input.ts              # Pure key mapping + jump decisions
     blocks.ts             # Pure block bump detection + collection scoring
     motion.ts             # Reduced-motion preference + helpers
+    walk.ts               # Walk-cycle frame selection from the sprite-sheet JSON
+    shadow.ts             # Ground shadow sizing helpers
     soundEngine.ts        # Web Audio chiptune synthesis
     particleSystem.ts     # Canvas particle effects
 public/
@@ -134,8 +160,9 @@ badly below ~75. Once you're happy, the `.originals/` folders can be deleted.
 
 ### Sprite framing
 
-The character art is a **portrait** canvas surrounded by transparent margin, and
-that margin is what makes sizing easy to get wrong. The shipped sprite measures
+The static portrait sprite (`pixel_arshad_sprite.webp`, shown in the character
+sheet) is a **portrait** canvas surrounded by transparent margin, and that
+margin is what makes sizing easy to get wrong. The shipped sprite measures
 799×1967 with the character only occupying 769×1778 of it (padding: 14 left / 93
 top / 16 right / 96 bottom). Scaling the *canvas* to the 72px collision width
 renders the character at the wrong size, so every consumer sizes him by the
@@ -146,15 +173,15 @@ helpers, both driven by the same metrics:
 
 | Helper | Used by | Result |
 | --- | --- | --- |
-| `spriteCanvasSize(172)` | `ArcadeStage` | canvas renders at **77×190**, character 74.4×172 |
-| `spritePlacement(72, 172)` | `ArcadeStage` | `left: −3px`, `bottom: −9px` — centres him on the collision box and lands his feet on the ground line |
+| `spritePlacement(72, 172)` | `ArcadeStage` | collision box centring + feet-on-ground-line offsets for the walk-sheet frame |
 | `spriteCanvasSize(301)` | `CharacterSheet` | portrait canvas renders at **135×333**, matching the original portrait's visible height |
 
-The `height` matters as much as the `width`: the canvas is **not** square, so
-pinning both dimensions to one number would letterbox or distort him. The
-collision box (`ACTOR_W` = 72px) is deliberately left alone, so gameplay is
-untouched, and the ground shadow is derived from the visible width rather than
-the collision box.
+On the stage the character is animated by the **walk-cycle sheet** (see above);
+this portrait only appears in the character sheet. The `height` matters as much
+as the `width`: the canvas is **not** square, so pinning both dimensions to one
+number would letterbox or distort him. The collision box (`ACTOR_W` = 72px) is
+deliberately left alone, so gameplay is untouched, and the ground shadow is
+derived from the visible width rather than the collision box.
 
 If you swap the artwork, re-measure its alpha bounding box and update
 `CHARACTER_SPRITE`. Trimming reports the visible size and the canvas size you

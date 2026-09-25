@@ -12,5 +12,8 @@ coverage/
 .originals/
 
 # Walk-pack sources: individual frames, previews, demo files, full-size sheets.
-# The app ships only sprite/Walk/arshad-walk.png + .json (compact sheet).
+# The app ships only sprite/walk/arshad-walk.png + .json (compact sheet).
 src/assets/images/sprite/.originals/
+
+# Freebuff agent workspace
+.freebuff/

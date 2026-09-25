@@ -29,7 +29,7 @@ import {
   nearestBumpTarget,
 } from '../utils/blocks';
 import { crossfadeMs, shouldAutoAdvance, usePrefersReducedMotion } from '../utils/motion';
-import { spriteCanvasSize, spritePlacement } from '../data/sprite';
+import { spritePlacement } from '../data/sprite';
 import { shadowForHeight } from '../utils/shadow';
 import {
   WALK_SHEET,
@@ -216,7 +216,6 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   // renders far smaller than intended. Metrics and maths live in data/sprite.ts;
   // 172px matches the height the original portrait sprite rendered at.
   const SPRITE_VISIBLE_H = 172;
-  const SPRITE_SIZE = spriteCanvasSize(SPRITE_VISIBLE_H);
   const SPRITE_PLACEMENT = spritePlacement(ACTOR_W, SPRITE_VISIBLE_H);
 
   // The ground shadow tracks the character's visible width, not the collision box.
