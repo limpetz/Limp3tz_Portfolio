@@ -200,8 +200,8 @@ in and it joins the rotation, no code change required.
 - Under `prefers-reduced-motion` the crossfade becomes instant. Auto-advance
   deliberately keeps running so the backdrop still rotates — a product call,
   not an oversight (see `shouldAutoAdvance` in `src/utils/motion.ts`)
-- The artwork is drawn inset from the stage edges (`BACKGROUND_ZOOM`) so the
-  world reads smaller next to the character; lower it to zoom further out
+- The wallpaper is full-bleed edge to edge. (An inset "arcade bezel" variant
+  was tried and reverted — its frame line cut through the intro text.)
 - Supported formats: `.jpg` `.jpeg` `.png` `.webp` `.avif`
 - If the folder is empty, the single fallback backdrop is used
 

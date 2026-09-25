@@ -133,18 +133,6 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
   // Hero background slideshow (auto-discovers images in assets/images/backgrounds)
   const hasMultipleBackgrounds = STAGE_BACKGROUNDS.length > 1;
-  // The artwork is drawn inset from the stage edges so the world reads smaller
-  // next to the character. Lower this to zoom the wallpaper further out.
-  const BACKGROUND_ZOOM = 0.9;
-  // The neon frame traces the inset wallpaper's edge. `scale()` shrinks the
-  // layer about its centre, so the edge sits (1 - zoom) / 2 of the way in.
-  const BACKGROUND_FRAME_INSET = ((1 - BACKGROUND_ZOOM) / 2) * 100;
-  // Bezel behind the inset wallpaper: scanlines plus a soft centre bloom, so the
-  // surround reads as an arcade-cabinet frame rather than bare black bars.
-  const BEZEL_TEXTURE =
-    'repeating-linear-gradient(0deg, rgba(0,229,255,0.06) 0 1px, transparent 1px 4px), ' +
-    'repeating-linear-gradient(90deg, rgba(143,108,255,0.05) 0 1px, transparent 1px 6px), ' +
-    'radial-gradient(ellipse at center, rgba(61,255,162,0.10) 0%, rgba(7,5,18,0) 62%)';
   const [bgIndex, setBgIndex] = useState(0);
   // Bumped on manual navigation so the auto-advance timer restarts
   const [slideEpoch, setSlideEpoch] = useState(0);
@@ -1088,14 +1076,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         partyMode ? 'party-mode' : ''
       }`}
     >
-      {/* Hero Background Slideshow */}
+      {/* Hero Background Slideshow — full-bleed. An earlier inset "arcade
+          bezel" framing was tried here and reverted: the frame line cut
+          through the intro overlay's text on the left edge. */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-        {/* Arcade bezel: only paints when there is an inset wallpaper to frame —
-            the procedural fallback fills the whole stage. */}
-        {!useProceduralBackground && (
-          <div className="absolute inset-0" style={{ background: BEZEL_TEXTURE }} />
-        )}
-
         {useProceduralBackground ? (
           <div
             className="absolute inset-0"
@@ -1112,20 +1096,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               style={{
                 backgroundImage: `url('${url}')`,
                 opacity: i === bgIndex ? 1 : 0,
-                transform: `scale(${BACKGROUND_ZOOM})`,
-                transformOrigin: 'center',
                 transition: `opacity ${crossfadeMs(prefersReducedMotion, SLIDESHOW_FADE_MS)}ms ease-in-out`,
               }}
             />
           ))
-        )}
-
-        {/* Neon frame on the bezel, hugging the inset wallpaper's edge. */}
-        {!useProceduralBackground && (
-          <div
-            className="absolute border-2 border-[#00e5ff]/70 shadow-[0_0_28px_rgba(0,229,255,0.45),inset_0_0_28px_rgba(0,229,255,0.16)]"
-            style={{ inset: `${BACKGROUND_FRAME_INSET}%` }}
-          />
         )}
 
         {/* Dimming overlay only for the procedural fallback — the custom
