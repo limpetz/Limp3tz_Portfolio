@@ -1,6 +1,9 @@
 import React from 'react';
 import { sound } from '../utils/soundEngine';
 
+/** Build identity, injected at build time by vite.config.ts `define`. */
+const BUILD_LABEL = `${__APP_VERSION__} · ${__BUILD_DATE__}`;
+
 interface BootScreenProps {
   onStart: () => void;
 }
@@ -52,6 +55,12 @@ export const BootScreen: React.FC<BootScreenProps> = ({ onStart }) => {
 
         <p className="font-pixel text-[8px] text-[#7d7aa3]/70 pt-10">
           © 2026 ARSHAD MOHEMED (LIMP3TZ) · ALL RIGHTS RESERVED
+        </p>
+
+        {/* Build badge: version · date · sha. Comparing this against the latest
+            commit on main makes a stale Pages deploy obvious at a glance. */}
+        <p className="font-pixel text-[8px] text-[#7d7aa3]/50 pt-1 tracking-wider">
+          BUILD {BUILD_LABEL} · {__BUILD_SHA__.toUpperCase()}
         </p>
       </div>
     </div>

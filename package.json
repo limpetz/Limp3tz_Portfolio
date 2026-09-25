@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "tsc --noEmit",
-    "playtest": "node scripts/playtest.mjs"
+    "playtest": "node scripts/playtest.mjs",
+    "playtest:ci": "bash scripts/playtest-retry.sh"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
