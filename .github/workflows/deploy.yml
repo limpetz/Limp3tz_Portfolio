@@ -101,9 +101,13 @@ jobs:
             && [ "$(git rev-parse "refs/tags/${PKG_VERSION}^{commit}")" = "$(git rev-parse HEAD)" ]; then
             TAG="${PKG_VERSION}"
           else
-            # Seed from the highest existing semver tag (auto or manual) so
-            # the first auto release builds on e.g. v1.1.0, not v0.0.0.
-            LAST="$(git tag --list 'auto/v*' 'v*' --sort=-v:refname | head -n1 | sed 's/^auto\/v//; s/+.*//')"
+            # Seed from the most recently created version tag (auto or
+            # manual) so the first auto release builds on e.g. v1.1.0, not
+            # v0.0.0, and subsequent autos keep incrementing from the latest
+            # auto/vX.Y.Z+sha. Creation order beats version sort here:
+            # version sort ranks the auto/ prefix below v* tags. Strip an
+            # optional auto/ prefix, then the v, then any +build metadata.
+            LAST="$(git tag --list --sort=-creatordate | grep -E '^(auto/)?v[0-9]+\.[0-9]+\.[0-9]+(\+|$)' | head -n1 | sed -E 's/^auto\/v?//; s/^v//; s/\+.*//')"
             MAJOR=0; MINOR=0; PATCH=0
             if [ -n "$LAST" ]; then
               MAJOR="${LAST%%.*}"; REST="${LAST#*.}"; MINOR="${REST%%.*}"; PATCH="${REST#*.}"
