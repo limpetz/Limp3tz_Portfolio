@@ -1,6 +1,6 @@
 /**
  * LIMP3TZ // Neon Pixel Arcade Portfolio
- * Arshad Mohemed — Senior Specialist Trainer, Ad Operations @ MarketStar · ex-NVIDIA QA
+ * LIMP3TZ — Senior Specialist Trainer, Ad Operations @ MarketStar · ex-NVIDIA QA
  */
 
 import { useState, useEffect, useCallback } from 'react';

@@ -121,7 +121,7 @@ export const JUMP_COLUMNS = {
 /**
  * Timing constants for turning and jumping.
  */
-export const TURN_DURATION = 0.25; // 250ms per user preference
+export const TURN_DURATION = 0.4; // 400ms — matches the 240px pack metadata
 export const JUMP_TIMINGS = {
   ANTICIPATION: 0.12, // seconds
   AIRTIME: 0.8,       // seconds

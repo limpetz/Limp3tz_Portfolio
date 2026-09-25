@@ -38,7 +38,7 @@ export const BootScreen: React.FC<BootScreenProps> = ({ onStart }) => {
         <div className="h-0.5 w-32 mx-auto bg-gradient-to-r from-transparent via-[#00e5ff] to-transparent my-4" />
 
         <p className="font-pixel text-[9px] sm:text-[11px] text-[#ff2d78] tracking-widest leading-relaxed shadow-[0_0_12px_rgba(255,45,120,0.5)]">
-          ARSHAD MOHEMED · SR. SPECIALIST TRAINER — AD OPS · EX-NVIDIA
+          LIMP3TZ · SR. SPECIALIST TRAINER — AD OPS · EX-NVIDIA
         </p>
 
         <div className="pt-8">
@@ -51,7 +51,7 @@ export const BootScreen: React.FC<BootScreenProps> = ({ onStart }) => {
         </div>
 
         <p className="font-pixel text-[8px] text-[#7d7aa3]/70 pt-10">
-          © 2026 ARSHAD MOHEMED (LIMP3TZ) · ALL RIGHTS RESERVED
+          © 2026 LIMP3TZ · ALL RIGHTS RESERVED
         </p>
       </div>
     </div>

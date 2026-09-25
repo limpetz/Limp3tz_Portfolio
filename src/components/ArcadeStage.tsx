@@ -82,7 +82,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   const [bumpedBlockKey, setBumpedBlockKey] = useState<string | null>(null);
 
   // Speech bubble
-  const [bubbleText, setBubbleText] = useState("HI, I'M ARSHAD! CLICK OR MOVE ME!");
+  const [bubbleText, setBubbleText] = useState("HI, I'M LIMP3TZ! CLICK OR MOVE ME!");
   const [bubbleVisible, setBubbleVisible] = useState(true);
   const typingTimerRef = useRef<number | null>(null);
   const bubbleHideTimerRef = useRef<number | null>(null);
@@ -206,8 +206,11 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   const ACCEL = 1800; // px/sec²
   const FRICTION = 2200; // px/sec²
   const SKID_DECEL = 3400; // px/sec²
-  const JUMP_V = 1100; // px/sec (raised so the player can reach the overhead blocks)
-  const GRAVITY = 1950; // px/sec²
+  // Jump arc, tuned for the 240px character: the rise reads best when it
+  // roughly matches his height, and the head still has to reach the block band
+  // (BLOCK_Y above ground) — see the reach maths in the tests.
+  const JUMP_V = 1250; // px/sec
+  const GRAVITY = 2000; // px/sec²
   
   // --- Turn / sprint kinematics ---
   const TURN_SPEED = 10;       // how quickly the sprite springs toward its target turn
@@ -225,6 +228,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   // A block's collision box is the measured block plus this grace, so it is
   // forgiving to hit without reaching far past its visible edges.
   const BLOCK_BUMP_GRACE = 4;
+  // Downward speed after a head bump (px/sec). A firmer drop reads better on a
+  // 240px body and keeps hold-to-jump bumps from double-triggering the same
+  // block; the constant in blocks.ts carries the tested contract.
+  const HEAD_BOUNCE_V = HEAD_BUMP_BOUNCE;
 
   // --- Character actor box ---
   const ACTOR_W = 72; // collision-box width (px)
@@ -794,8 +801,9 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
       // Vertical jumping & gravity
       if (!stateRef.current.grounded) {
-        // Apex float: subtle gravity dampening near peak
-        const apexFactor = Math.abs(stateRef.current.vy) < 80 ? 0.75 : 1.0;
+        // Apex float: subtle gravity dampening near peak (window scales with
+        // the heavier arc, roughly half a body-height of speed)
+        const apexFactor = Math.abs(stateRef.current.vy) < 110 ? 0.75 : 1.0;
         stateRef.current.vy -= GRAVITY * apexFactor * dt;
         stateRef.current.y += stateRef.current.vy * dt;
 
@@ -811,7 +819,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
           if (hit) {
             openBlock(MYSTERY_BLOCKS_DATA[hit.index].key, hit.centerX);
-            stateRef.current.vy = HEAD_BUMP_BOUNCE; // Bounce downward
+            stateRef.current.vy = HEAD_BOUNCE_V; // Firm downward bounce off the block
           }
         }
 
@@ -826,7 +834,9 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           setIsAirborne(false);
           setIsLanding(true);
           stateRef.current.landingTimer = 0.22;
-          stateRef.current.landingIntensity = Math.min(1.0, Math.max(0.4, fallSpeed / 620));
+          // Heavier body: full impact over a shorter fall, floored at 0.5 so
+          // hop-landings still compress visibly.
+          stateRef.current.landingIntensity = Math.min(1.0, Math.max(0.5, fallSpeed / 700));
           sound.playLand();
 
           // Authentic ground landing dust burst
@@ -856,15 +866,17 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       let isIdle = false;
 
       if (!stateRef.current.grounded) {
-        // Airborne: stretch on ascent, aerodynamic float/fall on descent
+        // Airborne: stretch on ascent, aerodynamic float/fall on descent.
+        // Amplitudes were tuned at 172px and scale with body height (240px now),
+        // so the deformation reads the same proportionally.
         const vy = stateRef.current.vy;
         if (vy > 60) {
-          const stretch = Math.min(0.20, (vy / JUMP_V) * 0.20);
+          const stretch = Math.min(0.16, (vy / JUMP_V) * 0.20);
           squashY = 1 + stretch;
           squashX = 1 - stretch * 0.6;
           tilt = stateRef.current.turnAngle * 1.15;
         } else if (vy < -60) {
-          const fallStretch = Math.min(0.14, (Math.abs(vy) / JUMP_V) * 0.14);
+          const fallStretch = Math.min(0.11, (Math.abs(vy) / JUMP_V) * 0.14);
           squashY = 1 + fallStretch;
           squashX = 1 - fallStretch * 0.5;
           tilt = stateRef.current.turnAngle;
@@ -881,18 +893,19 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         const intensity = stateRef.current.landingIntensity;
 
         if (progress < 0.35) {
-          // Impact squash
+          // Impact squash — gentler per-pixel than at 172px (a 62px compression
+          // read as a collapse), with a slightly longer, softer profile.
           const p = progress / 0.35;
           const s = Math.sin(p * Math.PI * 0.5);
-          squashY = 1.0 - 0.26 * intensity * s;
-          squashX = 1.0 + 0.24 * intensity * s;
+          squashY = 1.0 - 0.19 * intensity * s;
+          squashX = 1.0 + 0.17 * intensity * s;
           bobY = 3.5 * intensity * s;
         } else if (progress < 0.70) {
           // Elastic spring overshoot
           const p = (progress - 0.35) / 0.35;
           const r = Math.sin(p * Math.PI);
-          squashY = 1.0 + 0.08 * intensity * r;
-          squashX = 1.0 - 0.06 * intensity * r;
+          squashY = 1.0 + 0.06 * intensity * r;
+          squashX = 1.0 - 0.05 * intensity * r;
           bobY = -2.0 * intensity * r;
         } else {
           // Settle
@@ -1439,7 +1452,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             imageRendering: 'pixelated',
           }}
           role="img"
-          aria-label="Pixel character of Arshad Mohemed"
+          aria-label="Pixel character of LIMP3TZ"
         />
       </div>
 

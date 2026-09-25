@@ -74,9 +74,14 @@ describe('jumpApexHeight', () => {
   });
 
   // Regression guard: the stage raises the character to the overhead blocks
-  // (BLOCK_Y = 300 in ArcadeStage). Keep these in sync with JUMP_V / GRAVITY.
+  // (BLOCK_Y = 300, JUMP_V = 1250, GRAVITY = 2000 in ArcadeStage). Keep these
+  // in sync — the 240px character's head must reach the band, but his feet
+  // must not carry him past the top of it.
   it('still clears the 300px overhead block band with the configured jump', () => {
-    expect(jumpApexHeight(1100, 1950)).toBeGreaterThan(300);
+    const apex = jumpApexHeight(1250, 2000);
+    expect(apex).toBeGreaterThan(300);
+    // Head at apex must not fly past the band's top + tolerance window.
+    expect(apex).toBeLessThan(560);
   });
 });
 

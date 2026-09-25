@@ -23,8 +23,15 @@ export const BLOCK_COIN = 1;
 /** One-off bonus once every power item has been found. */
 export const ALL_BLOCKS_BONUS = 500;
 
-/** Downward velocity applied to the actor on a head bump (px/sec). */
-export const HEAD_BUMP_BOUNCE = -120;
+/**
+ * Downward velocity applied to the actor on a head bump (px/sec).
+ *
+ * Baseline for the 240px body: firm enough that a hold-to-jump bounce reads as
+ * a distinct beat and cannot re-trigger the same block, soft enough to feel
+ * springy. The stage may apply its own tuned value; this stays the tested,
+ * shared contract.
+ */
+export const HEAD_BUMP_BOUNCE = -180;
 
 export interface BlockHit {
   /** Index into the block definitions array. */

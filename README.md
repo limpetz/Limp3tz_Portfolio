@@ -1,6 +1,6 @@
 # LIMP3TZ // Neon Pixel Arcade Portfolio
 
-An interactive neon-cyberpunk arcade portfolio for **Arshad Mohemed (LIMP3TZ)** —
+An interactive neon-cyberpunk arcade portfolio for **LIMP3TZ** —
 Senior Specialist Trainer, Ad Ops @ MarketStar, ex-NVIDIA QA.
 
 Instead of a static page it opens as a playable 2D platformer: a pixel character
@@ -57,29 +57,42 @@ mid-air double jumps are impossible. There's also a **Konami code**
 Score and coins persist to `localStorage` under `limp3tz_score` and
 `limp3tz_coins`.
 
-## Walk-cycle sprite sheet
+## Character sprite pack (240px)
 
-The character animates with a 2-row sprite sheet,
-`src/assets/images/sprite/walk/arshad-walk.png` (792×340, 88×170 cells): row 0
-faces right (idle + 8 walk frames), row 1 mirrors it facing left. The sheet's
-companion `arshad-walk.json` is the single source of truth — cell size, frame
-rectangles, per-frame durations, animation index groups and the foot anchor all
-live there, so `src/utils/walk.ts` hard-codes nothing.
+The character animates from the **240px pack** in
+`src/assets/images/arshad-sprites-240px/assets/` — four indexed-PNG sheets drawn
+at **scale 1.0**: the standing figure is exactly **240px** tall inside a 330px
+cell, with the feet on a baseline 12px above the cell bottom (`footY` 318).
+Because the art is native, the renderer never upscales it.
+
+| Sheet | Cells | Sheet size | anchorX | Use |
+| --- | --- | --- | --- | --- |
+| `arshad-walk.png` | 172×330, 9×2 | 1548×660 | 86 | Row 0 right, row 1 left; col 0 idle, cols 1–8 walk |
+| `arshad-jump.png` | 224×330, 9×2 | 2016×660 | 112 | Jump lifecycle, same row convention |
+| `arshad-turn.png` | 176×330, 9×1 | 1584×330 | 88 | Grounded turn — 3/4-left → front → 3/4-right |
+| `arshad-air-turn.png` | 224×330, 9×1 | 2016×330 | 112 | Tucked mid-air turn |
+
+Turn and air-turn sheets carry artwork only in columns 2–6; columns 0, 1, 7, 8
+are transparent by design. `arshad-walk.json` (same folder) is the walk sheet's
+source of truth — cell size, frame rectangles, per-frame durations, animation
+index groups and the foot anchor — so `src/utils/walk.ts` hard-codes nothing.
+The pack's full `animations.json`, the individual frames, WebP twins and the
+interactive demo live in the git-ignored `sprite/.originals/240px-pack/`
+archive.
 
 - While moving, the physics loop advances a walk clock and `frameAtElapsed()`
-  picks the frame; the renderer only updates a CSS `background-position`, so no
-  React state churn per frame
+  picks the frame; the renderer only updates CSS `background-position` and
+  `background-size`, so no React state churn per frame
 - The clock advances only while actually moving, freezes on idle, and resets
   when a new walk starts
-- The walk sheet is drawn ~25% smaller than the jump/turn art, so it is scaled
-  up (1.25×) to land the standing character at the shared target height — see
-  **Jump & 3D turning**. Scaling goes through `background-size`, never by
-  resizing the frame element
+- Every sheet normalises to one standing height (`TARGET_CONTENT_H`, 240px) —
+  with the native pack the scale is exactly 1.0, but the plumbing stays so a
+  future art swap can't make the character change size mid-animation again
 - Click-to-walk: tapping the ground walks the character there at 100 px/s (the
   on-screen D-pad and keyboard move at full sprint speed). Clicking the
   character, hiding the tab or losing window focus cancels the walk
 
-New game logic in `walk.ts` is pure and unit tested (`walk.test.ts`), like the
+Game logic in `walk.ts` and `jumpTurn.ts` is pure and unit tested, like the
 other helpers.
 
 ## Jump & 3D turning
@@ -89,22 +102,11 @@ rotation instead. `src/utils/jumpTurn.ts` owns this — a small
 `AvatarAnimationController` state machine plus pure mapping helpers, all unit
 tested in `jumpTurn.test.ts`.
 
-Three further sheets sit in `src/assets/images/sprite/jump-turn/`:
-
-| Sheet | Size | Cells | Use |
-| --- | --- | --- | --- |
-| `arshad-jump.png` | 1296×416 | 144×208, 9×2 | Jump lifecycle — row 0 faces right, row 1 left |
-| `arshad-turn.png` | 1008×170 | 112×170, 9×1 | Grounded turn — left profile → front → right profile |
-| `arshad-air-turn.png` | 1296×208 | 144×208, 9×1 | Tucked mid-air turn |
-
-`animations.json` beside them is reference metadata (cell sizes, anchors and
-nominal angles); `SPRITE_SPECS` in `jumpTurn.ts` is what the renderer actually
-uses.
-
-- **Turning** lasts `TURN_DURATION` (250ms) and eases linearly across the
-  sheet's 3/4-left → front → 3/4-right columns. Rotating *on the ground* pauses
-  horizontal movement, so the turn reads as a beat; in mid-air you keep full
-  horizontal control and get the tucked air-turn frames instead
+- **Turning** lasts `TURN_DURATION` (400ms, matching the pack metadata) and
+  steps linearly across the turn sheet's 3/4-left → front → 3/4-right columns.
+  Rotating *on the ground* pauses horizontal movement, so the turn reads as a
+  beat; in mid-air you keep full horizontal control and get the tucked air-turn
+  frames instead
 - **Reversal is free**: tapping the opposite key mid-turn continues from the
   current rotation rather than snapping back or restarting, and holding a
   direction never restarts an in-flight turn
@@ -115,9 +117,10 @@ uses.
   progress value
 - **One character size across every sheet**: each sheet normalises its art
   scale so the standing character is the same on-screen height
-  (`TARGET_CONTENT_H`, 155px) and anchors its feet on the actor box bottom — so
+  (`TARGET_CONTENT_H`, 240px) and anchors its feet on the actor box bottom — so
   switching walk ↔ jump ↔ turn neither resizes nor shifts the character. The
-  walk art is the odd one out and gets scaled up 1.25×
+  collision box height derives from the same constant, so gameplay and art can't
+  drift apart
 - While rotating, the squash/stretch and lean transforms are neutralised so the
   pixel art stays sharp instead of smearing through the rotation
 - Each turn emits a short `sound.playTurn()` blip
@@ -213,8 +216,10 @@ Full-resolution sources are **not committed** — they live in `git`-ignored
 | Original | Shipped |
 | --- | --- |
 | `backgrounds/.originals/*.png` (~15 MB) | `backgrounds/*.webp` (1.9 MB) + fallback `cyberpunk…webp` (242 KB) |
-| `images/.originals/pixel_arshad_sprite.png` (949 KB) | `images/pixel_arshad_sprite.webp` (42 KB) |
+| `images/.originals/pixel_arshad_sprite.png` (949 KB) | `images/pixel_arshad_sprite.webp` (42 KB) — portrait filename is historical |
 | `images/.originals/Contact_*.png` (~3.4 MB) | `images/Contact_*.webp` (21 KB total, 128px) |
+| `sprite/.originals/240px-pack/` (frames, previews, WebP twins, demo) | `arshad-sprites-240px/assets/` — four PNG sheets + walk JSON (603 KB) |
+| `sprite/.originals/legacy-*/` (the retired 88px sheets) | — replaced by the 240px pack |
 
 Regenerate any of them with `sharp-cli`:
 
@@ -236,7 +241,25 @@ npx sharp-cli -i src/assets/images/.originals/pixel_arshad_sprite.png \
 Quality 82 is deliberate for the backgrounds — they're neon gradients that band
 badly below ~75. Once you're happy, the `.originals/` folders can be deleted.
 
-### Sprite framing
+### Stage sprite pack
+
+The 240px pack is generated art with its own verification — `validation.json` in
+the archive records the alpha-bounding-box checks (standing height, baseline
+alignment, transparent turn columns, PNG/WebP pixel equality). The app pins the
+pack's grid in `jumpTurn.test.ts`: if you regenerate or swap the sheets, update
+`SPRITE_SPECS` and those tripwires from the new metadata.
+
+Rules the renderer relies on:
+
+- the standing character is `TARGET_CONTENT_H` (240px) tall on **every** sheet,
+  so nothing resizes between idle, walk, turn and jump
+- the feet sit on `footY` (318) in every cell — the 12px below is transparent
+- turn/air-turn artwork lives only in columns 2–6
+- `TARGET_CONTENT_H` is also the stage collision-box height; raising it needs
+  the blocks (`BLOCK_Y`), jump (`JUMP_V`/`GRAVITY`) and stage `min-h` retuned —
+  see the reach-maths comment in `jumpTurn.ts`
+
+### Portrait framing
 
 The static portrait sprite (`pixel_arshad_sprite.webp`, shown in the character
 sheet) is a **portrait** canvas surrounded by transparent margin, and that
@@ -254,7 +277,7 @@ helpers, both driven by the same metrics:
 | `spritePlacement(72, 172)` | `ArcadeStage` | collision box centring + feet-on-ground-line offsets for the walk-sheet frame |
 | `spriteCanvasSize(301)` | `CharacterSheet` | portrait canvas renders at **135×333**, matching the original portrait's visible height |
 
-On the stage the character is animated by the **walk-cycle sheet** (see above);
+On the stage the character is animated by the **240px sprite pack** (see above);
 this portrait only appears in the character sheet. The `height` matters as much
 as the `width`: the canvas is **not** square, so pinning both dimensions to one
 number would letterbox or distort him. The collision box (`ACTOR_W` = 72px) is
@@ -307,6 +330,20 @@ animation loop.
   jump-and-award interaction.
 - **Contrast** — a radial overlay sits between the hero image and the HUD text
   so headings stay readable over any background.
+
+## License & trademarks
+
+**All rights reserved.** The repository is public so the work can be viewed and
+used as a portfolio piece — that is not a license. No permission is granted to
+reproduce, modify, distribute or build on any part of it; see `LICENSE` for the
+full notice.
+
+The name and wordmark **LIMP3TZ**, its logo, the pixel-art character likeness
+and the arcade look-and-feel (trade dress) are unregistered trademarks and
+trade dress of LIMP3TZ. They may not be used for any product, service or
+derivative work. The owner holds common-law rights from use; a formal
+registration (e.g. with the USPTO) is a separate legal process and is not
+granted or implied by anything here.
 
 ## CI and deployment
 

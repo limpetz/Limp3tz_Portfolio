@@ -45,7 +45,7 @@ export const ArcadeContact: React.FC<ArcadeContactProps> = ({ onAddScore }) => {
 
     const subject = encodeURIComponent(`PORTFOLIO QUEST: [${selectedTopic}] from ${name || 'Operator'}`);
     const body = encodeURIComponent(
-      `Hello Arshad,\n\nTopic: ${selectedTopic}\nSender: ${name}\n\nMessage:\n${message}\n\n— Sent from Limp3tz Arcade Terminal`
+      `Hello LIMP3TZ,\n\nTopic: ${selectedTopic}\nSender: ${name}\n\nMessage:\n${message}\n\n— Sent from Limp3tz Arcade Terminal`
     );
 
     window.location.href = `mailto:${PORTFOLIO_CONFIG.email}?subject=${subject}&body=${body}`;
@@ -83,7 +83,7 @@ export const ArcadeContact: React.FC<ArcadeContactProps> = ({ onAddScore }) => {
       </div>
 
       <p className="font-pixel text-xs text-[#00e5ff] tracking-widest mb-8 animate-pulse">
-        INSERT COIN TO CONNECT WITH ARSHAD
+        INSERT COIN TO CONNECT WITH LIMP3TZ
       </p>
 
       {/* Main Action Links — pixel-art contact icons, one per channel. The
