@@ -232,6 +232,33 @@ class RetroSoundEngine {
     this.playTone(880, t + 0.06, 0.15, 'square', 0.09);
   }
 
+  public playDroneHum() {
+    if (!this.sfxEnabled) return;
+    const ctx = this.getContext();
+    if (!ctx || !this.masterGain) return;
+    try {
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(110, t);
+      osc.frequency.linearRampToValueAtTime(140, t + 0.12);
+      osc.frequency.linearRampToValueAtTime(110, t + 0.25);
+
+      gain.gain.setValueAtTime(0.015, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+
+      osc.start(t);
+      osc.stop(t + 0.3);
+    } catch {
+      // Audio safety catch
+    }
+  }
+
   public playStart() {
     if (!this.sfxEnabled) return;
     const ctx = this.getContext();

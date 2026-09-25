@@ -129,12 +129,12 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   const [fallingHearts, setFallingHearts] = useState<FallingHeart[]>([]);
   const fallingHeartsRef = useRef<FallingHeart[]>([]);
   const [hazards, setHazards] = useState<GlitchHazard[]>([
-    { id: 1, x: 500, y: 18, vx: -65, width: 32, height: 28, type: 'bug' },
-    { id: 2, x: 750, y: 140, vx: -85, width: 36, height: 22, type: 'drone', baseY: 140, time: 0 },
+    { id: 1, x: 500, y: 18, vx: -55, width: 32, height: 28, type: 'bug' },
+    { id: 2, x: 750, y: 130, vx: -65, width: 36, height: 22, type: 'drone', baseY: 130, time: 0 },
   ]);
   const hazardsRef = useRef<GlitchHazard[]>([
-    { id: 1, x: 500, y: 18, vx: -65, width: 32, height: 28, type: 'bug' },
-    { id: 2, x: 750, y: 140, vx: -85, width: 36, height: 22, type: 'drone', baseY: 140, time: 0 },
+    { id: 1, x: 500, y: 18, vx: -55, width: 32, height: 28, type: 'bug' },
+    { id: 2, x: 750, y: 130, vx: -65, width: 36, height: 22, type: 'drone', baseY: 130, time: 0 },
   ]);
   const [invulnerable, setInvulnerable] = useState(false);
   const invulnerableRef = useRef(false);
@@ -1230,6 +1230,17 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           const hz = currentHazards[i];
           let nextX = hz.x + hz.vx * dt;
           let nextVx = hz.vx;
+          let nextY = hz.y;
+          const nextTime = (hz.time || 0) + dt;
+
+          // Drone sine-wave hovering and periodic retro motor hum
+          if (hz.type === 'drone') {
+            const baseY = hz.baseY || 130;
+            nextY = baseY + Math.sin(nextTime * 3) * 16;
+            if (Math.random() < 0.015 && Math.abs(stateRef.current.x - hz.x) < 400) {
+              sound.playDroneHum();
+            }
+          }
 
           if (nextX <= 20) {
             nextX = 20;
@@ -1292,7 +1303,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             }
           }
 
-          nextHazards.push({ ...hz, x: nextX, vx: nextVx });
+          nextHazards.push({ ...hz, x: nextX, vx: nextVx, y: nextY, time: nextTime });
         }
 
         hazardsRef.current = nextHazards;
