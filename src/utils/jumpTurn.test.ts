@@ -30,27 +30,39 @@ describe('turnProgressToColumn', () => {
   });
 });
 
+const SHEET_KEYS = Object.keys(SPRITE_SPECS) as Array<keyof typeof SPRITE_SPECS>;
+
 describe('renderScale — one on-screen size for every sheet', () => {
   // Deliberate tripwire: these are the *measured* standing heights of the
-  // shipped art. The walk sheet is drawn smaller than the jump/turn art, so it
-  // is scaled up; it previously made the character look undersized on idle and
-  // suddenly "grow" on takeoff. If the art is replaced, re-measure here.
-  it('records the measured standing heights', () => {
+  // shipped art plus the height the renderer normalises them to. The walk sheet
+  // is drawn smaller than the jump/turn art, so it is scaled up — without this
+  // the character looked undersized on idle and then "grew" on takeoff. If the
+  // art or the target changes, re-measure and update here.
+  it('records the measured standing heights and the shared target', () => {
+    expect(TARGET_CONTENT_H).toBe(240);
     expect(SPRITE_SPECS.walk.contentH).toBe(124);
     expect(SPRITE_SPECS.jump.contentH).toBe(155);
     expect(SPRITE_SPECS.turn.contentH).toBe(155);
     expect(SPRITE_SPECS.airTurn.contentH).toBe(155);
   });
 
-  it('scales the smaller walk art up and leaves the jump/turn art at native', () => {
-    expect(renderScale(SPRITE_SPECS.walk)).toBeCloseTo(1.25, 5);
-    expect(renderScale(SPRITE_SPECS.jump)).toBe(1);
-    expect(renderScale(SPRITE_SPECS.turn)).toBe(1);
-    expect(renderScale(SPRITE_SPECS.airTurn)).toBe(1);
+  it('scales each sheet by the target over its measured height', () => {
+    for (const key of SHEET_KEYS) {
+      const spec = SPRITE_SPECS[key];
+      expect(renderScale(spec)).toBeCloseTo(TARGET_CONTENT_H / spec.contentH, 6);
+    }
+  });
+
+  it('scales the smaller walk art up harder than the jump/turn art', () => {
+    expect(renderScale(SPRITE_SPECS.walk)).toBeGreaterThan(1);
+    expect(renderScale(SPRITE_SPECS.walk)).toBeGreaterThan(renderScale(SPRITE_SPECS.jump));
+    // Jump, turn and air-turn share one art scale.
+    expect(renderScale(SPRITE_SPECS.jump)).toBeCloseTo(renderScale(SPRITE_SPECS.turn), 6);
+    expect(renderScale(SPRITE_SPECS.jump)).toBeCloseTo(renderScale(SPRITE_SPECS.airTurn), 6);
   });
 
   it('lands every sheet at the same on-screen standing height', () => {
-    for (const key of Object.keys(SPRITE_SPECS) as Array<keyof typeof SPRITE_SPECS>) {
+    for (const key of SHEET_KEYS) {
       const spec = SPRITE_SPECS[key];
       const pose = getRenderPose(key, 0, 0, 72);
       // The standing character occupies contentH/h of the cell, so its rendered
@@ -66,9 +78,9 @@ describe('getRenderPose alignment and anchors', () => {
     const spec = SPRITE_SPECS.walk;
     const scale = renderScale(spec);
     const pose = getRenderPose('walk', 0, 0, 72);
-    // ax: 44, actorW: 72, scale 1.25 -> offsetX = 36 - 55 = -19
+    // Centred on the actor box, one scaled anchor in from the left edge.
     expect(pose.offsetX).toBe(72 / 2 - spec.ax * scale);
-    // fy: 164, h: 170, scale 1.25 -> offsetY = -(6) * 1.25 = -7.5
+    // The 6px of art below the feet scales with the sheet.
     expect(pose.offsetY).toBe(-(spec.h - spec.fy) * scale);
     expect(pose.width).toBe(spec.w * scale);
     expect(pose.height).toBe(spec.h * scale);
@@ -108,7 +120,8 @@ describe('getRenderPose alignment and anchors', () => {
       // offsetY places the cell so its foot baseline (fy from the cell top)
       // lands on the box bottom; the only overhang is the art below the feet.
       expect(-pose.offsetY).toBeCloseTo((spec.h - spec.fy) * scale, 5);
-      expect(-pose.offsetY).toBeLessThanOrEqual(8);
+      // ...and that overhang stays a small slice of the cell.
+      expect(-pose.offsetY).toBeLessThanOrEqual(pose.height * 0.05);
     }
   });
 });
@@ -191,16 +204,17 @@ describe('AvatarAnimationController', () => {
     expect(idlePose.sheet).toBe('walk');
     expect(idlePose.row).toBe(1);
     expect(idlePose.column).toBe(0);
-    // Walk cell is 170px tall, scaled by 1.25 -> row 1 sits 212.5px up the sheet.
-    expect(idlePose.backgroundPosition).toBe('0px -212.5px');
+    // Row 1 (left-facing) sits one scaled cell height down the sheet.
+    const cellW = SPRITE_SPECS.walk.w * renderScale(SPRITE_SPECS.walk);
+    const cellH = SPRITE_SPECS.walk.h * renderScale(SPRITE_SPECS.walk);
+    expect(idlePose.backgroundPosition).toBe(`0px ${-cellH}px`);
 
     // Left-walk-01 (frame 10 in WALK_SHEET) should map to column 1 row 1
     const walkPose = ctrl.getCurrentPose({ walking: true, walkFrame: 10 });
     expect(walkPose.sheet).toBe('walk');
     expect(walkPose.row).toBe(1);
     expect(walkPose.column).toBe(1);
-    // Column 1 of an 88px cell at 1.25 scale -> 110px.
-    expect(walkPose.backgroundPosition).toBe('-110px -212.5px');
+    expect(walkPose.backgroundPosition).toBe(`${-cellW}px ${-cellH}px`);
   });
 
   it('swaps instantly with reduced motion', () => {

@@ -82,11 +82,17 @@ export const SPRITE_SPECS: Record<SpriteSheetKey, SheetSpec> = {
 /**
  * On-screen height the standing character renders at, in CSS px.
  *
- * Set to the jump/turn art's native standing height so idle, walking and
- * jumping all read at the same size — the walk sheet is scaled up to match,
- * which also stops the character looking undersized against the backdrop.
+ * Every sheet is scaled so its standing character lands here, which is what
+ * stops the character changing size between idle, walking and jumping. Bumping
+ * this number scales the whole character uniformly (all sheets together), so
+ * the size stays consistent while he reads larger against the backdrop.
+ *
+ * Ceiling: the standing head must clear the overhead block band (BLOCK_Y) and
+ * the head must still fit the stage at the top of a jump, so this cannot grow
+ * without also moving the blocks or retuning the jump. See the reach maths in
+ * ArcadeStage (BLOCK_Y / JUMP_V / GRAVITY).
  */
-export const TARGET_CONTENT_H = 155;
+export const TARGET_CONTENT_H = 240;
 
 /** Cell scale that lands a sheet's standing character at `TARGET_CONTENT_H`. */
 export function renderScale(spec: SheetSpec): number {

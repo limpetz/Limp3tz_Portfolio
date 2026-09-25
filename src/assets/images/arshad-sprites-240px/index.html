@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+ <title>Arshad · Native 240px sprites</title>
+ <style>
+  :root{color-scheme:dark;font-family:system-ui,sans-serif;background:#111727;color:#f1f4ff}
+  *{box-sizing:border-box}body{margin:0;padding:24px}main{max-width:940px;margin:auto}
+  h1{font-size:1.8rem;font-weight:600;margin:0 0 12px}p{color:#c2cee3;line-height:1.6}
+  .scene{background:#1c263b;border:1px solid #62718d;border-radius:12px;padding:16px}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  button{font:inherit;background:#e9eeff;color:#192337;border:0;border-radius:7px;padding:11px 15px;cursor:pointer}
+  button:disabled{opacity:.5;cursor:wait}button:focus-visible{outline:3px solid #ffb782;outline-offset:4px}
+  canvas{display:block;width:100%;height:460px;min-width:224px;image-rendering:pixelated;touch-action:pan-y}
+  #status{display:block;min-height:1.5em;margin-top:12px;color:#d1dbee}#error{color:#ffb7b7}
+  .previews{display:flex;flex-wrap:wrap;gap:24px}.previews figure{margin:0}.previews img{width:320px;max-width:100%;image-rendering:pixelated}
+  figcaption{color:#c2cee3;margin-top:8px}code{color:#ffb782}
+  @media(max-width:480px){body{padding:14px}.scene{padding:10px}.controls{gap:8px}button{padding:11px 12px}}
+  @media(prefers-reduced-motion:reduce){.previews{display:none}}
+ </style>
+</head>
+<body><main>
+ <h1>Arshad at 240px</h1>
+ <p>Click/tap to move. Use <strong>← → / A D</strong> to walk and change direction. Press <strong>Space / W / ↑</strong> to jump. Change direction during a jump to turn in mid-air.</p>
+ <section id="avatar-demo" class="scene" aria-label="Interactive character animation">
+  <div class="controls">
+   <button id="left" type="button" disabled>Walk left</button><button id="right" type="button" disabled>Walk right</button>
+   <button id="jump" type="button" disabled>Jump</button><button id="turn" type="button" disabled>Turn</button>
+   <button id="jump-turn" type="button" disabled>Jump + turn</button>
+  </div>
+  <span id="status" role="status">Loading your character…</span>
+  <canvas id="stage" role="img" aria-label="Arshad character on a horizontal floor. Use the buttons or keyboard for walking, jumping and turning."></canvas>
+ </section>
+ <p id="error" role="alert"></p>
+ <p>Native 240px standing height · scale 1.0 · shared palette. The turn is a sequence of pixel-art views that creates a 3D rotation effect. Controls work while this scene has focus. Escape or leaving the scene stops the action.</p>
+ <div class="previews">
+  <figure><img src="previews/jump-right.webp" alt="Right-facing jump animation"><figcaption>Jump and landing</figcaption></figure>
+  <figure><img src="previews/turn-both-directions.webp" alt="Turn from left through front to right, then back"><figcaption>Turn in both directions</figcaption></figure>
+  <figure><img src="previews/jump-turn.webp" alt="Jump, rotate in mid-air and land"><figcaption>Jump with a mid-air turn</figcaption></figure>
+ </div>
+</main><script src="motion.js"></script><script src="demo.js"></script></body>
+</html>

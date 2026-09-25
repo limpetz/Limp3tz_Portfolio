@@ -74,9 +74,9 @@ describe('jumpApexHeight', () => {
   });
 
   // Regression guard: the stage raises the character to the overhead blocks
-  // (BLOCK_Y = 275 in ArcadeStage). Keep these in sync with JUMP_V / GRAVITY.
-  it('still clears the 275px overhead block band with the configured jump', () => {
-    expect(jumpApexHeight(1100, 1950)).toBeGreaterThan(275);
+  // (BLOCK_Y = 300 in ArcadeStage). Keep these in sync with JUMP_V / GRAVITY.
+  it('still clears the 300px overhead block band with the configured jump', () => {
+    expect(jumpApexHeight(1100, 1950)).toBeGreaterThan(300);
   });
 });
 

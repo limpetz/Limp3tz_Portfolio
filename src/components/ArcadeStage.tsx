@@ -36,6 +36,7 @@ import {
   AvatarAnimationController,
   CharacterRenderPose,
   SPRITE_SPECS,
+  TARGET_CONTENT_H,
   getRenderPose,
 } from '../utils/jumpTurn';
 import moveControlsImg from '../assets/images/move.webp';
@@ -133,9 +134,17 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   // Hero background slideshow (auto-discovers images in assets/images/backgrounds)
   const hasMultipleBackgrounds = STAGE_BACKGROUNDS.length > 1;
   // The artwork is drawn inset from the stage edges so the world reads smaller
-  // next to the character (the stage's dark base fills the surround). Lower
-  // this to zoom the wallpaper further out.
+  // next to the character. Lower this to zoom the wallpaper further out.
   const BACKGROUND_ZOOM = 0.9;
+  // The neon frame traces the inset wallpaper's edge. `scale()` shrinks the
+  // layer about its centre, so the edge sits (1 - zoom) / 2 of the way in.
+  const BACKGROUND_FRAME_INSET = ((1 - BACKGROUND_ZOOM) / 2) * 100;
+  // Bezel behind the inset wallpaper: scanlines plus a soft centre bloom, so the
+  // surround reads as an arcade-cabinet frame rather than bare black bars.
+  const BEZEL_TEXTURE =
+    'repeating-linear-gradient(0deg, rgba(0,229,255,0.06) 0 1px, transparent 1px 4px), ' +
+    'repeating-linear-gradient(90deg, rgba(143,108,255,0.05) 0 1px, transparent 1px 6px), ' +
+    'radial-gradient(ellipse at center, rgba(61,255,162,0.10) 0%, rgba(7,5,18,0) 62%)';
   const [bgIndex, setBgIndex] = useState(0);
   // Bumped on manual navigation so the auto-advance timer restarts
   const [slideEpoch, setSlideEpoch] = useState(0);
@@ -212,7 +221,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   // centres are measured from the DOM (see measureBlocks below). Sizes below are
   // only needed for the vertical band and as a pre-measurement fallback.
   const BLOCK_SIZE = 56;        // rendered block size (w-14 = 56px)
-  const BLOCK_Y = 275;          // px above ground the blocks sit
+  const BLOCK_Y = 300;          // px above ground the blocks sit
   // A block's collision box is the measured block plus this grace, so it is
   // forgiving to hit without reaching far past its visible edges.
   const BLOCK_BUMP_GRACE = 4;
@@ -222,9 +231,12 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
   // The sprite canvas is mostly transparent margin, so it is sized by its
   // *visible* character rather than by the canvas — otherwise the character
-  // renders far smaller than intended. Metrics and maths live in data/sprite.ts;
-  // 172px matches the height the original portrait sprite rendered at.
-  const SPRITE_VISIBLE_H = 172;
+  // renders far smaller than intended. Metrics and maths live in data/sprite.ts.
+  //
+  // This is deliberately the same number the sprite renderer targets: the box
+  // is the visible character, so head-bump detection (`actorHeight`) and the
+  // click target must track the art. Deriving it prevents the two drifting.
+  const SPRITE_VISIBLE_H = TARGET_CONTENT_H;
   const SPRITE_PLACEMENT = spritePlacement(ACTOR_W, SPRITE_VISIBLE_H);
 
   // The ground shadow tracks the character's visible width, not the collision box.
@@ -282,7 +294,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     actorWidth: ACTOR_W,
     // Visible character height, which is what head-bump detection should use.
     actorHeight: SPRITE_VISIBLE_H,
-    blocksLift: 275, // height of blocks above ground (positioned above speech bubble)
+    blocksLift: BLOCK_Y, // height of blocks above ground (positioned above speech bubble)
   });
 
   // --- Block geometry ------------------------------------------------------
@@ -1059,12 +1071,18 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     <section
       ref={containerRef}
       id="stage"
-      className={`relative w-full h-[100svh] min-h-[640px] overflow-hidden select-none touch-manipulation bg-[#070512] ${
+      className={`relative w-full h-[100svh] min-h-[660px] overflow-hidden select-none touch-manipulation bg-[#070512] ${
         partyMode ? 'party-mode' : ''
       }`}
     >
       {/* Hero Background Slideshow */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+        {/* Arcade bezel: only paints when there is an inset wallpaper to frame —
+            the procedural fallback fills the whole stage. */}
+        {!useProceduralBackground && (
+          <div className="absolute inset-0" style={{ background: BEZEL_TEXTURE }} />
+        )}
+
         {useProceduralBackground ? (
           <div
             className="absolute inset-0"
@@ -1087,6 +1105,14 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               }}
             />
           ))
+        )}
+
+        {/* Neon frame on the bezel, hugging the inset wallpaper's edge. */}
+        {!useProceduralBackground && (
+          <div
+            className="absolute border-2 border-[#00e5ff]/70 shadow-[0_0_28px_rgba(0,229,255,0.45),inset_0_0_28px_rgba(0,229,255,0.16)]"
+            style={{ inset: `${BACKGROUND_FRAME_INSET}%` }}
+          />
         )}
 
         {/* Dimming overlay only for the procedural fallback — the custom
@@ -1374,12 +1400,14 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         }}
       />
 
-      {/* Playable Character Actor */}
+      {/* Playable Character Actor. Sits above the mystery blocks (z-30) so
+          passing through their band reads as going in front of them instead of
+          being sliced up by the gaps between them. */}
       <div
         ref={actorRef}
         onClick={handleActorClick}
         title="That's me! Click to jump or bump mystery blocks!"
-        className={`absolute z-20 cursor-pointer select-none ${
+        className={`absolute z-40 cursor-pointer select-none ${
           isCheering ? 'animate-bounce' : ''
         }`}
         style={{

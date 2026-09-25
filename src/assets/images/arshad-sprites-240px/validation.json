@@ -1,0 +1,112 @@
+{
+  "status": "passed",
+  "standingHeight": 240,
+  "sheets": {
+    "walk": {
+      "width": 1548,
+      "height": 660,
+      "pngBitDepth": 8,
+      "pngColorType": 3,
+      "activeFrames": 18,
+      "occupiedHeights": [
+        240,
+        240,
+        232,
+        245,
+        245,
+        242,
+        238,
+        238,
+        238,
+        240,
+        241,
+        235,
+        238,
+        238,
+        238,
+        235,
+        236,
+        238
+      ],
+      "pngBytes": 237201,
+      "webpBytes": 207140
+    },
+    "jump": {
+      "width": 2016,
+      "height": 660,
+      "pngBitDepth": 8,
+      "pngColorType": 3,
+      "activeFrames": 18,
+      "occupiedHeights": [
+        240,
+        203,
+        251,
+        231,
+        214,
+        238,
+        242,
+        202,
+        244,
+        240,
+        199,
+        238,
+        225,
+        207,
+        231,
+        238,
+        205,
+        236
+      ],
+      "pngBytes": 257381,
+      "webpBytes": 221072
+    },
+    "turn": {
+      "width": 1584,
+      "height": 330,
+      "pngBitDepth": 8,
+      "pngColorType": 3,
+      "activeFrames": 5,
+      "occupiedHeights": [
+        240,
+        240,
+        240,
+        240,
+        240
+      ],
+      "pngBytes": 65784,
+      "webpBytes": 55658
+    },
+    "airTurn": {
+      "width": 2016,
+      "height": 330,
+      "pngBitDepth": 8,
+      "pngColorType": 3,
+      "activeFrames": 5,
+      "occupiedHeights": [
+        207,
+        206,
+        204,
+        207,
+        207
+      ],
+      "pngBytes": 63340,
+      "webpBytes": 51494
+    }
+  },
+  "checks": [
+    "Exact grids and anchors",
+    "240px upright silhouettes; y78..317",
+    "12px transparent bottom padding",
+    "Centered silhouettes and no clipping",
+    "Unused turn columns transparent",
+    "PNG-8 with binary alpha",
+    "PNG/WebP pixels identical",
+    "Standalone / walk / jump / turn endpoint idles identical",
+    "All individual frames and JSON coordinates match",
+    "Controller: both turns visit every active angle",
+    "Controller: mid-turn reversal preserves angle",
+    "Controller: both walk cycles use all eight frames",
+    "Controller: jump, air-turn, landing and recovery",
+    "Controller: reduced-motion behavior"
+  ]
+}
