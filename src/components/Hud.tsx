@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { sound } from '../utils/soundEngine';
 
-/** Short display version (e.g. "v1.1.0"); full identity lives in the tooltip. */
-const BUILD_SHORT = __APP_VERSION__.split('-')[0];
+/** Short display version (e.g. "v1.1.0"); full identity lives in the tooltip.
+ *  Handles all describe shapes: "v1.1.0-6-gsha", "auto/v1.1.2+sha", bare sha. */
+const BUILD_SHORT = __APP_VERSION__.replace(/^[^/]*\//, '').split(/[+-]/)[0];
 const BUILD_TOOLTIP = `BUILD ${__APP_VERSION__} · ${__BUILD_DATE__} · ${__BUILD_SHA__.toUpperCase()}`;
 /** GitHub commit page for the exact build, opened by the version chip. */
 const COMMIT_URL = `https://github.com/limpetz/Limp3tz_Portfolio/commit/${__BUILD_SHA__}`;
