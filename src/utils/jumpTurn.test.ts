@@ -209,8 +209,8 @@ describe('AvatarAnimationController', () => {
   });
 
   it('renders left-facing poses from the baked left row (no runtime flip)', () => {
-    // The sheet's left row is a baked mirror of the right art (stride-identical,
-    // stride-first ordering), so facing selects the row and no flip flag is set.
+    // The sheet's left row is a baked mirror of the right art (stride-identical),
+    // so facing selects the row and no flip flag is set.
     const ctrl = new AvatarAnimationController({ facingDir: -1 });
 
     const idlePose = ctrl.getCurrentPose({ walking: false, walkFrame: 9 });
