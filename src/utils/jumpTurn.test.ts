@@ -161,7 +161,7 @@ describe('AvatarAnimationController', () => {
     expect(ctrl.facingDir).toBe(-1);
     const endPose = ctrl.getCurrentPose({ walking: false, walkFrame: 0 });
     expect(endPose.sheet).toBe('walk');
-    expect(endPose.row).toBe(1); // Left-facing row
+    expect(endPose.flip).toBe(true); // left-facing: mirrored row-0 art
   });
 
   it('reverses mid-turn without restarting', () => {
@@ -206,24 +206,52 @@ describe('AvatarAnimationController', () => {
     expect(pose.column).toBe(4); // Center tucked-knee frame
   });
 
-  it('renders left-walking and left-idle frames within sheet column boundaries', () => {
+  it('renders left-facing poses from the lively right art, mirrored', () => {
+    // The pack's left-facing row ships with almost no limb movement, so
+    // left-facing ground poses reuse row 0 flipped. Facing must NOT change the
+    // sheet cell — only the flip flag.
     const ctrl = new AvatarAnimationController({ facingDir: -1 });
-    // Left-idle (frame 9 in WALK_SHEET) should map to column 0 row 1
+
     const idlePose = ctrl.getCurrentPose({ walking: false, walkFrame: 9 });
     expect(idlePose.sheet).toBe('walk');
-    expect(idlePose.row).toBe(1);
-    expect(idlePose.column).toBe(0);
-    // Row 1 (left-facing) sits one scaled cell height down the sheet.
-    const cellW = SPRITE_SPECS.walk.w * renderScale(SPRITE_SPECS.walk);
-    const cellH = SPRITE_SPECS.walk.h * renderScale(SPRITE_SPECS.walk);
-    expect(idlePose.backgroundPosition).toBe(`0px ${-cellH}px`);
+    expect(idlePose.row).toBe(0);
+    expect(idlePose.flip).toBe(true);
+    expect(idlePose.backgroundPosition).toBe('0px 0px'); // row 0, col 0
 
-    // Left-walk-01 (frame 10 in WALK_SHEET) should map to column 1 row 1
     const walkPose = ctrl.getCurrentPose({ walking: true, walkFrame: 10 });
     expect(walkPose.sheet).toBe('walk');
-    expect(walkPose.row).toBe(1);
+    expect(walkPose.row).toBe(0);
+    expect(walkPose.flip).toBe(true);
+    // frame 10 is index 1 of the left walk group -> sheet column 1 (frame 0 is
+    // the left idle), still rendered from row 0.
     expect(walkPose.column).toBe(1);
-    expect(walkPose.backgroundPosition).toBe(`${-cellW}px ${-cellH}px`);
+    expect(walkPose.backgroundPosition).toBe('-172px 0px');
+  });
+
+  it('never flips the right-facing poses', () => {
+    const ctrl = new AvatarAnimationController({ facingDir: 1 });
+    const walkPose = ctrl.getCurrentPose({ walking: true, walkFrame: 1 });
+    expect(walkPose.flip).toBe(false);
+  });
+
+  it('relaunches a held jump from landing and recovery, but not mid-air', () => {
+    const ctrl = new AvatarAnimationController({ facingDir: 1 });
+
+    // Mid-air relaunch is still refused (no double jumps).
+    ctrl.startJump();
+    ctrl.mode = 'air';
+    expect(ctrl.startJump()).toBe(false);
+
+    // Landing: the body is grounded again while the controller still plays the
+    // landing pose — a held jump must relaunch from here, or the first stretch
+    // of the next bounce renders stiff standing frames.
+    ctrl.mode = 'landing';
+    expect(ctrl.startJump()).toBe(true);
+    expect(ctrl.mode).toBe('anticipation');
+
+    ctrl.mode = 'recovery';
+    expect(ctrl.startJump()).toBe(true);
+    expect(ctrl.mode).toBe('anticipation');
   });
 
   it('swaps instantly with reduced motion', () => {

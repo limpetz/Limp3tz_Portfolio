@@ -212,7 +212,11 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   // centres are measured from the DOM (see measureBlocks below). Sizes below are
   // only needed for the vertical band and as a pre-measurement fallback.
   const BLOCK_SIZE = 56;        // rendered block size (w-14 = 56px)
-  const BLOCK_Y = 300;          // px above ground the blocks sit
+  // Set to the hero's full jump reach: apex is ~391px (JUMP_V²/2G), and the
+  // bump registers while the head is inside the block band + tolerance, i.e.
+  // from y ≥ BLOCK_Y − 240. 380 puts the band's bottom just under the head's
+  // highest reach, so a max-height jump is required to bump.
+  const BLOCK_Y = 380;          // px above ground the blocks sit
   // A block's collision box is the measured block plus this grace, so it is
   // forgiving to hit without reaching far past its visible edges.
   const BLOCK_BUMP_GRACE = 4;
@@ -902,10 +906,11 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           bobY = 0;
         }
       } else if (Math.abs(stateRef.current.vx) > 15) {
-        // WALKING: advance the sheet's clock only while actually moving, so the
-        // cadence is tied to motion (10fps from the JSON). Frame advance happens
-        // below in the sprite-update block; here we just keep the lean.
-        walkElapsedRef.current += dt * 1000;
+        // WALKING: advance the sheet's clock only while actually moving. The
+        // cadence tracks ground speed (frames are drawn for ~150px/s strides, we
+        // sprint at 280px/s), so the legs don't slide against the ground. Frame
+        // advance happens below in the sprite-update block; here we keep the lean.
+        walkElapsedRef.current += dt * 1000 * (Math.abs(stateRef.current.vx) / 150);
 
         // Smooth turn lean toward movement direction
         const targetTilt = stateRef.current.turnAngle;
@@ -957,7 +962,8 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           !prevPose ||
           prevPose.sheet !== pose.sheet ||
           prevPose.column !== pose.column ||
-          prevPose.row !== pose.row
+          prevPose.row !== pose.row ||
+          prevPose.flip !== pose.flip
         ) {
           currentRenderPoseRef.current = pose;
           const spec = SPRITE_SPECS[pose.sheet];
@@ -971,6 +977,18 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           spriteRef.current.style.backgroundImage = `url(${spec.src})`;
           spriteRef.current.style.backgroundSize = pose.backgroundSize;
           spriteRef.current.style.backgroundPosition = pose.backgroundPosition;
+          // Left-facing ground poses reuse the (far livelier) right-facing art,
+          // mirrored about the cell's horizontal centre, which is the anchor.
+          spriteRef.current.style.transform =
+            `scaleX(${pose.flip ? -1 : 1}) ${spriteRef.current.style.transform || ''}`.trim();
+        } else {
+          // Keep the mirror in sync even when the pose cell didn't change (the
+          // squash/tilt writer below overwrites `transform` every frame).
+          const flipScale = pose.flip ? 'scaleX(-1)' : 'scaleX(1)';
+          if (!spriteRef.current.style.transform.startsWith(flipScale)) {
+            spriteRef.current.style.transform =
+              `${flipScale} ${spriteRef.current.style.transform || ''}`.trim();
+          }
         }
 
         // Apply idle breathing when fully standing idle, or physics squash/tilt otherwise
@@ -984,12 +1002,14 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           if (spriteRef.current.classList.contains('animate-idle-breathe')) {
             spriteRef.current.classList.remove('animate-idle-breathe');
           }
-          // Do not squash or tilt while rotating in 3D to keep true volume and sharp pixel rotation
+          // Do not squash or tilt while rotating in 3D to keep true volume and sharp pixel rotation.
+          // scaleX prefixes the mirror so squash/tilt compose on top of it.
           const appliedSquashX = isTurning ? 1 : squashX;
           const appliedSquashY = isTurning ? 1 : squashY;
           const appliedTilt = isTurning ? 0 : tilt;
           const appliedBobY = isTurning ? 0 : bobY;
-          spriteRef.current.style.transform = `scale(${appliedSquashX.toFixed(3)}, ${appliedSquashY.toFixed(3)}) rotate(${appliedTilt.toFixed(2)}deg) translateY(${appliedBobY.toFixed(2)}px)`;
+          const flipScale = pose.flip ? 'scaleX(-1)' : 'scaleX(1)';
+          spriteRef.current.style.transform = `${flipScale} scale(${appliedSquashX.toFixed(3)}, ${appliedSquashY.toFixed(3)}) rotate(${appliedTilt.toFixed(2)}deg) translateY(${appliedBobY.toFixed(2)}px)`;
         }
       }
 

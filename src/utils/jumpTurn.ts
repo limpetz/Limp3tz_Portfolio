@@ -166,6 +166,12 @@ export interface CharacterRenderPose {
   backgroundPosition: string;
   /** Background-size CSS value that keeps the whole sheet at the cell scale */
   backgroundSize: string;
+  /**
+   * Mirror the sprite horizontally. The walk sheet's left-facing row is drawn
+   * with almost no limb movement, so left-facing ground poses reuse the
+   * right-facing row mirrored instead; everything else uses real art.
+   */
+  flip: boolean;
 }
 
 /**
@@ -177,6 +183,7 @@ export function getRenderPose(
   column: number,
   row: number,
   actorWidth: number = 72,
+  flip = false,
 ): CharacterRenderPose {
   const spec = SPRITE_SPECS[sheetKey];
   // Normalise the art scale so every sheet's standing character is the same
@@ -206,6 +213,7 @@ export function getRenderPose(
     offsetY,
     backgroundPosition: `${-column * cellW}px ${-row * cellH}px`,
     backgroundSize: `${cellW * spec.cols}px ${cellH * spec.rows}px`,
+    flip,
   };
 }
 
@@ -274,9 +282,17 @@ export class AvatarAnimationController {
 
   /**
    * Trigger a jump. Returns true if jump transition started.
+   *
+   * Landing and recovery count as grounded states: holding jump relaunches the
+   * body the instant it touches down, while the controller is still playing
+   * those poses. Without this, a held jump would leave the controller behind
+   * finishing its ground animation while the body was already airborne —
+   * rendering stiff standing frames for the first part of every held bounce.
    */
   startJump(): boolean {
-    if (this.mode !== 'ground') return false;
+    if (this.mode !== 'ground' && this.mode !== 'landing' && this.mode !== 'recovery') {
+      return false;
+    }
     if (this.reducedMotion) {
       this.mode = 'air';
       this.elapsed = 0;
@@ -389,11 +405,11 @@ export class AvatarAnimationController {
       return getRenderPose('jump', JUMP_COLUMNS.RECOVERY, row, actorW);
     }
 
-    // 3. Grounded: Walk or Idle
-    const walkRow = this.facingDir === 1 ? 0 : 1;
-    // Map walk frame index (which is an index into WALK_SHEET.frames, e.g. 0 or 9 for idle, 1..8 or 10..17 for walk)
-    // to column (0..8) within row 0 or row 1:
+    // 3. Grounded: Walk or Idle. Both directions render from row 0 — the
+    // left-facing row ships with almost no limb movement — mirrored on the
+    // actor when facing left (the walk anchor is the cell centre, so the
+    // mirror keeps the feet planted).
     const walkCol = options.walking ? (options.walkFrame % 9) : 0;
-    return getRenderPose('walk', walkCol, walkRow, actorW);
+    return getRenderPose('walk', walkCol, 0, actorW, this.facingDir === -1);
   }
 }
