@@ -11,6 +11,7 @@ const COMMIT_URL = `https://github.com/limpetz/Limp3tz_Portfolio/commit/${__BUIL
 
 interface HudProps {
   score: number;
+  highScore: number;
   coins: number;
   health: number;
   onTakeDamage?: (amount?: number) => void;
@@ -25,6 +26,7 @@ interface HudProps {
 
 export const Hud: React.FC<HudProps> = ({
   score,
+  highScore,
   coins,
   health,
   onTakeDamage,
@@ -134,6 +136,12 @@ export const Hud: React.FC<HudProps> = ({
 
       {/* Right HUD Zone: Score, Coins, Audio, Assets, Menu */}
       <div className="flex items-center gap-3 ml-auto shrink-0">
+        {/* High Score Banner */}
+        <div className="hidden xl:flex items-center gap-1.5 px-2 py-0.5 border border-[#ffd23f]/30 bg-[#ffd23f]/5">
+          <span className="text-[#ffd23f] text-[8px] font-bold">HI</span>
+          <span className="text-[#ffd23f] tabular-nums text-[8px]">{String(highScore).padStart(6, '0')}</span>
+        </div>
+
         {/* Score */}
         <div className="hidden sm:flex items-center gap-1.5">
           <span className="text-[#7d7aa3]">SCORE</span>

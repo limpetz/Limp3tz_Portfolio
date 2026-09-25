@@ -82,6 +82,9 @@ interface GlitchHazard {
   vx: number;
   width: number;
   height: number;
+  type: 'bug' | 'drone';
+  baseY?: number;
+  time?: number;
 }
 
 export const ArcadeStage: React.FC<ArcadeStageProps> = ({
@@ -126,10 +129,12 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   const [fallingHearts, setFallingHearts] = useState<FallingHeart[]>([]);
   const fallingHeartsRef = useRef<FallingHeart[]>([]);
   const [hazards, setHazards] = useState<GlitchHazard[]>([
-    { id: 1, x: 500, y: 18, vx: -65, width: 32, height: 28 },
+    { id: 1, x: 500, y: 18, vx: -65, width: 32, height: 28, type: 'bug' },
+    { id: 2, x: 750, y: 140, vx: -85, width: 36, height: 22, type: 'drone', baseY: 140, time: 0 },
   ]);
   const hazardsRef = useRef<GlitchHazard[]>([
-    { id: 1, x: 500, y: 18, vx: -65, width: 32, height: 28 },
+    { id: 1, x: 500, y: 18, vx: -65, width: 32, height: 28, type: 'bug' },
+    { id: 2, x: 750, y: 140, vx: -85, width: 36, height: 22, type: 'drone', baseY: 140, time: 0 },
   ]);
   const [invulnerable, setInvulnerable] = useState(false);
   const invulnerableRef = useRef(false);
@@ -1263,6 +1268,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                     vx: Math.random() > 0.5 ? 70 : -70,
                     width: 32,
                     height: 28,
+                    type: 'bug',
                   },
                 ];
                 setHazards(hazardsRef.current);
@@ -1575,20 +1581,28 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               <span className="absolute bottom-1 left-1 w-1 h-1 bg-current opacity-70" />
               <span className="absolute bottom-1 right-1 w-1 h-1 bg-current opacity-70" />
 
-              {/* Block Content: Animated '?' when idle, Word label when revealed */}
+              {/* Block Content: Animated '?' when idle, Asset image or label when revealed */}
               {isUsed ? (
-                <span
-                  className={`font-pixel font-bold tracking-tight uppercase leading-none block px-0.5 text-center ${
-                    block.label.length >= 8
-                      ? 'text-[6.5px] sm:text-[7.5px]'
-                      : block.label.length >= 6
-                      ? 'text-[7.5px] sm:text-[8.5px]'
-                      : 'text-[9px] sm:text-[10px]'
-                  }`}
-                  style={{ color: block.color }}
-                >
-                  {block.label}
-                </span>
+                block.image ? (
+                  <img
+                    src={block.image}
+                    alt={block.label}
+                    className="w-8 h-8 sm:w-10 sm:h-10 object-contain pixel-art drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)] animate-in zoom-in-75 duration-200"
+                  />
+                ) : (
+                  <span
+                    className={`font-pixel font-bold tracking-tight uppercase leading-none block px-0.5 text-center ${
+                      block.label.length >= 8
+                        ? 'text-[6.5px] sm:text-[7.5px]'
+                        : block.label.length >= 6
+                        ? 'text-[7.5px] sm:text-[8.5px]'
+                        : 'text-[9px] sm:text-[10px]'
+                    }`}
+                    style={{ color: block.color }}
+                  >
+                    {block.label}
+                  </span>
+                )
               ) : (
                 <span className="font-pixel text-xl sm:text-2xl animate-mystery-question inline-block">
                   ?
@@ -1689,7 +1703,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         </button>
       ))}
 
-      {/* Cyber Glitch Hazards (Floating Bugs) */}
+      {/* Cyber Glitch Hazards (Floating Bugs & Flying Drones) */}
       {hazards.map((hz) => (
         <div
           key={hz.id}
@@ -1700,31 +1714,51 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             width: `${hz.width}px`,
             height: `${hz.height}px`,
           }}
-          aria-label="Cyber Glitch Bug Hazard"
+          aria-label={hz.type === 'drone' ? 'Cyber Drone Hazard' : 'Cyber Glitch Bug Hazard'}
         >
-          {/* Retro Pixel Bug Art */}
-          <div className="relative w-full h-full animate-pulse">
-            <svg viewBox="0 0 16 14" className="w-full h-full drop-shadow-[0_0_8px_rgba(255,45,120,0.8)]">
-              {/* Antennae */}
-              <rect x="3" y="1" width="2" height="2" fill="#00e5ff" />
-              <rect x="11" y="1" width="2" height="2" fill="#00e5ff" />
-              <rect x="4" y="3" width="2" height="2" fill="#00e5ff" />
-              <rect x="10" y="3" width="2" height="2" fill="#00e5ff" />
-              {/* Body */}
-              <rect x="3" y="5" width="10" height="6" fill="#ff2d78" />
-              <rect x="5" y="4" width="6" height="8" fill="#ff5c98" />
-              {/* Eyes */}
-              <rect x="4" y="6" width="2" height="2" fill="#ffffff" />
-              <rect x="10" y="6" width="2" height="2" fill="#ffffff" />
-              <rect x="5" y="6" width="1" height="1" fill="#0a0817" />
-              <rect x="11" y="6" width="1" height="1" fill="#0a0817" />
-              {/* Legs */}
-              <rect x="1" y="8" width="2" height="2" fill="#00e5ff" />
-              <rect x="13" y="8" width="2" height="2" fill="#00e5ff" />
-              <rect x="2" y="11" width="2" height="2" fill="#00e5ff" />
-              <rect x="12" y="11" width="2" height="2" fill="#00e5ff" />
-            </svg>
-          </div>
+          {hz.type === 'drone' ? (
+            /* Retro Flying Drone */
+            <div className="relative w-full h-full animate-bounce">
+              <svg viewBox="0 0 18 12" className="w-full h-full drop-shadow-[0_0_10px_rgba(0,229,255,0.9)]">
+                {/* Propellers */}
+                <rect x="0" y="1" width="5" height="1" fill="#00e5ff" />
+                <rect x="13" y="1" width="5" height="1" fill="#00e5ff" />
+                <rect x="2" y="2" width="1" height="2" fill="#7d7aa3" />
+                <rect x="15" y="2" width="1" height="2" fill="#7d7aa3" />
+                {/* Chassis */}
+                <rect x="4" y="4" width="10" height="5" fill="#110d24" stroke="#00e5ff" strokeWidth="0.5" />
+                {/* Laser Eye */}
+                <rect x="8" y="5" width="2" height="3" fill="#ff2d78" className="animate-pulse" />
+                {/* Antennas */}
+                <rect x="7" y="2" width="1" height="2" fill="#ffd23f" />
+                <rect x="10" y="2" width="1" height="2" fill="#ffd23f" />
+              </svg>
+            </div>
+          ) : (
+            /* Retro Pixel Bug Art */
+            <div className="relative w-full h-full animate-pulse">
+              <svg viewBox="0 0 16 14" className="w-full h-full drop-shadow-[0_0_8px_rgba(255,45,120,0.8)]">
+                {/* Antennae */}
+                <rect x="3" y="1" width="2" height="2" fill="#00e5ff" />
+                <rect x="11" y="1" width="2" height="2" fill="#00e5ff" />
+                <rect x="4" y="3" width="2" height="2" fill="#00e5ff" />
+                <rect x="10" y="3" width="2" height="2" fill="#00e5ff" />
+                {/* Body */}
+                <rect x="3" y="5" width="10" height="6" fill="#ff2d78" />
+                <rect x="5" y="4" width="6" height="8" fill="#ff5c98" />
+                {/* Eyes */}
+                <rect x="4" y="6" width="2" height="2" fill="#ffffff" />
+                <rect x="10" y="6" width="2" height="2" fill="#ffffff" />
+                <rect x="5" y="6" width="1" height="1" fill="#0a0817" />
+                <rect x="11" y="6" width="1" height="1" fill="#0a0817" />
+                {/* Legs */}
+                <rect x="1" y="8" width="2" height="2" fill="#00e5ff" />
+                <rect x="13" y="8" width="2" height="2" fill="#00e5ff" />
+                <rect x="2" y="11" width="2" height="2" fill="#00e5ff" />
+                <rect x="12" y="11" width="2" height="2" fill="#00e5ff" />
+              </svg>
+            </div>
+          )}
         </div>
       ))}
 

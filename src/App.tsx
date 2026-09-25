@@ -25,6 +25,10 @@ export default function App() {
     const saved = localStorage.getItem('limp3tz_score');
     return saved ? parseInt(saved, 10) : 0;
   });
+  const [highScore, setHighScore] = useState(() => {
+    const saved = localStorage.getItem('limp3tz_high_score');
+    return saved ? parseInt(saved, 10) : 1000;
+  });
   const [coins, setCoins] = useState(() => {
     const saved = localStorage.getItem('limp3tz_coins');
     return saved ? parseInt(saved, 10) : 0;
@@ -72,7 +76,11 @@ export default function App() {
 
   // Score & Coin handlers
   const handleAddScore = useCallback((amount: number) => {
-    setScore((prev) => clampScore(prev, amount));
+    setScore((prev) => {
+      const next = clampScore(prev, amount);
+      setHighScore((h) => Math.max(h, next));
+      return next;
+    });
     setScorePopping(true);
     setTimeout(() => setScorePopping(false), 300);
   }, []);
@@ -121,6 +129,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('limp3tz_score', String(score));
   }, [score]);
+
+  useEffect(() => {
+    localStorage.setItem('limp3tz_high_score', String(highScore));
+  }, [highScore]);
 
   useEffect(() => {
     localStorage.setItem('limp3tz_coins', String(coins));
@@ -173,6 +185,7 @@ export default function App() {
       {/* Fixed HUD Navigation Bar */}
       <Hud
         score={score}
+        highScore={highScore}
         coins={coins}
         health={health}
         onTakeDamage={handleTakeDamage}

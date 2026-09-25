@@ -5,6 +5,10 @@ import contactEmailIcon from '../assets/images/Contact_email.webp';
 import contactGithubIcon from '../assets/images/Contact_github.webp';
 import contactLinkedinIcon from '../assets/images/Contact_linkedin.webp';
 import contactSteamIcon from '../assets/images/Contact_steam.webp';
+import blockNameImg from '../assets/images/blocks/Name.png';
+import blockRoleImg from '../assets/images/blocks/Role.png';
+import blockLocationImg from '../assets/images/blocks/location.png';
+import blockStatusImg from '../assets/images/blocks/status.png';
 
 export interface PortfolioConfig {
   name: string;
@@ -457,6 +461,7 @@ export const MYSTERY_BLOCKS_DATA = [
     shortLabel: "NAME",
     color: "#00e5ff",
     title: "IDENTIFIER",
+    image: blockNameImg,
     getLine: () => `I'M ARSHAD · AKA ${PORTFOLIO_CONFIG.ign}`,
   },
   {
@@ -465,6 +470,7 @@ export const MYSTERY_BLOCKS_DATA = [
     shortLabel: "ROLE",
     color: "#3dffa2",
     title: "CLASS",
+    image: blockRoleImg,
     getLine: () => `CLASS: ${PORTFOLIO_CONFIG.role}`,
   },
   {
@@ -473,6 +479,7 @@ export const MYSTERY_BLOCKS_DATA = [
     shortLabel: "LOC",
     color: "#ffd23f",
     title: "BASE",
+    image: blockLocationImg,
     getLine: () => `BASED IN ${PORTFOLIO_CONFIG.location}`,
   },
   {
@@ -481,6 +488,7 @@ export const MYSTERY_BLOCKS_DATA = [
     shortLabel: "STAT",
     color: "#ff2d78",
     title: "STATUS",
+    image: blockStatusImg,
     getLine: () => `${PORTFOLIO_CONFIG.status} · ${PORTFOLIO_CONFIG.company}`,
   },
 ];
