@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   blockDxPct,
   clampDxPct,
+  clampDyUpPct,
   blockStageX,
   defaultDxPct,
   withBlockPosition,
@@ -32,6 +33,36 @@ describe('withBlockPosition', () => {
       { key: 'b', dxPct: 0.3 },
       { key: 'a', dxPct: -0.1 },
     ]);
+  });
+
+  it('carries the vertical offset and replaces it on re-upsert', () => {
+    let pos = withBlockPosition([], 'a', 0, 0.05);
+    expect(pos).toEqual([{ key: 'a', dxPct: 0, dyUpPct: 0.05 }]);
+    pos = withBlockPosition(pos, 'a', 0.1); // no dy => dx-only update, dy dropped
+    expect(pos).toEqual([{ key: 'a', dxPct: 0.1 }]);
+    pos = withBlockPosition(pos, 'a', 0.1, -0.04);
+    expect(pos).toEqual([{ key: 'a', dxPct: 0.1, dyUpPct: -0.04 }]);
+  });
+});
+
+describe('clampDyUpPct', () => {
+  const H = 800;
+  const DEFAULT_LIFT = 380;
+
+  it('keeps 0 unchanged (default height is legal)', () => {
+    expect(clampDyUpPct(0, H, DEFAULT_LIFT)).toBeCloseTo(0, 6);
+  });
+
+  it('never lets the block bottom dip into the walking lane', () => {
+    // Huge "up" values get clamped so the bottom stays >= 240px above ground.
+    const clamped = clampDyUpPct(1, H, DEFAULT_LIFT);
+    expect(DEFAULT_LIFT - clamped * H).toBeGreaterThanOrEqual(240);
+  });
+
+  it('never lets the block bottom exceed the stage minus margin', () => {
+    // Huge "down" values clamp so the bottom stays <= stageHeight - 40.
+    const clamped = clampDyUpPct(-1, H, DEFAULT_LIFT);
+    expect(DEFAULT_LIFT - clamped * H).toBeLessThanOrEqual(H - 40);
   });
 });
 

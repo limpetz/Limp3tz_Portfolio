@@ -86,8 +86,9 @@ describe('left-facing idle (row 1 anchor)', () => {
 
 describe('frameDurationMs', () => {
   it('uses the per-frame duration when the JSON declares one', () => {
-    // Contact frames hold 150ms so each footfall lands as a visible event.
-    expect(frameDurationMs(F[WALK_RIGHT[0]], WALK_SHEET.defaultFps)).toBe(150);
+    // Contact frames hold 170ms (2x the 85ms lift frames) so each footfall
+    // lands as a visible event against the fast-moving lift frames.
+    expect(frameDurationMs(F[WALK_RIGHT[0]], WALK_SHEET.defaultFps)).toBe(170);
   });
 
   it('falls back to the default fps when durationMs is null (idle frame)', () => {
@@ -99,8 +100,8 @@ describe('frameDurationMs', () => {
 
 describe('animationLengthMs', () => {
   it('sums the frame durations of the walk cycle', () => {
-    // 2 contact frames x 150ms + 6 passes x 100ms.
-    expect(animationLengthMs(WALK_RIGHT, F, 10)).toBe(900);
+    // 2 contacts x 170 + 2 passes x 100 + 4 lifts x 85.
+    expect(animationLengthMs(WALK_RIGHT, F, 10)).toBe(880);
   });
 
   it('is zero-safe on an empty animation', () => {
@@ -114,10 +115,12 @@ describe('frameAtElapsed', () => {
   });
 
   it('advances through the weighted frames', () => {
-    // f0 is a 150ms contact frame; passes hold 100ms.
+    // f0 is a 170ms contact; lifts hold 85ms, passes 100ms.
+    // Ranges: f0 0-170, f1 170-270, f2 270-355, f3 355-440, f4 440-610,
+    //         f5 610-695, f6 695-780, f7 780-880.
     expect(frameAtElapsed(50, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[0]);
-    expect(frameAtElapsed(100, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[0]);
-    expect(frameAtElapsed(150, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[1]);
+    expect(frameAtElapsed(160, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[0]); // contact hold
+    expect(frameAtElapsed(175, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[1]);
     expect(frameAtElapsed(700, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[6]);
     expect(frameAtElapsed(850, WALK_RIGHT, F, 10)).toBe(WALK_RIGHT[7]);
   });
@@ -176,8 +179,8 @@ describe('integration: loop cadence at 60fps', () => {
   it('walks all 8 frames in order across one loop', () => {
     const seen: number[] = [];
     let last = -1;
-    // 53 steps ≈ 883ms: inside the 900ms loop, so each frame is seen once.
-    for (let step = 0; step < 53; step++) {
+    // 52 steps ≈ 867ms: inside the 880ms loop, so each frame is seen once.
+    for (let step = 0; step < 52; step++) {
       t += 1000 / 60;
       const frame = frameAtElapsed(t, WALK_RIGHT, F, 10);
       if (frame !== last) {

@@ -16,8 +16,30 @@
 
 export const BLOCK_POSITIONS_KEY = 'limp3tz_block_positions';
 
-/** Horizontal placement of one block: centre offset from stage centre. */
-export type BlockPosition = { key: string; dxPct: number };
+/**
+ * Placement of one block. `dxPct` is the horizontal centre offset from the
+ * stage centre (fraction of stage width); `dyUpPct` is the VERTICAL offset
+ * from the default BLOCK_Y height, as a fraction of stage height — positive
+ * moves the block UP. The stage is `100svh` tall (min 660px), so the fraction
+ * is resolution-independent; physics always measures the real DOM bottoms.
+ */
+export type BlockPosition = { key: string; dxPct: number; dyUpPct?: number };
+
+/**
+ * Vertical clamp, in px above ground for the block's bottom: never below 240
+ * (a lower block would clip the standing actor — head at ~227 — breaking the
+ * "walking underneath is unobstructed" design), never above stageH - 40.
+ */
+export const BLOCK_MIN_BOTTOM_PX = 240;
+
+export function clampDyUpPct(dyUpPct: number, stageHeight: number, defaultLiftPx: number): number {
+  if (stageHeight <= 0) return 0;
+  const dyPx = defaultLiftPx - dyUpPct * stageHeight;
+  const min = BLOCK_MIN_BOTTOM_PX;
+  const max = Math.max(min, stageHeight - 40);
+  const clamped = Math.min(max, Math.max(min, dyPx));
+  return (defaultLiftPx - clamped) / stageHeight;
+}
 
 export function loadBlockPositions(storageKey: string): BlockPosition[] {
   try {
@@ -34,7 +56,12 @@ export function loadBlockPositions(storageKey: string): BlockPosition[] {
         typeof (entry as BlockPosition).dxPct === 'number' &&
         Number.isFinite((entry as BlockPosition).dxPct)
       ) {
-        positions.push({ key: (entry as BlockPosition).key, dxPct: (entry as BlockPosition).dxPct });
+        const dy = (entry as BlockPosition).dyUpPct;
+        positions.push({
+          key: (entry as BlockPosition).key,
+          dxPct: (entry as BlockPosition).dxPct,
+          ...(typeof dy === 'number' && Number.isFinite(dy) ? { dyUpPct: dy } : {}),
+        });
       }
     }
     return positions;
@@ -65,9 +92,10 @@ export function withBlockPosition(
   saved: BlockPosition[],
   key: string,
   dxPct: number,
+  dyUpPct?: number,
 ): BlockPosition[] {
   const next = saved.filter((p) => p.key !== key);
-  next.push({ key, dxPct });
+  next.push({ key, dxPct, ...(dyUpPct !== undefined ? { dyUpPct } : {}) });
   return next;
 }
 

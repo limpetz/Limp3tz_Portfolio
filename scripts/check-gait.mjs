@@ -133,6 +133,87 @@ for (let col = 1; col < columns; col++) {
 }
 if (!failed) ok(`foot-band structure correct on both rows (contacts at ${CONTACT_COLS.join(', ')}, mirror within ${MIRROR_TOLERANCE}px)`);
 
+// --- Ground contact: both feet planted in every contact column ---
+// The x-cluster check above can't tell a planted foot from a raised one. Here
+// each cluster's LOWEST foot pixel is compared to the baseline: a planted
+// foot touches the floor of the 16px foot zone (gap 0-1px), a raised one
+// sits clearly above it (the pack art lifts 6-12px). Prevents a re-bake from
+// silently dropping a planted foot — the "incomplete walk" failure mode.
+const FOOT_ZONE = 18; // scan height above the baseline
+const PLANTED_GAP = 1; // px of tolerated anti-aliasing above the zone floor
+
+function footGroundGaps(row, col) {
+  const data = rowPixels[row];
+  const x0 = col * frameWidth;
+  // rowPixels holds the WIDE leg band starting at BAND_TOP (footY - 48);
+  // the foot zone is its bottom slice. Map sheet-y -> strip-y explicitly:
+  // indexing the strip from 0 would read mid-calf, where both feet always
+  // have pixels, and every cell would look planted.
+  const zoneTopSheet = anchor.footY - FOOT_ZONE; // sheet-y of the zone top
+  const zoneTop = zoneTopSheet - BAND_TOP;       // strip-y of the zone top
+  const zoneH = FOOT_ZONE - 2;
+  const votes = new Array(frameWidth).fill(0);
+  const lowestY = new Array(frameWidth).fill(-1);
+  for (let y = 0; y < zoneH; y++) {
+    for (let x = 0; x < frameWidth; x++) {
+      if (data[((zoneTop + y) * imageWidth + x0 + x) * 4 + 3] > 64) {
+        votes[x]++;
+        lowestY[x] = zoneTop + y;
+      }
+    }
+  }
+  const clusters = [];
+  let start = -1;
+  let gap = 0;
+  for (let x = 0; x < frameWidth; x++) {
+    if (votes[x] > 2) {
+      if (start < 0) start = x;
+      gap = 0;
+    } else if (start >= 0 && ++gap > 4) {
+      clusters.push([start, x - gap]);
+      start = -1;
+    }
+  }
+  if (start >= 0) clusters.push([start, frameWidth - 1]);
+  return clusters
+    .filter(([a, b]) => b - a >= 4)
+    .map(([a, b]) => {
+      let lowY = -1;
+      for (let x = a; x <= b; x++) if (lowestY[x] > lowY) lowY = lowestY[x];
+      // Strip floor = the last cached row (baseline row itself is excluded).
+      return BAND_HEIGHT - 2 - lowY; // gap above the zone floor
+    });
+}
+
+const contactReport = [];
+// Ground truth from scripts/ground-probe.mjs: cols 1 and 5 plant BOTH feet
+// (the footfalls); col 7 is the push-off transition — the trailing foot has
+// already begun lifting (11-12px), so it requires only the stance foot.
+const BOTH_PLANTED_COLS = [1, 5];
+for (const col of BOTH_PLANTED_COLS) {
+  for (const row of [0, 1]) {
+    const gaps = footGroundGaps(row, col);
+    // A wide straddle can split one shoe into toe+heel clusters, so count
+    // PLANTED groups rather than requiring exactly 2 clusters.
+    const planted = gaps.filter((g) => g <= PLANTED_GAP).length;
+    if (planted < 2) {
+      fail(`row ${row} col ${col}: expected both feet planted, got gaps [${gaps.join(', ')}]`);
+    }
+    contactReport.push(`r${row}c${col}: ${planted}/${gaps.length}`);
+  }
+}
+// Every other walk column keeps at least the stance foot planted.
+for (const col of [2, 3, 4, 6, 7, 8]) {
+  for (const row of [0, 1]) {
+    const gaps = footGroundGaps(row, col);
+    const planted = gaps.filter((g) => g <= PLANTED_GAP).length;
+    if (planted < 1) {
+      fail(`row ${row} col ${col}: stance foot left the ground entirely (gaps [${gaps.join(', ')}])`);
+    }
+  }
+}
+if (!failed) ok(`ground contact verified: footfalls plant both feet (${contactReport.join(', ')}), all other columns keep the stance foot down`);
+
 // --- Jump / turn / air-turn sheets: cell bounds vs the pack manifest ---
 // animations.json declares a pixel bbox per used cell (half-open edges:
 // right = left + width, bottom = top + height, bottom = footY). A re-export

@@ -7,6 +7,7 @@ import {
   HEAD_BUMP_BOUNCE,
   collectBlock,
   findHeadBumpedBlock,
+  findOverlappingBlockInBand,
   nearestBumpTarget,
 } from './blocks';
 // Centres as actually measured from the rendered flex row in a 1440px stage:
@@ -177,5 +178,48 @@ describe('scoring constants', () => {
 
   it('bounces the actor downward on a head bump', () => {
     expect(HEAD_BUMP_BOUNCE).toBeLessThan(0);
+  });
+});
+
+describe('per-block vertical bands (relocation)', () => {
+  const base = {
+    actorCenterX: 600,
+    blockCentres: [400, 600, 800],
+    blockLift: 380,
+    radius: 34,
+  };
+
+  it('head-bumps the block whose own band the head is inside', () => {
+    // Block 0 lowered by 60px: its band starts at 320. Standing under block 0
+    // with the head at 330 hits the lowered block; the shared 380 band would
+    // reject that same jump (330 < 380), proving per-block bands are used.
+    const bottoms = [320, 380, 380];
+    const hit = findHeadBumpedBlock({ ...base, actorCenterX: 400, actorHead: 330, blockBottoms: bottoms });
+    expect(hit?.index).toBe(0);
+    expect(findHeadBumpedBlock({ ...base, actorCenterX: 400, actorHead: 330 })).toBeNull();
+  });
+
+  it('still honours the horizontal radius per candidate', () => {
+    const bottoms = [320, 380, 380];
+    // Band matches for block 0, but the actor stands 200px away — no hit.
+    const hit = findHeadBumpedBlock({ ...base, actorCenterX: 600, actorHead: 330, blockBottoms: bottoms });
+    expect(hit).toBeNull();
+  });
+
+  it('ignores blocks whose band the head is above or below', () => {
+    const bottoms = [380, 420, 380];
+    // Head at 335: below block 1's band (420) but in-range for blocks 0/2.
+    const hit = findHeadBumpedBlock({ ...base, actorCenterX: 600, actorHead: 335, blockBottoms: bottoms });
+    expect(hit).toBeNull(); // block 1 is the x-nearest and its band rejects
+  });
+
+  it('finds the side-collision block by horizontal AND vertical overlap', () => {
+    // Block 0 lowered to 300, block 1 raised to 470 (band tops = bottom + 56).
+    const bottoms = [300, 470, 380];
+    const tops = bottoms.map((b) => b + 56);
+    // Actor at y 350..460 under block 0: inside its 300..356 band.
+    expect(findOverlappingBlockInBand(370, 430, 350, 460, [400, 600, 800], 34, bottoms, tops)).toBe(0);
+    // Same actor under block 1: its 470..526 band is above the actor's head.
+    expect(findOverlappingBlockInBand(570, 630, 350, 460, [400, 600, 800], 34, bottoms, tops)).toBe(-1);
   });
 });

@@ -7,6 +7,7 @@ import {
   blockDxPct,
   withBlockPosition,
   clampDxPct,
+  clampDyUpPct,
   defaultDxPct,
   type BlockPosition,
 } from '../utils/blockLayout';
@@ -36,6 +37,7 @@ import {
   HEAD_BUMP_BOUNCE,
   collectBlock,
   findHeadBumpedBlock,
+  findOverlappingBlockInBand,
   nearestBumpTarget,
 } from '../utils/blocks';
 import { crossfadeMs, shouldAutoAdvance, usePrefersReducedMotion } from '../utils/motion';
@@ -217,6 +219,31 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   /** Stage-local x of a client-x (the container spans the viewport width). */
   const rectLeft = () => containerRef.current?.getBoundingClientRect().left ?? 0;
 
+  /** Nudge a block by dirX/dirY (relocation arranger). Measured live so it
+   *  works for blocks still in the default flex flow too. dirX is a fraction
+   *  of stage width; dirY is ±16px expressed as a fraction of stage height. */
+  const nudgeBlock = (blockKey: string, dirX: number, dirY: number) => {
+    const row = blocksRowRef.current;
+    const btn = row?.querySelector<HTMLButtonElement>(`[data-block-key="${blockKey}"]`);
+    const stageH = containerRef.current?.clientHeight ?? 0;
+    if (!row || !btn || !stageH) return;
+    const rowRect = row.getBoundingClientRect();
+    const bRect = btn.getBoundingClientRect();
+    const currentDx =
+      (bRect.left + bRect.width / 2 - (rowRect.left + rowRect.width / 2)) / rowRect.width;
+    const saved = blockPositions.find((p) => p.key === blockKey);
+    const next = withBlockPosition(
+      blockPositions,
+      blockKey,
+      clampDxPct(currentDx + dirX * 0.03, rowRect.width, BLOCK_SIZE),
+      dirY !== 0
+        ? clampDyUpPct((saved?.dyUpPct ?? 0) + (dirY * 16) / stageH, stageH, BLOCK_Y)
+        : saved?.dyUpPct,
+    );
+    setBlockPositions(next);
+    saveBlockPositions(BLOCK_POSITIONS_KEY, next);
+  };
+
   // Konami code buffer
   const konamiBuffer = useRef<string[]>([]);
   const konamiSequence = [
@@ -333,6 +360,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     turnAngle: 0,       // current smoothed lean angle, in degrees
     turnDamping: 0,     // damped turn velocity (prevents jitter/overshoot)
     blockCentres: [] as number[], // measured centres, in stage px
+    blockBottoms: [] as number[], // per-block band bottoms above ground (relocation)
     blockHalfWidth: BLOCK_SIZE / 2, // measured, until the first DOM measure
     tilt: 0,
     landingTimer: 0,
@@ -360,10 +388,14 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     const centres: number[] = [];
     let halfWidth = 0;
 
+    const groundTop = stage.getBoundingClientRect().bottom - GROUND_H;
+    const bottoms: number[] = [];
     Array.from(row.children).forEach((child) => {
       const rect = child.getBoundingClientRect();
       if (rect.width <= 0) return;
       centres.push(rect.left - stageLeft + rect.width / 2);
+      // Block bottom above the ground line (relocation-aware).
+      bottoms.push(Math.max(0, groundTop - rect.bottom));
       halfWidth = Math.max(halfWidth, rect.width / 2);
     });
 
@@ -371,6 +403,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     if (centres.length === MYSTERY_BLOCKS_DATA.length) {
       stateRef.current.blockCentres = centres;
       stateRef.current.blockHalfWidth = halfWidth;
+      stateRef.current.blockBottoms = bottoms;
     }
   }, []);
 
@@ -815,8 +848,14 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       // Collision box = the measured block plus a little grace.
       const blockRadius = stateRef.current.blockHalfWidth + BLOCK_BUMP_GRACE;
 
-      // Vertical band occupied by the overhead blocks
-      const blockBandBottom = GROUND_H + BLOCK_Y;
+      // Vertical band occupied by the overhead blocks. With relocation, each
+      // block has its own band; the shared band is the union fallback.
+      const blockBottoms = stateRef.current.blockBottoms;
+      const perBlockBands =
+        blockBottoms.length === blocks.length && blocks.length > 0;
+      const blockBandBottom = perBlockBands
+        ? Math.min(...blockBottoms)
+        : GROUND_H + BLOCK_Y;
       const blockBandTop = blockBandBottom + BLOCK_SIZE;
       const inBlockBand = isInVerticalBand(actorBottom, actorTop, blockBandBottom, blockBandTop);
 
@@ -834,7 +873,20 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       // sideways into a block. Jumping straight up (vx ~ 0) should bump the
       // block from below instead of being shoved out sideways.
       if (inBlockBand && Math.abs(stateRef.current.vx) > 1) {
-        const hitIndex = findOverlappingBlock(actorL, actorR, blocks, blockRadius);
+        // Prefer the per-block band test (relocation-aware); fall back to the
+        // shared-band test when vertical measurements are not ready yet.
+        const hitIndex = perBlockBands
+          ? findOverlappingBlockInBand(
+              actorL,
+              actorR,
+              actorBottom - GROUND_H,
+              actorTop - GROUND_H,
+              blocks,
+              blockRadius,
+              blockBottoms,
+              blockBottoms.map((b) => b + BLOCK_SIZE),
+            )
+          : findOverlappingBlock(actorL, actorR, blocks, blockRadius);
 
         if (hitIndex !== -1) {
           stateRef.current.x = clampToStage(
@@ -894,6 +946,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             actorHead: stateRef.current.y + stateRef.current.actorHeight,
             blockCentres: stateRef.current.blockCentres,
             blockLift: stateRef.current.blocksLift,
+            blockBottoms: stateRef.current.blockBottoms,
             radius: stateRef.current.blockHalfWidth + BLOCK_BUMP_GRACE,
           });
 
@@ -1184,6 +1237,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     <section
       ref={containerRef}
       id="stage"
+      style={{ ['--stage-h' as string]: '100svh' }}
       className={`relative w-full h-[100svh] min-h-[660px] overflow-hidden select-none touch-manipulation bg-[#070512] ${
         partyMode ? 'party-mode' : ''
       }`}
@@ -1381,7 +1435,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           saved positions, and RESET restores the default spread. */}
       {arrangeMode && (
         <div className="absolute left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-3 py-1.5 border-2 border-[#ffd23f] bg-[#0a0620]/95 font-pixel text-[9px] text-[#ffd23f] shadow-[0_0_16px_rgba(255,210,63,0.45)] pointer-events-none">
-          <span>ARRANGE MODE · drag a ? block anywhere on the stage, or nudge ◀ ▶</span>
+          <span>ARRANGE MODE · drag a ? block anywhere, or nudge ◀ ▶ ▲ ▼ (▼ lowers into bumpable range)</span>
           <button
             type="button"
             className="pointer-events-auto px-2 py-1 border border-[#7d7aa3] text-[#7d7aa3] hover:text-[#00e5ff] hover:border-[#00e5ff] cursor-pointer"
@@ -1426,7 +1480,8 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           const isHinted = hintedBlock === idx && !isUsed;
           // Relocation (dev): a saved dxPct places the block absolutely within
           // the full-width row; blocks without one keep the centred flex flow.
-          const savedDx = blockPositions.find((p) => p.key === block.key);
+          const savedPos = blockPositions.find((p) => p.key === block.key);
+          const savedDx = savedPos;
           return (
             <button
               key={block.key}
@@ -1437,6 +1492,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                   : 500;
                 openBlock(block.key, bLeft);
               }}
+              data-block-key={block.key}
               draggable={arrangeMode || undefined}
               onDragStart={(e) => {
                 if (!arrangeMode) return;
@@ -1471,14 +1527,22 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                       }),
                   // Centre the block on its saved fraction of the row width
                   // (the -1.75rem half-block offset is tuned for the sm size).
+                  // dyUpPct raises/lowers the block from the default row height
+                  // via bottom (positive = up). Row height ≈ BLOCK_SIZE, so a
+                  // moved block's bottom is the row bottom + dy px.
                   ...(savedDx
-                    ? { left: `calc(${50 + savedDx.dxPct * 100}% - 1.75rem)` }
+                    ? {
+                        left: `calc(${50 + savedDx.dxPct * 100}% - 1.75rem)`,
+                        ...(savedDx.dyUpPct
+                          ? { bottom: `calc(${savedDx.dyUpPct * 100} * var(--stage-h, 100svh) / 100)` }
+                          : {}),
+                      }
                     : {}),
                 }
               }
               title={
                 arrangeMode
-                  ? `Arrange mode: drag anywhere on the stage or nudge ◀ ▶ (${block.title})`
+                  ? `Arrange mode: drag anywhere, or nudge ◀ ▶ ▲ ▼ (${block.title})`
                   : `Mystery Block: ${block.title}`
               }
               aria-label={`Mystery Block: ${block.title}`}
@@ -1496,24 +1560,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                     className="absolute -left-2 top-1/2 -translate-x-full -translate-y-1/2 px-1 py-0.5 border border-[#ffd23f] text-[#ffd23f] text-[8px] cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
-                      // Relocate by ±3% of the row width, measured live so it
-                      // works for blocks still in the default flex flow too.
-                      const row = blocksRowRef.current;
-                      const btn = (e.currentTarget as HTMLElement).closest('button');
-                      if (!row || !btn) return;
-                      const rowRect = row.getBoundingClientRect();
-                      const bRect = btn.getBoundingClientRect();
-                      const current =
-                        (bRect.left + bRect.width / 2 - (rowRect.left + rowRect.width / 2)) /
-                        rowRect.width;
-                      const dir = -1;
-                      const next = withBlockPosition(
-                        blockPositions,
-                        block.key,
-                        clampDxPct(current + dir * 0.03, rowRect.width, BLOCK_SIZE),
-                      );
-                      setBlockPositions(next);
-                      saveBlockPositions(BLOCK_POSITIONS_KEY, next);
+                      nudgeBlock(block.key, -1, 0);
                     }}
                     title="Move block left"
                   >
@@ -1523,25 +1570,31 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                     className="absolute -right-2 top-1/2 translate-x-full -translate-y-1/2 px-1 py-0.5 border border-[#ffd23f] text-[#ffd23f] text-[8px] cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
-                      const row = blocksRowRef.current;
-                      const btn = (e.currentTarget as HTMLElement).closest('button');
-                      if (!row || !btn) return;
-                      const rowRect = row.getBoundingClientRect();
-                      const bRect = btn.getBoundingClientRect();
-                      const current =
-                        (bRect.left + bRect.width / 2 - (rowRect.left + rowRect.width / 2)) /
-                        rowRect.width;
-                      const next = withBlockPosition(
-                        blockPositions,
-                        block.key,
-                        clampDxPct(current + 0.03, rowRect.width, BLOCK_SIZE),
-                      );
-                      setBlockPositions(next);
-                      saveBlockPositions(BLOCK_POSITIONS_KEY, next);
+                      nudgeBlock(block.key, 1, 0);
                     }}
                     title="Move block right"
                   >
                     ▶
+                  </span>
+                  <span
+                    className="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full px-1 py-0.5 border border-[#ffd23f] text-[#ffd23f] text-[8px] cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      nudgeBlock(block.key, 0, 1);
+                    }}
+                    title="Move block up"
+                  >
+                    ▲
+                  </span>
+                  <span
+                    className="absolute -bottom-2 left-1/2 -translate-x-1/2 translate-y-full px-1 py-0.5 border border-[#ffd23f] text-[#ffd23f] text-[8px] cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      nudgeBlock(block.key, 0, -1);
+                    }}
+                    title="Move block down"
+                  >
+                    ▼
                   </span>
                 </>
               )}
@@ -1561,12 +1614,21 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         style={{ bottom: `${GROUND_H - 6}px`, opacity: blockShadow.opacity.toFixed(3) }}
       >
         {MYSTERY_BLOCKS_DATA.map((block) => {
-          const savedDx = blockPositions.find((p) => p.key === block.key);
+          const savedPos = blockPositions.find((p) => p.key === block.key);
           return (
             <div
               key={block.key}
-              className={`${savedDx ? 'absolute' : 'relative'} w-12 sm:w-14 h-2 flex justify-center`}
-              style={savedDx ? { left: `calc(${50 + savedDx.dxPct * 100}% - 1.75rem)` } : undefined}
+              className={`${savedPos ? 'absolute' : 'relative'} w-12 sm:w-14 h-2 flex justify-center`}
+              style={
+                savedPos
+                  ? {
+                      left: `calc(${50 + savedPos.dxPct * 100}% - 1.75rem)`,
+                      ...(savedPos.dyUpPct
+                        ? { bottom: `calc(${savedPos.dyUpPct * 100} * var(--stage-h, 100svh) / 100)` }
+                        : {}),
+                    }
+                  : undefined
+              }
             >
               <span
                 className="w-[60%] h-full"

@@ -87,7 +87,7 @@
       "name": "right-walk-01",
       "footBaseline": 318,
       "pelvisAnchorX": 86,
-      "durationMs": 150
+      "durationMs": 170
     },
     {
       "row": 0,
@@ -135,7 +135,7 @@
       "name": "right-walk-03",
       "footBaseline": 318,
       "pelvisAnchorX": 86,
-      "durationMs": 100
+      "durationMs": 85
     },
     {
       "row": 0,
@@ -159,7 +159,7 @@
       "name": "right-walk-04",
       "footBaseline": 318,
       "pelvisAnchorX": 86,
-      "durationMs": 100
+      "durationMs": 85
     },
     {
       "row": 0,
@@ -183,7 +183,7 @@
       "name": "right-walk-05",
       "footBaseline": 318,
       "pelvisAnchorX": 86,
-      "durationMs": 150
+      "durationMs": 170
     },
     {
       "row": 0,
@@ -207,7 +207,7 @@
       "name": "right-walk-06",
       "footBaseline": 318,
       "pelvisAnchorX": 86,
-      "durationMs": 100
+      "durationMs": 85
     },
     {
       "row": 0,
@@ -231,7 +231,7 @@
       "name": "right-walk-07",
       "footBaseline": 318,
       "pelvisAnchorX": 86,
-      "durationMs": 100
+      "durationMs": 85
     },
     {
       "row": 0,
@@ -303,7 +303,7 @@
       "name": "left-walk-01",
       "footBaseline": 318,
       "pelvisAnchorX": 86,
-      "durationMs": 150
+      "durationMs": 170
     },
     {
       "row": 1,
@@ -351,7 +351,7 @@
       "name": "left-walk-03",
       "footBaseline": 318,
       "pelvisAnchorX": 86,
-      "durationMs": 100
+      "durationMs": 85
     },
     {
       "row": 1,
@@ -375,7 +375,7 @@
       "name": "left-walk-04",
       "footBaseline": 318,
       "pelvisAnchorX": 86,
-      "durationMs": 100
+      "durationMs": 85
     },
     {
       "row": 1,
@@ -399,7 +399,7 @@
       "name": "left-walk-05",
       "footBaseline": 318,
       "pelvisAnchorX": 86,
-      "durationMs": 150
+      "durationMs": 170
     },
     {
       "row": 1,
@@ -423,7 +423,7 @@
       "name": "left-walk-06",
       "footBaseline": 318,
       "pelvisAnchorX": 86,
-      "durationMs": 100
+      "durationMs": 85
     },
     {
       "row": 1,
@@ -447,7 +447,7 @@
       "name": "left-walk-07",
       "footBaseline": 318,
       "pelvisAnchorX": 86,
-      "durationMs": 100
+      "durationMs": 85
     },
     {
       "row": 1,

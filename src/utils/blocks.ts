@@ -56,6 +56,12 @@ export interface HeadBumpQuery {
   blockCentres: readonly number[];
   /** Height of the block band above ground. */
   blockLift: number;
+  /**
+   * Per-block band bottoms above ground (relocation). When provided and
+   * complete, it replaces the shared `blockLift` so a block moved up or down
+   * by the arranger collides at its real height.
+   */
+  blockBottoms?: readonly number[];
   /** Half-width of a block's collision box. */
   radius: number;
   tolerance?: number;
@@ -74,21 +80,50 @@ export function findHeadBumpedBlock({
   actorHead,
   blockCentres,
   blockLift,
+  blockBottoms,
   radius,
   tolerance = 40,
 }: HeadBumpQuery): BlockHit | null {
   if (blockCentres.length === 0) return null;
 
-  // The head only collides while it is inside the block band.
-  if (!isHeadBump(actorHead, blockLift, tolerance)) return null;
+  // Per-block bands (relocation) take precedence; the shared band is the
+  // fallback for callers that have not measured vertical offsets yet.
+  const perBlock = blockBottoms && blockBottoms.length === blockCentres.length;
 
   for (let i = 0; i < blockCentres.length; i++) {
+    const bandBottom = perBlock ? blockBottoms[i] : blockLift;
+    // The head only collides while it is inside this block's band.
+    if (!isHeadBump(actorHead, bandBottom, tolerance)) continue;
     if (Math.abs(actorCenterX - blockCentres[i]) < radius) {
       return { index: i, centerX: blockCentres[i] };
     }
   }
 
   return null;
+}
+
+/**
+ * Index of the first block whose horizontal footprint AND vertical band
+ * overlap the actor's, or -1 if none. Used for side collisions when blocks
+ * sit at different heights (relocation); `bandBottoms`/`bandTops` are per
+ * block, above ground, in stage pixels.
+ */
+export function findOverlappingBlockInBand(
+  actorLeft: number,
+  actorRight: number,
+  actorBottom: number,
+  actorTop: number,
+  blockCentres: readonly number[],
+  radius: number,
+  bandBottoms: readonly number[],
+  bandTops: readonly number[],
+): number {
+  for (let i = 0; i < blockCentres.length; i++) {
+    const bx = blockCentres[i];
+    if (actorRight < bx - radius || actorLeft > bx + radius) continue;
+    if (actorTop > bandBottoms[i] && actorBottom < bandTops[i]) return i;
+  }
+  return -1;
 }
 
 /**
