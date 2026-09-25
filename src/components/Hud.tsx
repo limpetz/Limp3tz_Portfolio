@@ -4,6 +4,8 @@ import { sound } from '../utils/soundEngine';
 /** Short display version (e.g. "v1.1.0"); full identity lives in the tooltip. */
 const BUILD_SHORT = __APP_VERSION__.split('-')[0];
 const BUILD_TOOLTIP = `BUILD ${__APP_VERSION__} · ${__BUILD_DATE__} · ${__BUILD_SHA__.toUpperCase()}`;
+/** GitHub commit page for the exact build, opened by the version chip. */
+const COMMIT_URL = `https://github.com/limpetz/Limp3tz_Portfolio/commit/${__BUILD_SHA__}`;
 
 interface HudProps {
   score: number;
@@ -48,13 +50,17 @@ export const Hud: React.FC<HudProps> = ({
         </div>
         <span className="text-[#ffd23f] tracking-wider hidden sm:inline-block">P1: LIMP3TZ</span>
         {/* Build badge: matches the boot-screen stamp, so a stale deploy is
-            visible without leaving the game. Details on hover. */}
-        <span
-          className="hidden md:inline-block text-[8px] text-[#7d7aa3]/60 tracking-wider"
+            visible without leaving the game. Click opens the exact commit on
+            GitHub; hover shows full build identity. */}
+        <a
+          href={COMMIT_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hidden md:inline-block text-[8px] text-[#7d7aa3]/60 tracking-wider hover:text-[#00e5ff] transition-colors"
           title={BUILD_TOOLTIP}
         >
           {BUILD_SHORT}
-        </span>
+        </a>
       </div>
 
       {/* Desktop Navigation */}

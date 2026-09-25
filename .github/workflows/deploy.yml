@@ -6,9 +6,10 @@ on:
   # Lets you publish a previously untagged revision from the Actions tab.
   workflow_dispatch:
 
-# Required by the Pages deployment: write the artifact and mint an OIDC token.
+# Pages deployment needs to write the artifact and mint an OIDC token; the
+# release job needs contents:write to tag commits and publish releases.
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -73,3 +74,61 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # Every successful deploy from main cuts a release. Reuse the exact vX.Y.Z
+  # when package.json was bumped for this push (human releases), otherwise
+  # mint the next patch as auto/vX.Y.Z+<sha>. Skips when the commit is
+  # already tagged, so re-runs and tag pushes never duplicate releases.
+  release:
+    name: Auto patch release
+    needs: [build, deploy]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Resolve tag for this commit
+        id: tag
+        env:
+          PKG_VERSION: ${{ vars.PKG_VERSION }}
+        run: |
+          SHA="$(git rev-parse --short HEAD)"
+          if git rev-parse "refs/tags/${PKG_VERSION}" >/dev/null 2>&1 \
+            && [ "$(git rev-parse "refs/tags/${PKG_VERSION}^{commit}")" = "$(git rev-parse HEAD)" ]; then
+            TAG="${PKG_VERSION}"
+          else
+            # Seed from the highest existing semver tag (auto or manual) so
+            # the first auto release builds on e.g. v1.1.0, not v0.0.0.
+            LAST="$(git tag --list 'auto/v*' 'v*' --sort=-v:refname | head -n1 | sed 's/^auto\/v//; s/+.*//')"
+            MAJOR=0; MINOR=0; PATCH=0
+            if [ -n "$LAST" ]; then
+              MAJOR="${LAST%%.*}"; REST="${LAST#*.}"; MINOR="${REST%%.*}"; PATCH="${REST#*.}"
+            fi
+            TAG="auto/v${MAJOR}.${MINOR}.$((PATCH + 1))+${SHA}"
+          fi
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Tag ${TAG} already exists — skipping release."
+          else
+            echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+            echo "Will release ${TAG} at ${SHA}."
+          fi
+
+      - name: Tag and publish release
+        if: steps.tag.outputs.skip != 'true'
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Automatic release ${TAG} (deploy of $(git rev-parse --short HEAD))"
+          git push origin "$TAG"
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --target "$(git rev-parse HEAD)" \
+            --notes "Automatic release cut by the deploy workflow after a successful publish of $(git rev-parse --short HEAD) to GitHub Pages. See the commit history for changes; manually curated releases (e.g. v1.1.0) carry full notes."

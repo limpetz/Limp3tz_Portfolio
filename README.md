@@ -1,5 +1,9 @@
 # LIMP3TZ // Neon Pixel Arcade Portfolio
 
+| CI | Deploy | Release | Play |
+| :---: | :---: | :---: | :---: |
+| [![CI](https://github.com/limpetz/Limp3tz_Portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/limpetz/Limp3tz_Portfolio/actions/workflows/ci.yml) | [![Deploy to GitHub Pages](https://github.com/limpetz/Limp3tz_Portfolio/actions/workflows/deploy.yml/badge.svg)](https://github.com/limpetz/Limp3tz_Portfolio/actions/workflows/deploy.yml) | [![Latest release](https://img.shields.io/github/v/release/limpetz/Limp3tz_Portfolio?sort=semver&label=release)](https://github.com/limpetz/Limp3tz_Portfolio/releases) | [![▶ Play](https://img.shields.io/badge/%E2%96%B6_PLAY-limpetz.github.io-3dffa2)](https://limpetz.github.io/Limp3tz_Portfolio/) |
+
 An interactive neon-cyberpunk arcade portfolio for **Arshad Mohemed (LIMP3TZ)** —
 Senior Specialist Trainer, Ad Ops @ MarketStar, ex-NVIDIA QA.
 
@@ -37,6 +41,8 @@ npm run dev      # http://localhost:3000
 | `npm test` | Run the Vitest suite once |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run clean` | Delete `dist/` |
+| `npm run playtest` | Drive the built site with headless Chrome and assert the walk/bounce animation (needs `vite preview` running) |
+| `npm run playtest:ci` | Same, with one automatic retry on failure — what CI runs |
 
 ## Controls
 
@@ -353,7 +359,14 @@ Both workflows share the same gate — `npm ci` → `npm run typecheck` →
 | Workflow | Trigger | Purpose |
 | --- | --- | --- |
 | `.github/workflows/ci.yml` | push to `main`, every pull request | verify only |
-| `.github/workflows/deploy.yml` | push to `main`, or manual dispatch | verify, then publish `dist/` to GitHub Pages |
+| `.github/workflows/deploy.yml` | push to `main`, or manual dispatch | verify, publish `dist/` to GitHub Pages, then cut an automatic patch release |
+
+After a successful deploy from `main`, the workflow's `release` job tags the
+built commit `auto/vX.Y.Z+<short-sha>` (or `vX.Y.Z` when a repo variable
+`PKG_VERSION` was set to match a `package.json` bump in that push) and
+publishes a GitHub release — unless a tag at that commit already exists, in
+which case it skips. Manual `vX.Y.Z` tags and releases (like `v1.1.0`) are
+always cut by hand.
 
 > `package-lock.json` must stay committed, otherwise `npm ci` fails.
 
