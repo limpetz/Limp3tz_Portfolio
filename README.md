@@ -266,20 +266,22 @@ node scripts/cadence-probe.mjs [url]  # live steps/min + travel per step
 If a future re-bake permutes or re-mirrors the cells, restore the layout with
 `node scripts/relayout-walk-sheet.mjs` (moves whole cells; pixels untouched)
 and re-run the gate. Cadence tuning lives in `ArcadeStage.tsx`, and the two
-knobs are independent:
+knobs are independent — **final as of v1.2.0**, decided from live
+measurements:
 
-- `STRIDE_REFERENCE_PX_S` alone sets **travel per step** = `0.4s × value`
-  (84px at 210; the art's contact stride is ~66px, so the stance foot slides
-  ~18px/step — accepted trade-off, since zero slide at REF 165 would read as
-  ~236 frantic steps/min at the tuned speed).
-- `MAX_SPEED` alone sets **footfalls per minute** = `150 × speed ÷ REF`
-  (~185/min at 260/210).
-- The two footfall frames hold 150ms (JSON `durationMs`; passes hold 100ms),
-  so each step-down registers as a visible event — the ground probe
-  (`scripts/ground-probe.mjs`) confirmed both feet plant; unweighted playback
-  at high clock rates blurred the second footfall.
+- `STRIDE_REFERENCE_PX_S = 210` sets **travel per step** = `0.4s × value`
+  (~92px measured; the art's contact stride is ~66px, so the stance foot
+  slides ~26px/step — accepted trade-off, since zero slide at REF 165 ran
+  ~240 steps/min and the second footfall read as a blur).
+- `MAX_SPEED = 260` sets **footfalls per minute** = `150 × speed ÷ REF`
+  (~169/min measured).
+- The two footfall frames hold **170ms** and the lift frames **85ms** (JSON
+  `durationMs`), a 2× contrast that makes each step-down register as a
+  visible event — the ground probe (`scripts/ground-probe.mjs`) confirmed
+  both feet plant; unweighted playback at high clock rates blurred it.
 
-Measure both live with `node scripts/cadence-probe.mjs [url]`.
+Measure live with `node scripts/cadence-probe.mjs [url]`; `[` / `]` tune the
+stride reference in-game while the C overlay is open.
 
 Quality 82 is deliberate for the backgrounds — they're neon gradients that band
 badly below ~75. Once you're happy, the `.originals/` folders can be deleted.

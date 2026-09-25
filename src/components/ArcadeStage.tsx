@@ -254,17 +254,17 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
   // Physics constants
   const GROUND_H = 92;
-  // Cadence pair (STRIDE_REFERENCE_PX_S below). The two knobs are
-  // independent: travel per step = 0.4s × REF (~84px at 210; the art's
-  // contact stride is ~66px, so the stance foot slides a subtle ~18px/step),
-  // while footfalls/min = 150 × speed ÷ REF (≈185/min at 260/210). The
-  // zero-slide setting (REF 165) was tried and reverted: at ~240 steps/min
-  // each frame shows ~63ms and the second footfall reads as a blur —
-  // ground-probe data confirmed the art plants both feet, but the beat was
-  // too fast to register. Contact frames also hold 150ms (see the JSON) so
-  // each step-down lands as a visible event.
+  // Cadence pair (STRIDE_REFERENCE_PX_S below) — FINAL as of v1.2.0, decided
+  // from live cadence-probe measurements: 169 footfalls/min, 711ms loop,
+  // contact frames reading 2x over lift frames. The zero-slide setting
+  // (REF 165) was tried and reverted: at ~240 steps/min each frame shows
+  // ~63ms and the second footfall reads as a blur — ground-probe data
+  // confirmed the art plants both feet, but the beat was too fast to
+  // register. Knob maths: travel per step = 0.4s × REF (~84px at 210; the
+  // art's contact stride is ~66px — the stance-foot slide is the accepted
+  // trade-off), footfalls/min = 150 × speed ÷ REF.
   const MAX_SPEED = 260; // px/sec
-  const STRIDE_REFERENCE_PX_S = 210; // default; [ / ] live-tunes it while the C overlay is open
+  const STRIDE_REFERENCE_PX_S = 210; // FINAL; [ / ] live-tunes it while the C overlay is open
   const ACCEL = 1800; // px/sec²
   const FRICTION = 2200; // px/sec²
   const SKID_DECEL = 3400; // px/sec²
