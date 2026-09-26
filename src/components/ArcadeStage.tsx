@@ -2076,6 +2076,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           frameIndex={s.frameIndex}
           width={s.width}
           height={s.height}
+          facing={s.facing}
         />
       ))}
 

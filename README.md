@@ -180,6 +180,12 @@ whole system is unit tested (`slime.test.ts`) without a DOM or an animation loop
   every tick, so the patrol direction and the attack telegraph can never
   disagree. The medium slimes are symmetric blobs with no facing row, so the
   renderer never mirrors them
+- **Renderer-drawn eyes** — because the sheets carry no face, `SlimeMonster`
+  draws two pixel eyes on top of the body, leaning one art-pixel toward
+  `facing` (the same value the physics loop derived from the velocity, so the
+  gaze always points where the slime is going). On `hit` and `die` the eyes
+  swap to flat 2px dazed lids with no lean; they are anchored on the same cell
+  points as the sprite, so they stay put at either body scale
 - **Visible marker** — a neon strip on the ground under the player's spawn,
   with a centred shield-and-check emblem above a glowing **SAFE ZONE HERE**
   label (inline SVG + CSS glow, no asset), makes the zone discoverable. It is
