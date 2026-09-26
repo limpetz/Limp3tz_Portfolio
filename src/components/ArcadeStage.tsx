@@ -2101,7 +2101,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             fallingHeartsRef.current = remaining;
             setFallingHearts(remaining);
           }}
-          className="absolute z-20 cursor-pointer hover:scale-125 transition-transform p-0 bg-transparent border-0"
+          className="absolute z-20 w-5 h-5 flex items-center justify-center cursor-pointer hover:scale-125 transition-transform p-0 bg-transparent border-0"
           style={{
             left: `${heart.x}px`,
             top: `${heart.y}px`,
@@ -2109,12 +2109,17 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           title="1UP Heart: Recover Health (+250 pts)"
           aria-label="1UP Heart: Recover Health"
         >
-          <img
-            src={heartSvg}
-            alt=""
-            className="w-5 h-5 collectible-icon collectible-icon--heart"
-            draggable={false}
-          />
+          {/* 16px art in the 20px tap target: the heart's solid silhouette
+              (plus its glow) reads bigger than the coin's octagon, so it sits
+              a step down to match the coin's visual weight. */}
+          <span className="block w-4 h-4">
+            <img
+              src={heartSvg}
+              alt=""
+              className="collectible-icon collectible-icon--heart"
+              draggable={false}
+            />
+          </span>
         </button>
       ))}
 
