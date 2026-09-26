@@ -197,7 +197,9 @@ whole system is unit tested (`slime.test.ts`) without a DOM or an animation loop
   can't mint points. The chain counter resets on every landing, the shout
   names the combo (`STOMP CHAIN x3! +650 PTS!`), and the pure maths lives in
   `stompChainScore`/`stompChainLabel` in `src/utils/slime.ts`, unit tested
-  like the rest of the module
+  like the rest of the module. From link 3 the dying slime also bursts coins
+  and the whole stage rattles for a beat — transform-only, scaling with the
+  chain, and suppressed under `prefers-reduced-motion`
 - **Visible marker** — a neon strip on the ground under the player's spawn,
   with a centred shield-and-check emblem above a glowing **SAFE ZONE HERE**
   label (inline SVG + CSS glow, no asset), makes the zone discoverable. It is

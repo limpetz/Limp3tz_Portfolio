@@ -196,6 +196,9 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   const slimeRespawnTimeoutsRef = useRef<number[]>([]);
   /** Consecutive airborne slime stomps this flight — the stomp-chain combo. */
   const stompChainRef = useRef(0);
+  /** Chain celebration: shake until this timestamp, at this power multiplier. */
+  const shakeUntilRef = useRef(0);
+  const shakePowerRef = useRef(1);
   // Contact damage is suppressed until this timestamp, so a hazard can't hit
   // the player during startup (and behind the boot screen).
   const spawnGraceUntilRef = useRef(0);
@@ -354,6 +357,9 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   // (BLOCK_Y above ground) — see the reach maths in the tests.
   const JUMP_V = 1250; // px/sec
   const GRAVITY = 2000; // px/sec²
+  /** Chain-celebration screen shake: duration and peak amplitude at power 1. */
+  const SHAKE_MS = 280;
+  const SHAKE_MAX_PX = 5;
   
   // --- Turn / sprint kinematics ---
   const TURN_SPEED = 10;       // how quickly the sprite springs toward its target turn
@@ -1487,6 +1493,9 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                   12 + chain * 4,
                   false,
                 );
+                // The bigger the chain, the harder the cabinet shakes.
+                shakeUntilRef.current = performance.now() + SHAKE_MS;
+                shakePowerRef.current = Math.min(1.5, 1 + (chain - 3) * 0.25);
               }
               say(stompChainLabel(chain), 1600);
 
@@ -1558,6 +1567,24 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
       // Update and render canvas particles
       particleSys.current.updateAndRender(dt);
+
+      // Chain juice: rattle the whole stage briefly after a big stomp chain.
+      // Transform-only so layout never reflows, decaying to zero, and skipped
+      // under reduced motion — the stomp response itself is input-driven, the
+      // shake is the celebratory part.
+      if (shakeUntilRef.current > 0) {
+        const remaining = shakeUntilRef.current - performance.now();
+        if (remaining <= 0) {
+          shakeUntilRef.current = 0;
+          if (containerRef.current) containerRef.current.style.transform = '';
+        } else if (!prefersReducedMotion && containerRef.current) {
+          const decay = remaining / SHAKE_MS;
+          const mag = SHAKE_MAX_PX * decay * shakePowerRef.current;
+          const jx = (Math.random() * 2 - 1) * mag;
+          const jy = (Math.random() * 2 - 1) * mag * 0.6;
+          containerRef.current.style.transform = `translate(${jx.toFixed(1)}px, ${jy.toFixed(1)}px)`;
+        }
+      }
 
       animId = requestAnimationFrame(loop);
     };
