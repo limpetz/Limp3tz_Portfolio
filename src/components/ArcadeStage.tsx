@@ -373,7 +373,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   // Block positions are NOT computed here: the row is laid out by CSS, so its
   // centres are measured from the DOM (see measureBlocks below). Sizes below are
   // only needed for the vertical band and as a pre-measurement fallback.
-  const BLOCK_SIZE = 56;        // rendered block size (w-14 = 56px)
+  const BLOCK_SIZE = 64;        // rendered block size (w-16 = 64px)
 
   // Set to the hero's full jump reach: apex is ~391px (JUMP_V²/2G), and the
   // bump registers while the head is inside the block band + tolerance, i.e.
@@ -1918,7 +1918,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                 openBlock(block.key, bLeft);
               }}
               data-block-key={block.key}
-              className={`${savedDx ? 'absolute' : 'relative'} w-12 h-12 sm:w-14 sm:h-14 transition-all cursor-pointer select-none ${
+              className={`${savedDx ? 'absolute' : 'relative'} w-14 h-14 sm:w-16 sm:h-16 transition-all cursor-pointer select-none ${
                 isBumped ? 'z-40' : ''
               } ${isHinted ? 'ring-2 ring-[#ffd23f] shadow-[0_0_20px_rgba(255,210,63,0.85)]' : ''}`}
               style={{
@@ -1941,7 +1941,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                 // moved block's bottom is the row bottom + dy px.
                 ...(savedDx
                   ? {
-                      left: `calc(${50 + savedDx.dxPct * 100}% - 1.75rem)`,
+                      left: `calc(${50 + savedDx.dxPct * 100}% - var(--block-half, 1.75rem))`,
                       ...(savedDx.dyUpPct
                         ? { bottom: `calc(${savedDx.dyUpPct * 100} * var(--stage-h, 100svh) / 100)` }
                         : {}),
@@ -2034,7 +2034,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               style={
                 savedPos
                   ? {
-                      left: `calc(${50 + savedPos.dxPct * 100}% - 1.75rem)`,
+                      left: `calc(${50 + savedPos.dxPct * 100}% - var(--block-half, 1.75rem))`,
                       ...(savedPos.dyUpPct
                         ? { bottom: `calc(${savedPos.dyUpPct * 100} * var(--stage-h, 100svh) / 100)` }
                         : {}),

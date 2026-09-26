@@ -37,6 +37,21 @@ const STATIC_POSITION: Record<MysteryBlockVisualState, string> = {
   revealed: '0% 100%',
 };
 
+/**
+ * Per-sheet size compensation. The four sheets draw their block at slightly
+ * different widths inside the 362px frame — measured content widths are
+ * ~291px (name), ~285px (role), ~235px (location) and ~227px (status) — so
+ * at one shared scale the LOCATION and STATUS blocks read visibly smaller
+ * than the rest of the row. Each sheet scales up by NAME's width divided by
+ * its own, normalising the drawn blocks to the same visual size.
+ */
+const SHEET_COMPENSATION: Record<MysteryBlockKey, number> = {
+  name: 1,
+  role: 1,
+  location: 291 / 235,
+  status: 291 / 227,
+};
+
 interface MysteryBlockSpriteProps {
   blockKey: MysteryBlockKey;
   state: MysteryBlockVisualState;
@@ -61,6 +76,9 @@ export const MysteryBlockSprite: React.FC<MysteryBlockSpriteProps> = ({
       backgroundPosition: STATIC_POSITION[state],
       backgroundRepeat: 'no-repeat',
       imageRendering: 'pixelated',
+      // Normalise the drawn block size across sheets (transform only, so the
+      // hitbox stays the button and neighbors never reflow).
+      transform: `scale(${SHEET_COMPENSATION[blockKey]})`,
     }}
   />
 );

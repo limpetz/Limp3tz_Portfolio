@@ -44,9 +44,9 @@ try {
       return { ax: a.left, aw: a.width, bottom: parseFloat(actor.style.bottom || '0'), blocks };
     });
 
-  // Walk toward `dir` until the actor's centre sits `targetDx` from a block
-  // centre (the edge zone just outside the collision box).
-  async function walkUntil(dir, targetDx, maxMs = 9000) {
+  // Walk toward `dir` until the actor's centre sits `targetDx` (± tol) from a
+  // block centre (the edge zone just outside the collision box).
+  async function walkUntil(dir, targetDx, maxMs = 9000, tol = 6) {
     await page.keyboard.down(dir < 0 ? 'ArrowLeft' : 'ArrowRight');
     const t0 = Date.now();
     while (Date.now() - t0 < maxMs) {
@@ -55,7 +55,7 @@ try {
         Math.abs(c.cx - (g.ax + g.aw / 2)) < Math.abs(b.cx - (g.ax + g.aw / 2)) ? c : b,
       );
       const dx = near.cx - (g.ax + g.aw / 2);
-      if (Math.abs(dx) <= targetDx + 6 && Math.abs(dx) >= targetDx - 6) {
+      if (Math.abs(dx) <= targetDx + tol && Math.abs(dx) >= targetDx - tol) {
         await page.keyboard.up(dir < 0 ? 'ArrowLeft' : 'ArrowRight');
         return true;
       }
@@ -90,10 +90,12 @@ try {
     return { maxB, minB, maxSnap };
   }
 
-  // Position beside the FIRST block's edge (centre dx ≈ 35, outside the 32px
-  // side box but inside the old 38px bump ring).
+  // Position beside the FIRST block's edge. The edge sliver sits between the
+  // head-bump radius (32 = true half width) and the side-collision radius
+  // (36 = half width + 4px grace), so target its middle and hold tight —
+  // landing at dx < 32 is a legitimate under-block bump, not the bug.
   console.log('positioning beside a block edge...');
-  const placed = await walkUntil(1, 35);
+  const placed = await walkUntil(1, 34, 9000, 2);
   if (!placed) {
     console.error('FAIL: could not position beside a block edge');
     process.exitCode = 1;

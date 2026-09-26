@@ -303,6 +303,24 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Mystery block layout variables
+
+   `--block-half` is half a block's rendered size, used by the absolutely
+   positioned (relocated) blocks to centre themselves on their saved dxPct.
+   The buttons are w-14 (56px) below the sm breakpoint and w-16 (64px) at and
+   above it, so the half-size tracks the same breakpoint.
+   --------------------------------------------------------------------------- */
+#stage {
+  --block-half: 1.75rem;
+}
+
+@media (min-width: 640px) {
+  #stage {
+    --block-half: 2rem;
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Mystery block sprite states
 
    The block sheets are 1448x1086 grids of 362px frames, drawn through the
