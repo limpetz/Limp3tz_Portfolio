@@ -18,7 +18,7 @@ chiptune soundtrack, a skill inventory, a quest log, and a live GitHub radar.
 | Framework | React 19 + TypeScript |
 | Build | Vite 8 (Rolldown) |
 | Styling | Tailwind CSS v4 via `@tailwindcss/vite` |
-| Audio | Web Audio API synthesis (`src/utils/soundEngine.ts`) |
+| Audio | Web Audio API synthesis (`src/utils/soundEngine.ts`) — includes `playHover()` menu ticks |
 | Tests | Vitest (pure logic only — no DOM needed) |
 | CI | GitHub Actions (verify only) |
 | Hosting | Google AI Studio (static `dist/`) |
@@ -48,6 +48,8 @@ hosted build on Google AI Studio.
 | `npm run playtest` | Drive the built site with headless Chrome and assert the walk/bounce animation (needs `vite preview` running) |
 | `npm run playtest:ci` | Same, with one automatic retry on failure — what CI runs |
 | `npm run playtest:slime` | Phone-width hazard playtest: patrol corridor, narrow body, facing eyes (pass a URL, or it defaults to `:4173`) |
+| `node scripts/stomp-hint-playtest.mjs [url]` | Drives a real stomp (score + shout + despawn gap) and asserts the under-block hint glow + ▼ marker |
+| `node scripts/coin-burst-playtest.mjs [url]` | Clicks INSERT COIN and asserts the coin-burst particles, re-click guard and cleanup |
 | `node scripts/capture-stomp.mjs [url] [out.mp4]` | Record a scripted stomp-chain demo (needs `vite preview` + `FFMPEG_PATH`); also writes a 7s `stomp-chain-highlight.mp4` beside the output |
 
 ## Controls
@@ -227,7 +229,33 @@ Profile URLs live in `PORTFOLIO_CONFIG` (`linkedin`, `github`, `discord`,
 `steam`); the `mailto:` target is derived from `email` at module load. Discord
 deep-links to the user profile (`discord.com/users/<id>`) and Steam uses the
 vanity URL. Every channel except email opens in a new tab with
-`rel="noopener noreferrer"`.
+`rel="noopener noreferrer"`. Hovering or keyboard-focusing a channel plays the
+shared `sound.playHover()` menu tick — the same affordance the INSERT COIN
+button uses.
+
+### INSERT COIN button & feedback sounds
+
+The floating **INSERT COIN** button (bottom-left, an Easter egg worth +100)
+carries the page's tactile feedback pair:
+
+- **Hover/focus** plays `sound.playHover()` — a soft high two-note triangle
+  tick (740 → 1100 Hz, ~30ms), deliberately quieter than every press sound so
+  it reads as a cabinet's menu tick. It is silent before the boot-screen
+  gesture unlocks the AudioContext (browser autoplay policy).
+- **Click** plays the existing `playPower()`, pays the score, and sprays a
+  **coin-burst particle effect** from the click point: ~14 `¤` glyph spans
+  with a random outward velocity (biased upward), animated by the `coinBurst`
+  keyframes in `index.css` via `--burst-dx`/`--burst-dy` custom properties and
+  self-removing on `animationend`. No timers, no React state, no canvas — the
+  stage's `ArcadeParticleSystem` is deliberately not reused because the button
+  is fixed at the app root while that canvas lives inside the stage layout.
+- Rapid re-clicks are suppressed by a `data-bursting` flag with a 900ms
+  safety valve; keyboard activation (Space) bursts from the button's centre;
+  under `prefers-reduced-motion` the burst is frozen and hidden via the shared
+  media query — the hover tick remains as the feedback channel.
+
+All feedback sounds respect the HUD's SFX toggle (`sfxEnabled` in the sound
+engine).
 
 Icons are 128px WebP cuts of the full-size art — see the asset workflow above.
 

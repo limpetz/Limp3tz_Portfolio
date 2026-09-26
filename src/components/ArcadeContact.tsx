@@ -97,6 +97,8 @@ export const ArcadeContact: React.FC<ArcadeContactProps> = ({ onAddScore }) => {
               aria-label={link.ariaLabel}
               {...(link.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
               onClick={() => (link.id === 'email' ? sound.playPower() : sound.playCoin())}
+              onMouseEnter={() => sound.playHover()}
+              onFocus={() => sound.playHover()}
               style={{ '--accent': link.color } as React.CSSProperties}
               className="group flex w-20 sm:w-24 flex-col items-center gap-2 px-2 py-3 bg-[#0a0817] border-2 border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[#001016] transition-all shadow-[0_5px_0_#000] active:translate-y-1 active:shadow-none"
             >
