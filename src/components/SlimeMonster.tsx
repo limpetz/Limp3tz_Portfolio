@@ -61,6 +61,19 @@ const EYE_H = 2;
 const DAZED_W = 2; // hit/die: a flat 2x1 closed lid, no lean
 const DAZED_H = 1;
 const EYE_COLOR = 'rgba(12,10,20,0.85)';
+/** Lunge telegraph: the eyes light up amber so the attack reads at a glance. */
+const ATTACK_EYE_COLOR = '#ffd23f';
+const ATTACK_EYE_GLOW = '0 0 4px rgba(255,210,63,0.95), 0 0 9px rgba(255,158,61,0.7)';
+/**
+ * Idle-blink stagger per colour: without it the four sheets would all blink on
+ * the same frame, which reads as a glitch rather than a blink.
+ */
+const BLINK_DELAYS: Record<SlimeColor, string> = {
+  blue: '0s',
+  green: '1.2s',
+  red: '2.3s',
+  white: '3.4s',
+};
 
 /**
  * Medium-slime hazard sprite. Draws one 32x32 cell from the colour's 128x128
@@ -85,10 +98,14 @@ export const SlimeMonster: React.FC<SlimeMonsterProps> = ({
   const SCALE = scaleFor(width);
   const cell = CELL * SCALE;
   const dazed = state === 'hit' || state === 'die';
+  const attacking = state === 'attack';
   const lean = dazed ? 0 : facing;
   const eyeW = (dazed ? DAZED_W : EYE_W) * SCALE;
   const eyeH = (dazed ? DAZED_H : EYE_H) * SCALE;
-  const eyeState = dazed ? 'dazed' : facing === 1 ? 'right' : 'left';
+  const eyeState = dazed ? 'dazed' : attacking ? 'attack' : facing === 1 ? 'right' : 'left';
+  const eyeStyle: React.CSSProperties = attacking
+    ? { background: ATTACK_EYE_COLOR, boxShadow: ATTACK_EYE_GLOW }
+    : { background: EYE_COLOR };
 
   return (
     <div
@@ -120,20 +137,27 @@ export const SlimeMonster: React.FC<SlimeMonsterProps> = ({
       {/* Renderer-drawn eyes: sheet art is symmetric, so the gaze lives here.
           Anchored on the same cell points as the sprite, so it stays put at
           either body scale. */}
-      {EYE_XS.map((ex) => (
-        <div
-          key={ex}
-          data-slime-eye={eyeState}
-          style={{
-            position: 'absolute',
-            left: `${width / 2 + (ex - ANCHOR_X + lean) * SCALE}px`,
-            top: `${height - (ANCHOR_Y - EYE_ROW) * SCALE}px`,
-            width: `${eyeW}px`,
-            height: `${eyeH}px`,
-            background: EYE_COLOR,
-          }}
-        />
-      ))}
+      {EYE_XS.map((ex) => {
+        // Dazed lids are already flat, and the attack telegraph must keep a
+        // steady glow — only the ordinary open eyes blink.
+        const blinking = !dazed && !attacking;
+        return (
+          <div
+            key={ex}
+            data-slime-eye={eyeState}
+            className={blinking ? 'animate-slime-blink' : undefined}
+            style={{
+              position: 'absolute',
+              left: `${width / 2 + (ex - ANCHOR_X + lean) * SCALE}px`,
+              top: `${height - (ANCHOR_Y - EYE_ROW) * SCALE}px`,
+              width: `${eyeW}px`,
+              height: `${eyeH}px`,
+              ...(blinking ? { animationDelay: BLINK_DELAYS[color] } : null),
+              ...eyeStyle,
+            }}
+          />
+        );
+      })}
     </div>
   );
 };

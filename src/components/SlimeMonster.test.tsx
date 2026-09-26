@@ -51,6 +51,26 @@ describe('SlimeMonster eyes', () => {
     }
   });
 
+  it('lights the eyes amber with a glow during the attack telegraph', () => {
+    const html = htmlWith({ x: 0, y: 0, color: 'red', state: 'attack' });
+    expect(html).toContain('data-slime-eye="attack"');
+    expect(html).toContain('background:#ffd23f');
+    expect(html).toContain('box-shadow:0 0 4px');
+    // The glow must stay steady: no blink on the telegraph.
+    expect(html).not.toContain('animate-slime-blink');
+  });
+
+  it('blinks the open eyes while patrolling, staggered per colour', () => {
+    const blue = htmlWith({ x: 0, y: 0, color: 'blue', state: 'run' });
+    expect(blue).toContain('animate-slime-blink');
+    expect(blue).toContain('animation-delay:0s');
+    // Distinct delays keep the four hazards from blinking in sync.
+    const green = htmlWith({ x: 0, y: 0, color: 'green', state: 'idle' });
+    expect(green).toContain('animation-delay:1.2s');
+    const white = htmlWith({ x: 0, y: 0, color: 'white', state: 'run' });
+    expect(white).toContain('animation-delay:3.4s');
+  });
+
   it('scales the eyes with the narrow-stage body (2x instead of 3x)', () => {
     const html = htmlWith({ x: 0, y: 0, color: 'blue', width: 32, height: 34 });
     // Open eye at 2x: 2x4 px.

@@ -303,6 +303,27 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Slime idle blink
+
+   The renderer-drawn eyes occasionally squint shut for a beat so the blobs
+   read as alive while they patrol. Each colour gets its own animation-delay
+   (set inline), so the four hazards never blink in sync. The attack telegraph
+   deliberately does not blink — its amber glow must stay steady to warn.
+   --------------------------------------------------------------------------- */
+@keyframes slimeBlink {
+  0%, 91%, 100% {
+    transform: scaleY(1);
+  }
+  94%, 97% {
+    transform: scaleY(0.12);
+  }
+}
+
+.animate-slime-blink {
+  animation: slimeBlink 4.6s linear infinite;
+}
+
+/* ---------------------------------------------------------------------------
    Footer arcade marquee
 
    The footer renders two identical copies of the ticker text in a `w-max`
@@ -374,6 +395,7 @@
   .animate-mystery-revealed,
   .animate-mystery-item,
   .animate-safe-zone,
+  .animate-slime-blink,
   .animate-marquee {
     /* The nudge stops blinking but keeps its neon glow, so it stays legible. */
     animation: none !important;

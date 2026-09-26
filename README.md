@@ -184,8 +184,19 @@ whole system is unit tested (`slime.test.ts`) without a DOM or an animation loop
   draws two pixel eyes on top of the body, leaning one art-pixel toward
   `facing` (the same value the physics loop derived from the velocity, so the
   gaze always points where the slime is going). On `hit` and `die` the eyes
-  swap to flat 2px dazed lids with no lean; they are anchored on the same cell
-  points as the sprite, so they stay put at either body scale
+  swap to flat 2px dazed lids with no lean; during the **attack telegraph**
+  they light up amber with a neon glow so a lunge reads from across the stage
+  (the glow never blinks — the warning must stay steady). While patrolling,
+  the eyes **blink** on a 4.6s loop with a per-colour delay, so the four
+  hazards never squint in sync. The eyes are anchored on the same cell points
+  as the sprite, so they stay put at either body scale
+- **Stomp chains** — consecutive airborne stomps escalate: the first pays the
+  classic +350, and each further link without touching the ground adds
+  +150 (350 → 500 → 650 …), capped at link 8 (+1,400) so a glitched multi-hit
+  can't mint points. The chain counter resets on every landing, the shout
+  names the combo (`STOMP CHAIN x3! +650 PTS!`), and the pure maths lives in
+  `stompChainScore`/`stompChainLabel` in `src/utils/slime.ts`, unit tested
+  like the rest of the module
 - **Visible marker** — a neon strip on the ground under the player's spawn,
   with a centred shield-and-check emblem above a glowing **SAFE ZONE HERE**
   label (inline SVG + CSS glow, no asset), makes the zone discoverable. It is

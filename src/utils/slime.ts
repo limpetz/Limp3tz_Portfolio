@@ -359,3 +359,39 @@ export function slimeSpawn(params: {
 export function slimeRoster(stageWidth: number, safeZone: SafeZoneBounds): SlimeSpawn[] {
   return SLIME_ROSTER.map((entry) => slimeSpawn({ ...entry, stageWidth, safeZone }));
 }
+
+/* ---------------------------------------------------------------------------
+ * Stomp chains
+ *
+ * A stomp bounces the player upward off the slime, so skilled play chains
+ * stomps without ever touching the ground. The chain rewards that: every
+ * consecutive airborne stomp is worth `STOMP_CHAIN_BASE` more than the last.
+ * Touching the ground (a landing, or a knockback) resets it.
+ * ------------------------------------------------------------------------ */
+
+/** Score for the first stomp of a chain — the long-standing flat reward. */
+export const STOMP_CHAIN_BASE = 350;
+/** Points each further link adds over the previous one. */
+export const STOMP_CHAIN_STEP = 150;
+/** Longest rewarded chain; later stomps in one flight keep this link's value. */
+export const STOMP_CHAIN_MAX = 8;
+
+/**
+ * Score for link `count` (1-based) of a stomp chain: 350, 500, 650, … capped
+ * after `STOMP_CHAIN_MAX` links so a glitched multi-hit can't mint points.
+ */
+export function stompChainScore(count: number): number {
+  // Degenerate counters (0, negative, NaN from an uninitialised ref) all pay
+  // the first link's score rather than minting a negative or NaN reward.
+  const link = Number.isFinite(count)
+    ? Math.min(Math.max(1, Math.floor(count)), STOMP_CHAIN_MAX)
+    : 1;
+  return STOMP_CHAIN_BASE + (link - 1) * STOMP_CHAIN_STEP;
+}
+
+/** Shout text for a chain link — 1 stays the classic line, 2+ name the combo. */
+export function stompChainLabel(count: number): string {
+  return count >= 2
+    ? `STOMP CHAIN x${Math.min(count, STOMP_CHAIN_MAX)}! +${stompChainScore(count)} PTS!`
+    : 'SLIME STOMPED! +350 PTS!';
+}

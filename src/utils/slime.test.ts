@@ -19,6 +19,11 @@ import {
   playerSpawnX,
   resolveSlimeMotion,
   safeZoneBounds,
+  STOMP_CHAIN_BASE,
+  STOMP_CHAIN_MAX,
+  STOMP_CHAIN_STEP,
+  stompChainLabel,
+  stompChainScore,
   slimeFrameCell,
   slimeFrameIndex,
   slimeRoster,
@@ -556,5 +561,37 @@ describe('resolveSlimeMotion', () => {
     expect(maxX + SLIME_WIDTH).toBeLessThanOrEqual(zone.min);
     expect(maxX).toBeGreaterThanOrEqual(zone.min - SLIME_WIDTH - 2);
     expect(minX).toBeLessThanOrEqual(leftWall + 2);
+  });
+});
+
+describe('stomp chains', () => {
+  it('pays the classic flat 350 for the first link', () => {
+    expect(STOMP_CHAIN_BASE).toBe(350);
+    expect(stompChainScore(1)).toBe(350);
+    expect(stompChainLabel(1)).toBe('SLIME STOMPED! +350 PTS!');
+  });
+
+  it('escalates by the step for each airborne link', () => {
+    expect(STOMP_CHAIN_STEP).toBe(150);
+    expect(stompChainScore(2)).toBe(500);
+    expect(stompChainScore(3)).toBe(650);
+    expect(stompChainLabel(3)).toBe('STOMP CHAIN x3! +650 PTS!');
+  });
+
+  it('caps the chain so a glitched multi-hit cannot mint points', () => {
+    expect(STOMP_CHAIN_MAX).toBe(8);
+    expect(stompChainScore(STOMP_CHAIN_MAX)).toBe(350 + 7 * 150);
+    expect(stompChainScore(STOMP_CHAIN_MAX + 1)).toBe(stompChainScore(STOMP_CHAIN_MAX));
+    expect(stompChainScore(STOMP_CHAIN_MAX + 50)).toBe(stompChainScore(STOMP_CHAIN_MAX));
+    expect(stompChainLabel(STOMP_CHAIN_MAX + 5)).toBe(
+      `STOMP CHAIN x${STOMP_CHAIN_MAX}! +${stompChainScore(STOMP_CHAIN_MAX)} PTS!`,
+    );
+  });
+
+  it('clamps degenerate inputs instead of paying negative or NaN scores', () => {
+    expect(stompChainScore(0)).toBe(350);
+    expect(stompChainScore(-3)).toBe(350);
+    expect(stompChainScore(2.9)).toBe(500);
+    expect(Number.isFinite(stompChainScore(NaN))).toBe(true);
   });
 });

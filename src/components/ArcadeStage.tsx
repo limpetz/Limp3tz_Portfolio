@@ -65,6 +65,8 @@ import {
   SLIME_RESPAWN_MS,
   SLIME_STATE_SECONDS,
   SPAWN_GRACE_MS,
+  stompChainLabel,
+  stompChainScore,
   playerSpawnX,
   resolveSlimeMotion,
   safeZoneBounds,
@@ -192,6 +194,8 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   // Pending respawn timers, tracked so they can be cleared on unmount instead
   // of firing setState into a dead component.
   const slimeRespawnTimeoutsRef = useRef<number[]>([]);
+  /** Consecutive airborne slime stomps this flight — the stomp-chain combo. */
+  const stompChainRef = useRef(0);
   // Contact damage is suppressed until this timestamp, so a hazard can't hit
   // the player during startup (and behind the boot screen).
   const spawnGraceUntilRef = useRef(0);
@@ -1071,6 +1075,8 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           stateRef.current.y = 0;
           stateRef.current.vy = 0;
           stateRef.current.grounded = true;
+          // Touching the ground ends the airborne stomp chain.
+          stompChainRef.current = 0;
           animCtrlRef.current.mode = 'landing';
           animCtrlRef.current.elapsed = 0;
           setIsAirborne(false);
@@ -1464,9 +1470,12 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               sound.playPower();
               stateRef.current.vy = 880; // High bounce upward off slime stomp
               stateRef.current.grounded = false;
-              onAddScore(350);
+              // Stomp chain: each airborne stomp without landing pays more.
+              stompChainRef.current += 1;
+              const chain = stompChainRef.current;
+              onAddScore(stompChainScore(chain));
               particleSys.current.triggerLandingDust(nextX + m.width / 2, stageH - mBottom);
-              say('SLIME STOMPED! +350 PTS!', 1600);
+              say(stompChainLabel(chain), 1600);
 
               // Stagger (Hit) first; the loop transitions it into Die.
               nextSlimes.push({
