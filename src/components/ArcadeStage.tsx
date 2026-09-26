@@ -53,7 +53,8 @@ import moveControlsImg from '../assets/images/move.webp';
 import jumpControlsImg from '../assets/images/jump.webp';
 import bumpBlocksImg from '../assets/images/bump-blocks.webp';
 import clickMeImg from '../assets/images/click-me.webp';
-import { PixelHeart } from './PixelHeart';
+import coinSvg from '../assets/images/coin.svg';
+import heartSvg from '../assets/images/heart.svg';
 import { SlimeMonster } from './SlimeMonster';
 import { MysteryBlockSprite, type MysteryBlockKey } from './MysteryBlockSprite';
 import {
@@ -828,7 +829,9 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   useEffect(() => {
     const coinInterval = setInterval(() => {
       if (!stageVisibleRef.current) return;
-      if (fallingCoinsRef.current.length < 5 && Math.random() < 0.7) {
+      // Collectibles spawn at twice the old rate with twice the on-stage cap,
+      // so the sky stays busier without piling up.
+      if (fallingCoinsRef.current.length < 10 && Math.random() < 0.7) {
         const newCoin: FallingCoin = {
           id: Math.random() + Date.now(),
           x: 40 + Math.random() * (stateRef.current.stageWidth - 80),
@@ -840,7 +843,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       }
 
       // Occasional falling 1UP heart pickup if player is not at max health
-      if (health < 4 && fallingHeartsRef.current.length < 2 && Math.random() < 0.35) {
+      if (health < 4 && fallingHeartsRef.current.length < 4 && Math.random() < 0.35) {
         const newHeart: FallingHeart = {
           id: Math.random() + Date.now(),
           x: 40 + Math.random() * (stateRef.current.stageWidth - 80),
@@ -850,7 +853,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         fallingHeartsRef.current = [...fallingHeartsRef.current, newHeart];
         setFallingHearts(fallingHeartsRef.current);
       }
-    }, 3800);
+    }, 1900);
 
     return () => clearInterval(coinInterval);
   }, [health]);
@@ -2068,7 +2071,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             fallingCoinsRef.current = remaining;
             setFallingCoins(remaining);
           }}
-          className="absolute z-20 w-5 h-5 bg-[#ffd23f] border-2 border-[#5a3d00] shadow-[inset_-2px_-2px_0_#b8860b,inset_2px_2px_0_#fff] cursor-pointer hover:scale-125 transition-transform"
+          className="absolute z-20 w-5 h-5 bg-transparent border-0 p-0 cursor-pointer hover:scale-125 transition-transform"
           style={{
             left: `${coin.x}px`,
             top: `${coin.y}px`,
@@ -2076,7 +2079,12 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           title="Collect Coin (+100 pts)"
           aria-label="Collect Coin"
         >
-          <span className="sr-only">Coin</span>
+          <img
+            src={coinSvg}
+            alt=""
+            className="collectible-icon collectible-icon--coin"
+            draggable={false}
+          />
         </button>
       ))}
 
@@ -2093,7 +2101,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             fallingHeartsRef.current = remaining;
             setFallingHearts(remaining);
           }}
-          className="absolute z-20 cursor-pointer hover:scale-125 transition-transform p-1 bg-[#110d24]/80 border border-[#ff2d78] shadow-[0_0_12px_rgba(255,45,120,0.6)]"
+          className="absolute z-20 cursor-pointer hover:scale-125 transition-transform p-0 bg-transparent border-0"
           style={{
             left: `${heart.x}px`,
             top: `${heart.y}px`,
@@ -2101,7 +2109,12 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           title="1UP Heart: Recover Health (+250 pts)"
           aria-label="1UP Heart: Recover Health"
         >
-          <PixelHeart size={16} />
+          <img
+            src={heartSvg}
+            alt=""
+            className="w-5 h-5 collectible-icon collectible-icon--heart"
+            draggable={false}
+          />
         </button>
       ))}
 

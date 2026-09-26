@@ -1,0 +1,48 @@
+/* Small pixel-style pickup icons. Attach to the existing 20x20 button. */
+.collectible-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.collectible-icon--coin {
+  transform-origin: center;
+  animation: collectible-coin-spin 900ms steps(8, end) infinite;
+}
+
+@keyframes collectible-coin-spin {
+  0%, 100% { transform: scaleX(1); }
+  12.5% { transform: scaleX(.72); }
+  25% { transform: scaleX(.28); }
+  37.5% { transform: scaleX(.08); }
+  50% { transform: scaleX(.2); }
+  62.5% { transform: scaleX(.52); }
+  75% { transform: scaleX(.86); }
+  87.5% { transform: scaleX(.96); }
+}
+
+.collectible-icon--heart {
+  filter: drop-shadow(0 0 2px #ff2d87) drop-shadow(0 0 5px #ff2d87);
+  transform-origin: center;
+  animation: collectible-heart-glow 900ms ease-in-out infinite;
+}
+
+@keyframes collectible-heart-glow {
+  0%, 100% {
+    transform: scale(.96);
+    filter: drop-shadow(0 0 2px #ff2d87) drop-shadow(0 0 4px #ff2d87);
+  }
+  50% {
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 3px #ff82b3) drop-shadow(0 0 8px #ff2d87);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .collectible-icon--coin,
+  .collectible-icon--heart {
+    animation: none;
+  }
+}
