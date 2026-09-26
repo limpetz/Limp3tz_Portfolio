@@ -54,6 +54,20 @@ const SHEET_COMPENSATION: Record<MysteryBlockKey, number> = {
   status: 291 / 227,
 };
 
+/**
+ * Revealed-state brightness lift. The status sheet draws its label art much
+ * darker than the rest — revealed-row mean luminance ~67 vs ~104 for name —
+ * so its revealed block reads dim against the backdrop. A lift on the
+ * revealed state only keeps idle/bump exactly as authored while the label
+ * pops; location gets half strength (mean ~90).
+ */
+const REVEALED_BRIGHTNESS: Record<MysteryBlockKey, number> = {
+  name: 1,
+  role: 1,
+  location: 1.1,
+  status: 1.3,
+};
+
 interface MysteryBlockSpriteProps {
   blockKey: MysteryBlockKey;
   state: MysteryBlockVisualState;
@@ -68,19 +82,24 @@ interface MysteryBlockSpriteProps {
 export const MysteryBlockSprite: React.FC<MysteryBlockSpriteProps> = ({
   blockKey,
   state,
-}) => (
-  <span
-    aria-hidden="true"
-    className={`pixel-art absolute inset-0 block ${ANIM_CLASS[state]}`}
-    style={{
-      backgroundImage: `url(${BLOCK_SHEETS[blockKey]})`,
-      backgroundSize: '400% 300%',
-      backgroundPosition: STATIC_POSITION[state],
-      backgroundRepeat: 'no-repeat',
-      imageRendering: 'pixelated',
-      // Normalise the drawn block size across sheets (transform only, so the
-      // hitbox stays the button and neighbors never reflow).
-      transform: `scale(${SHEET_COMPENSATION[blockKey]})`,
-    }}
-  />
-);
+}) => {
+  const lift = REVEALED_BRIGHTNESS[blockKey];
+  return (
+    <span
+      aria-hidden="true"
+      className={`pixel-art absolute inset-0 block ${ANIM_CLASS[state]}`}
+      style={{
+        backgroundImage: `url(${BLOCK_SHEETS[blockKey]})`,
+        backgroundSize: '400% 300%',
+        backgroundPosition: STATIC_POSITION[state],
+        backgroundRepeat: 'no-repeat',
+        imageRendering: 'pixelated',
+        // Normalise the drawn block size across sheets and lift the darker
+        // revealed labels (transform + filter only, so the hitbox stays the
+        // button and neighbors never reflow).
+        transform: `scale(${SHEET_COMPENSATION[blockKey]})`,
+        filter: state === 'revealed' && lift !== 1 ? `brightness(${lift})` : undefined,
+      }}
+    />
+  );
+};
