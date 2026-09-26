@@ -47,6 +47,7 @@ hosted build on Google AI Studio.
 | `npm run clean` | Delete `dist/` |
 | `npm run playtest` | Drive the built site with headless Chrome and assert the walk/bounce animation (needs `vite preview` running) |
 | `npm run playtest:ci` | Same, with one automatic retry on failure — what CI runs |
+| `npm run playtest:slime` | Phone-width hazard playtest: patrol corridor, narrow body, facing eyes (pass a URL, or it defaults to `:4173`) |
 
 ## Controls
 
@@ -491,7 +492,9 @@ granted or implied by anything here.
 `.github/workflows/ci.yml` is **verify-only**. It runs on every push to `main`
 and every pull request, and shares the same gate the old deploy job used:
 `npm ci` → `npm run typecheck` → `npm test` → `node scripts/check-gait.mjs` →
-`npm run build` → the headless playtest against `vite preview`.
+`npm run build` → the headless playtest against `vite preview` → the
+phone-width slime playtest against a second preview (hazards ON: narrow body,
+patrol corridor, facing eyes).
 
 It publishes nothing. Pushing to `main` just updates the source and runs the
 checks — the repo is the source of truth, not a host.

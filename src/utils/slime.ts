@@ -373,7 +373,18 @@ export function slimeRoster(stageWidth: number, safeZone: SafeZoneBounds): Slime
 export const STOMP_CHAIN_BASE = 350;
 /** Points each further link adds over the previous one. */
 export const STOMP_CHAIN_STEP = 150;
-/** Longest rewarded chain; later stomps in one flight keep this link's value. */
+/**
+ * Longest rewarded chain; later stomps in one flight keep this link's value.
+ *
+ * Tuning note (checked against the stage physics, final): a stomp relaunches
+ * the player at 880 px/s from about the slime's 48px top, so each link costs
+ * ~0.9s of flight while the arc drifts at the player's air speed — linking is
+ * about steering to the next patrolling slime. Two to four links is a normal
+ * skilled flight; x8 demands every one of the four hazards lined up under the
+ * arc, so the cap is a safety ceiling against degenerate multi-hits, not a
+ * limit anyone regularly feels. Revisit only if players start seeing x8
+ * shouts routinely; the fix would be a higher cap, not a smaller step.
+ */
 export const STOMP_CHAIN_MAX = 8;
 
 /**

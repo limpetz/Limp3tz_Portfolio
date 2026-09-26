@@ -1475,6 +1475,19 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               const chain = stompChainRef.current;
               onAddScore(stompChainScore(chain));
               particleSys.current.triggerLandingDust(nextX + m.width / 2, stageH - mBottom);
+              // Big combos celebrate: from link 3 the dying slime bursts coins
+              // and adds a coin chime, so a loud chain reads louder than the
+              // shout alone. The sparkle carries no floating score — the chain
+              // shout already announces the number.
+              if (chain >= 3) {
+                sound.playCoin();
+                particleSys.current.triggerCoinSparkle(
+                  nextX + m.width / 2,
+                  stageH - mBottom - m.height,
+                  12 + chain * 4,
+                  false,
+                );
+              }
               say(stompChainLabel(chain), 1600);
 
               // Stagger (Hit) first; the loop transitions it into Die.

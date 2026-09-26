@@ -45,3 +45,13 @@ jobs:
           npx vite preview --port 4173 --strictPort &
           sleep 3
           npm run playtest:ci
+
+      # Same served build, hazards ON, at phone width: asserts the narrow
+      # 32x34 slime body, a real patrol corridor, and renderer-drawn eyes
+      # that track the patrol. Fresh preview on its own port (steps don't
+      # share background processes); one retry, like the walk playtest.
+      - name: Slime playtest (phone width, retry once)
+        run: |
+          npx vite preview --port 4174 --strictPort &
+          sleep 3
+          npm run playtest:slime http://localhost:4174/ || (sleep 2 && npm run playtest:slime http://localhost:4174/)
