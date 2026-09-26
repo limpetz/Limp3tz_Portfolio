@@ -55,6 +55,7 @@ import bumpBlocksImg from '../assets/images/bump-blocks.webp';
 import clickMeImg from '../assets/images/click-me.webp';
 import { PixelHeart } from './PixelHeart';
 import { SlimeMonster } from './SlimeMonster';
+import { MysteryBlockSprite, type MysteryBlockKey } from './MysteryBlockSprite';
 import {
   type SlimeColor,
   type SlimeSide,
@@ -1917,16 +1918,8 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                 openBlock(block.key, bLeft);
               }}
               data-block-key={block.key}
-              className={`${savedDx ? 'absolute' : 'relative'} w-12 h-12 sm:w-14 sm:h-14 font-pixel transition-all cursor-pointer select-none border-2 flex items-center justify-center ${
-                isBumped
-                  ? 'animate-mystery-bump z-40'
-                  : isUsed
-                  ? 'animate-mystery-revealed'
-                  : 'animate-mystery-idle'
-              } ${
-                isUsed
-                  ? 'bg-[#0c0a18] border-[#241c42] text-[#7d7aa3] shadow-[0_4px_10px_rgba(0,0,0,0.6)]'
-                  : 'bg-[#0a0817] border-[#00e5ff] text-[#ff2d78] shadow-[0_0_12px_rgba(0,229,255,0.4),inset_0_0_10px_rgba(0,229,255,0.2)] hover:bg-[#0d1b2e]'
+              className={`${savedDx ? 'absolute' : 'relative'} w-12 h-12 sm:w-14 sm:h-14 transition-all cursor-pointer select-none ${
+                isBumped ? 'z-40' : ''
               } ${isHinted ? 'ring-2 ring-[#ffd23f] shadow-[0_0_20px_rgba(255,210,63,0.85)]' : ''}`}
               style={{
                 ...(!isBumped && !isUsed ? { animationDelay: `${idx * 0.28}s` } : {}),
@@ -1962,39 +1955,15 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               }
               aria-label={`Mystery Block: ${block.title}`}
             >
-              {/* Corner screws */}
-              <span className="absolute top-1 left-1 w-1 h-1 bg-current opacity-70" />
-              <span className="absolute top-1 right-1 w-1 h-1 bg-current opacity-70" />
-              <span className="absolute bottom-1 left-1 w-1 h-1 bg-current opacity-70" />
-              <span className="absolute bottom-1 right-1 w-1 h-1 bg-current opacity-70" />
-
-              {/* Block Content: Animated '?' when idle, Asset image or label when revealed */}
-              {isUsed ? (
-                block.image ? (
-                  <img
-                    src={block.image}
-                    alt={block.label}
-                    className="w-8 h-8 sm:w-10 sm:h-10 object-contain pixel-art drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)] animate-mystery-item"
-                  />
-                ) : (
-                  <span
-                    className={`font-pixel font-bold tracking-tight uppercase leading-none block px-0.5 text-center animate-mystery-item ${
-                      block.label.length >= 8
-                        ? 'text-[6.5px] sm:text-[7.5px]'
-                        : block.label.length >= 6
-                        ? 'text-[7.5px] sm:text-[8.5px]'
-                        : 'text-[9px] sm:text-[10px]'
-                    }`}
-                    style={{ color: block.color }}
-                  >
-                    {block.label}
-                  </span>
-                )
-              ) : (
-                <span className="font-pixel text-xl sm:text-2xl animate-mystery-question inline-block">
-                  ?
-                </span>
-              )}
+              {/* Block art: idle ?, bump pose or revealed label — the whole
+                  block lives on its sheet; the button only adds hitbox, hint
+                  glow and drag. Bump outranks revealed: openBlock sets both
+                  flags at once (the bump pose must play over the fresh
+                  reveal before the label settles). */}
+              <MysteryBlockSprite
+                blockKey={block.key as MysteryBlockKey}
+                state={isBumped ? 'bump' : isUsed ? 'revealed' : 'idle'}
+              />
 
               {/* Arrange Mode Nudge Controls */}
               {arrangeMode && (

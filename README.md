@@ -241,6 +241,7 @@ src/
   components/
     ArcadeStage.tsx       # The playable stage: physics loop, blocks, slideshow
     SlimeMonster.tsx      # 1448×1086 / 4×3 slime-sheet hazard renderer
+    MysteryBlockSprite.tsx # 4×3 block-sheet sprite (idle / bump / revealed rows)
     Hud.tsx               # Score / coin header
     BootScreen.tsx        # Retro boot sequence
     CharacterSheet.tsx    # Character stats panel
@@ -367,6 +368,21 @@ Measure live with `node scripts/cadence-probe.mjs [url]`.
 
 Quality 82 is deliberate for the backgrounds — they're neon gradients that band
 badly below ~75. Once you're happy, the `.originals/` folders can be deleted.
+
+### Block sprite sheets
+
+The four mystery blocks each draw from their own 1448×1086 sheet
+(`Identifier_Name_block.png`, `class_role_block.png`, `base-location_block.png`,
+`status_block.png`) laid out as a **4×3 grid of 362px frames** — row 0 idle,
+row 1 bump, row 2 revealed (the NAME / ROLE / LOCATION / STATUS label art).
+`MysteryBlockSprite.tsx` renders the sheet with the CSS-sprite grid
+(`background-size: 400% 300%`): x positions `0/33.33/66.67/100%` pick columns,
+y positions `0/50/100%` pick the row. Idle steps through the top row, bump
+plays the middle row once (0.38s) over the fresh reveal, and the revealed label
+holds frame 0 of the bottom row. The sheet carries the whole block art —
+rivets, `?`, bump pose and label — so the button behind it only supplies the
+hitbox, hint glow and drag; under `prefers-reduced-motion` the sprite freezes
+on each state's first frame.
 
 ### Stage sprite pack
 
