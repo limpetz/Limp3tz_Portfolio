@@ -58,7 +58,7 @@ export const BootScreen: React.FC<BootScreenProps> = ({ onStart }) => {
         </p>
 
         {/* Build badge: version · date · sha. Comparing this against the latest
-            commit on main makes a stale Pages deploy obvious at a glance. */}
+            commit on main makes a stale build obvious at a glance. */}
         <p className="font-pixel text-[8px] text-[#7d7aa3]/50 pt-1 tracking-wider">
           BUILD {BUILD_LABEL} · {__BUILD_SHA__.toUpperCase()}
         </p>

@@ -33,9 +33,9 @@ export default defineConfig(() => {
       __BUILD_SHA__: JSON.stringify(buildSha),
       __BUILD_DATE__: JSON.stringify(buildDate),
     },
-    // GitHub Pages serves this repo from a project sub-path. Dev mirrors it so
-    // base-path mistakes surface locally instead of only after deploying.
-    base: '/Limp3tz_Portfolio/',
+    // Hosted at the origin root (localhost dev, AI Studio). A '/' base keeps
+    // every asset URL root-relative so the same build works in both places.
+    base: '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

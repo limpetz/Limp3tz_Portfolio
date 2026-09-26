@@ -54,21 +54,24 @@ import jumpControlsImg from '../assets/images/jump.webp';
 import bumpBlocksImg from '../assets/images/bump-blocks.webp';
 import clickMeImg from '../assets/images/click-me.webp';
 import { PixelHeart } from './PixelHeart';
-import { MushroomMonster } from './MushroomMonster';
+import { SlimeMonster } from './SlimeMonster';
 import {
-  type MushroomState,
-  MUSHROOM_ATTACK_RANGE,
-  MUSHROOM_IDLE_SECONDS,
-  MUSHROOM_RESPAWN_MS,
-  MUSHROOM_SPEED,
-  MUSHROOM_STATE_SECONDS,
+  type SlimeColor,
+  type SlimeSide,
+  type SlimeSlot,
+  type SlimeState,
+  SLIME_ATTACK_RANGE,
+  SLIME_IDLE_SECONDS,
+  SLIME_RESPAWN_MS,
+  SLIME_STATE_SECONDS,
   SPAWN_GRACE_MS,
-  mushroomFrameIndex,
-  mushroomSpawn,
   playerSpawnX,
-  resolveMushroomMotion,
+  resolveSlimeMotion,
   safeZoneBounds,
-} from '../utils/mushroom';
+  slimeFrameIndex,
+  slimeRoster,
+  slimeSpawn,
+} from '../utils/slime';
 
 interface ArcadeStageProps {
   onAddScore: (amount: number) => void;
@@ -94,19 +97,42 @@ interface FallingHeart {
   vy: number;
 }
 
-interface MushroomHazard {
+interface SlimeHazard {
   id: number;
   x: number;
   y: number;
   vx: number;
   facing: 1 | -1;
-  state: MushroomState;
+  state: SlimeState;
   frameIndex: number;
   animTimer: number;
   /** Seconds spent in the current animation state — drives state transitions. */
   stateTimer: number;
   width: number;
   height: number;
+  color: SlimeColor;
+  side: SlimeSide;
+  slot: SlimeSlot;
+}
+
+/** Placeholder layout used before the stage has been measured; the sizing
+ *  effect immediately repositions every slime from the real stage width. */
+const PLACEHOLDER_SAFE_ZONE = { min: 300, max: 580 };
+
+/** The four medium slimes — 2 launched from each wall, one colour per slot. */
+function initialSlimeRoster(): SlimeHazard[] {
+  return slimeRoster(1000, PLACEHOLDER_SAFE_ZONE).map((spawn, i) => ({ id: i + 1, ...spawn }));
+}
+
+/**
+ * Automation hook. `scripts/playtest.mjs` sets `window.__ARCADE_NO_HAZARDS__`
+ * before load so its walk/jump timing assertions can't be perturbed by a slime
+ * knocking the character around (a hit also bounces the player, which would
+ * read as a stomp and show jump frames mid-walk). There is no UI or URL surface
+ * — only an injected script can set it.
+ */
+function hazardsSuppressed(): boolean {
+  return typeof window !== 'undefined' && window.__ARCADE_NO_HAZARDS__ === true;
 }
 
 export const ArcadeStage: React.FC<ArcadeStageProps> = ({
@@ -151,15 +177,13 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   const [fallingHearts, setFallingHearts] = useState<FallingHeart[]>([]);
   const fallingHeartsRef = useRef<FallingHeart[]>([]);
 
-  // Mushroom Hazards replacing old drone/bug. The x here is only a placeholder
-  // that can't overlap the default spawn; the sizing effect repositions every
-  // monster from the real camera width and safe zone once layout exists.
-  const [mushrooms, setMushrooms] = useState<MushroomHazard[]>([
-    { id: 1, ...mushroomSpawn(1000, 340) },
-  ]);
-  const mushroomsRef = useRef<MushroomHazard[]>([
-    { id: 1, ...mushroomSpawn(1000, 340) },
-  ]);
+  // Slime Hazards: four medium slimes, two pinned to each wall. The placeholder
+  // positions can't overlap the default spawn; the sizing effect repositions
+  // every slime from the real stage width and safe zone once layout exists.
+  const [slimes, setSlimes] = useState<SlimeHazard[]>(() => initialSlimeRoster());
+  const slimesRef = useRef<SlimeHazard[]>(initialSlimeRoster());
+  /** Latched once per mount; only the headless playtest ever sets this. */
+  const noHazards = useRef(hazardsSuppressed()).current;
 
   const [invulnerable, setInvulnerable] = useState(false);
   const invulnerableRef = useRef(false);
@@ -167,7 +191,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
   // Pending respawn timers, tracked so they can be cleared on unmount instead
   // of firing setState into a dead component.
-  const mushroomRespawnTimeoutsRef = useRef<number[]>([]);
+  const slimeRespawnTimeoutsRef = useRef<number[]>([]);
   // Contact damage is suppressed until this timestamp, so a hazard can't hit
   // the player during startup (and behind the boot screen).
   const spawnGraceUntilRef = useRef(0);
@@ -1331,9 +1355,9 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         setFallingHearts(remainingHearts);
       }
 
-      // Update Mushroom Hazards & collision detection (hazard damage or jump stomp)
-      const currentMushrooms = mushroomsRef.current;
-      if (currentMushrooms.length > 0) {
+      // Update Slime Hazards & collision detection (hazard damage or jump stomp)
+      const currentSlimes = slimesRef.current;
+      if (currentSlimes.length > 0 && !noHazards) {
         const stageW = stateRef.current.stageWidth || 1000;
         const actorLeft = stateRef.current.x + 12;
         const actorRight = stateRef.current.x + stateRef.current.actorWidth - 12;
@@ -1348,19 +1372,19 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         const playerInSafeZone = playerCenter >= zoneMin - 8 && playerCenter <= zoneMax + 8;
         const spawnGrace = performance.now() < spawnGraceUntilRef.current;
 
-        const nextMushrooms: MushroomHazard[] = [];
+        const nextSlimes: SlimeHazard[] = [];
 
-        for (let i = 0; i < currentMushrooms.length; i++) {
-          const m = currentMushrooms[i];
+        for (let i = 0; i < currentSlimes.length; i++) {
+          const m = currentSlimes[i];
           const stateTimer = m.stateTimer + dt;
 
           // --- Death: play the sheet out, then despawn ------------------
           if (m.state === 'die') {
-            if (stateTimer < MUSHROOM_STATE_SECONDS.die) {
-              nextMushrooms.push({
+            if (stateTimer < SLIME_STATE_SECONDS.die) {
+              nextSlimes.push({
                 ...m,
                 stateTimer,
-                frameIndex: mushroomFrameIndex('die', stateTimer),
+                frameIndex: slimeFrameIndex('die', stateTimer),
               });
             }
             continue;
@@ -1368,44 +1392,44 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
           // --- Hit stagger: a stomp plays Hit before falling into Die ----
           if (m.state === 'hit') {
-            if (stateTimer >= MUSHROOM_STATE_SECONDS.hit) {
-              nextMushrooms.push({ ...m, state: 'die', stateTimer: 0, frameIndex: 0 });
+            if (stateTimer >= SLIME_STATE_SECONDS.hit) {
+              nextSlimes.push({ ...m, state: 'die', stateTimer: 0, frameIndex: 0 });
             } else {
-              nextMushrooms.push({
+              nextSlimes.push({
                 ...m,
                 stateTimer,
-                frameIndex: mushroomFrameIndex('hit', stateTimer),
+                frameIndex: slimeFrameIndex('hit', stateTimer),
               });
             }
             continue;
           }
 
           // --- Spawn beat: idle for a moment, then start patrolling ------
-          if (m.state === 'idle' && stateTimer < MUSHROOM_IDLE_SECONDS) {
-            nextMushrooms.push({
+          if (m.state === 'idle' && stateTimer < SLIME_IDLE_SECONDS) {
+            nextSlimes.push({
               ...m,
               stateTimer,
-              frameIndex: mushroomFrameIndex('idle', stateTimer),
+              frameIndex: slimeFrameIndex('idle', stateTimer),
             });
             continue;
           }
 
           // `idle` falls through here once its beat elapses; the patrol starts
           // fresh from frame 0 instead of inheriting the idle clock.
-          let nextState: MushroomState = 'run';
+          let nextState: SlimeState = 'run';
           let nextStateTimer = m.state === 'idle' ? 0 : stateTimer;
 
           // Advance + resolve safe-zone repulsion and wall bounces as one
           // tested step; `facing` always follows the resolved velocity, so the
-          // sprite can't face one way while the monster moves the other.
-          const motion = resolveMushroomMotion({
+          // patrol direction and the attack telegraph can never disagree.
+          const motion = resolveSlimeMotion({
             x: m.x,
             vx: m.vx,
             width: m.width,
             dt,
             stageWidth: stageW,
             safeZone: { min: zoneMin, max: zoneMax },
-            speed: MUSHROOM_SPEED,
+            speed: Math.abs(m.vx),
           });
           const nextX = motion.x;
           const nextVx = motion.vx;
@@ -1417,7 +1441,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           const monsterCenter = nextX + m.width / 2;
           const dxPlayer = playerCenter - monsterCenter;
           const inAttackRange =
-            Math.abs(dxPlayer) <= MUSHROOM_ATTACK_RANGE &&
+            Math.abs(dxPlayer) <= SLIME_ATTACK_RANGE &&
             Math.sign(dxPlayer) === facing &&
             Math.abs(stateRef.current.y) < 140;
           if (inAttackRange) {
@@ -1434,18 +1458,18 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           const overlapsY = actorBottom <= mTop + 14 && actorTop >= mBottom;
 
           if (overlapsX && overlapsY) {
-            // Player stomped mushroom from above while falling down
+            // Player stomped a slime from above while falling down
             if (stateRef.current.vy < -40 && actorBottom >= mTop - 24) {
               sound.playBump();
               sound.playPower();
-              stateRef.current.vy = 880; // High bounce upward off mushroom stomp
+              stateRef.current.vy = 880; // High bounce upward off slime stomp
               stateRef.current.grounded = false;
               onAddScore(350);
               particleSys.current.triggerLandingDust(nextX + m.width / 2, stageH - mBottom);
-              say('MUSHROOM STOMPED! +350 PTS!', 1600);
+              say('SLIME STOMPED! +350 PTS!', 1600);
 
               // Stagger (Hit) first; the loop transitions it into Die.
-              nextMushrooms.push({
+              nextSlimes.push({
                 ...m,
                 x: nextX,
                 vx: nextVx,
@@ -1456,22 +1480,28 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                 stateTimer: 0,
               });
 
-              // Respawn a fresh monster clear of the safe zone after a delay.
+              // Respawn a fresh slime on the same side, clear of the zone.
               const timeoutId = window.setTimeout(() => {
-                const spawn = mushroomSpawn(
-                  stateRef.current.stageWidth || 1000,
-                  stateRef.current.safeZoneMax,
-                );
-                mushroomsRef.current = [
-                  ...mushroomsRef.current,
+                const spawn = slimeSpawn({
+                  side: m.side,
+                  slot: m.slot,
+                  color: m.color,
+                  stageWidth: stateRef.current.stageWidth || 1000,
+                  safeZone: {
+                    min: stateRef.current.safeZoneMin,
+                    max: stateRef.current.safeZoneMax,
+                  },
+                });
+                slimesRef.current = [
+                  ...slimesRef.current,
                   { id: Date.now() + Math.random(), ...spawn },
                 ];
-                setMushrooms(mushroomsRef.current);
-              }, MUSHROOM_RESPAWN_MS);
-              mushroomRespawnTimeoutsRef.current.push(timeoutId);
+                setSlimes(slimesRef.current);
+              }, SLIME_RESPAWN_MS);
+              slimeRespawnTimeoutsRef.current.push(timeoutId);
               continue;
             } else if (!invulnerableRef.current && !playerInSafeZone && !spawnGrace) {
-              // Player contact damage from mushroom
+              // Player contact damage from a slime
               if (onTakeDamage) {
                 onTakeDamage(1);
               }
@@ -1480,7 +1510,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               stateRef.current.vx = nextVx > 0 ? 200 : -200; // Knocks back player
               stateRef.current.vy = 360;
               stateRef.current.grounded = false;
-              say('OUCH! MUSHROOM MONSTER!', 1800);
+              say('OUCH! SLIME ATTACK!', 1800);
               window.setTimeout(() => {
                 invulnerableRef.current = false;
                 setInvulnerable(false);
@@ -1488,20 +1518,20 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             }
           }
 
-          nextMushrooms.push({
+          nextSlimes.push({
             ...m,
             x: nextX,
             vx: nextVx,
             facing,
             state: nextState,
             stateTimer: nextStateTimer,
-            frameIndex: mushroomFrameIndex(nextState, nextStateTimer),
+            frameIndex: slimeFrameIndex(nextState, nextStateTimer),
             animTimer: m.animTimer + dt,
           });
         }
 
-        mushroomsRef.current = nextMushrooms;
-        setMushrooms(nextMushrooms);
+        slimesRef.current = nextSlimes;
+        setSlimes(nextSlimes);
       }
 
       // Update and render canvas particles
@@ -1520,19 +1550,30 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   useEffect(() => {
     applyStageLayout(true);
 
-    const { stageWidth, safeZoneMax } = stateRef.current;
-    mushroomsRef.current = mushroomsRef.current.map((m) =>
-      m.state === 'die' ? m : { id: m.id, ...mushroomSpawn(stageWidth, safeZoneMax) },
+    const { stageWidth, safeZoneMin, safeZoneMax } = stateRef.current;
+    slimesRef.current = slimesRef.current.map((m) =>
+      m.state === 'die'
+        ? m
+        : {
+            id: m.id,
+            ...slimeSpawn({
+              side: m.side,
+              slot: m.slot,
+              color: m.color,
+              stageWidth,
+              safeZone: { min: safeZoneMin, max: safeZoneMax },
+            }),
+          },
     );
-    setMushrooms(mushroomsRef.current);
+    setSlimes(slimesRef.current);
 
     spawnGraceUntilRef.current = performance.now() + SPAWN_GRACE_MS;
   }, [applyStageLayout]);
 
-  // Clear any pending mushroom respawns on unmount so their timers can't fire
+  // Clear any pending slime respawns on unmount so their timers can't fire
   // setState into a torn-down component.
   useEffect(() => {
-    const pending = mushroomRespawnTimeoutsRef.current;
+    const pending = slimeRespawnTimeoutsRef.current;
     return () => {
       pending.forEach((id) => clearTimeout(id));
       pending.length = 0;
@@ -2023,15 +2064,16 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         </button>
       ))}
 
-      {/* Mushroom Monster Hazards */}
-      {mushrooms.map((m) => (
-        <MushroomMonster
-          key={m.id}
-          x={m.x}
-          y={GROUND_H + m.y}
-          facing={m.facing}
-          state={m.state}
-          frameIndex={m.frameIndex}
+      {/* Slime Hazards — two patrolling each side of the stage. Suppressed
+          under the automation hook so the playtest can measure the walk. */}
+      {!noHazards && slimes.map((s) => (
+        <SlimeMonster
+          key={s.id}
+          x={s.x}
+          y={GROUND_H + s.y}
+          color={s.color}
+          state={s.state}
+          frameIndex={s.frameIndex}
         />
       ))}
 
@@ -2063,9 +2105,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       )}
 
       {/* Safe-zone floor panel: a neon strip on the ground directly under the
-          player's spawn, labelled so the safe area is discoverable. Purely
-          decorative — the immunity itself is enforced by the hazard loop. It
-          sits above the backdrop but below the actor, shadows and hazards. */}
+          player's spawn, labelled with glowing text so the safe area is
+          discoverable. Purely decorative — the immunity itself is enforced by
+          the hazard loop. It sits above the backdrop but below the actor,
+          shadows and hazards. */}
       <div
         aria-hidden="true"
         className="absolute z-[5] pointer-events-none"
@@ -2080,9 +2123,29 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         <div className="absolute inset-0 bg-gradient-to-b from-[#3dffa2]/20 via-[#3dffa2]/5 to-transparent" />
         <div className="absolute left-0 top-0 bottom-0 w-px bg-[#3dffa2]/50" />
         <div className="absolute right-0 top-0 bottom-0 w-px bg-[#3dffa2]/50" />
-        <span className="absolute inset-x-0 bottom-1.5 text-center font-pixel text-[7px] sm:text-[8px] tracking-[0.25em] text-[#3dffa2] drop-shadow-[0_0_6px_rgba(61,255,162,0.8)] animate-safe-zone">
-          SAFE ZONE
-        </span>
+        {/* Centred badge sitting in the ground band under the feet: a shield
+            emblem above the label, both breathing as one indicator. */}
+        <div className="absolute inset-x-0 bottom-2 flex flex-col items-center gap-1 animate-safe-zone">
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            fill="none"
+            stroke="#3dffa2"
+            strokeWidth={1.75}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-6 w-6 sm:h-7 sm:w-7 drop-shadow-[0_0_6px_rgba(61,255,162,0.9)]"
+          >
+            <path
+              d="M12 2.5 4.5 5.6v6.1c0 4.5 3.2 8.3 7.5 9.4 4.3-1.1 7.5-4.9 7.5-9.4V5.6L12 2.5Z"
+              fill="rgba(61,255,162,0.12)"
+            />
+            <path d="m8.6 11.9 2.5 2.5 4.3-4.8" />
+          </svg>
+          <span className="font-pixel text-[7px] sm:text-[10px] tracking-[0.1em] sm:tracking-[0.3em] text-[#3dffa2] [text-shadow:0_0_6px_rgba(61,255,162,0.95),0_0_16px_rgba(61,255,162,0.75),0_0_30px_rgba(61,255,162,0.45)]">
+            SAFE ZONE HERE
+          </span>
+        </div>
       </div>
 
       {/* Actor Shadow on Ground — feathered so it reads as light falloff instead

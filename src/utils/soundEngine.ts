@@ -16,8 +16,8 @@ class RetroSoundEngine {
   private getBgm(): HTMLAudioElement | null {
     if (typeof window === 'undefined') return null;
     if (!this.bgmAudio) {
-      // BASE_URL keeps this working when the site is served from a sub-path
-      // (e.g. GitHub Pages project sites).
+      // BASE_URL resolves the public folder against whatever base Vite is
+      // built with (root '/' in dev and on AI Studio).
       this.bgmAudio = new Audio(`${import.meta.env.BASE_URL}background_music.mp3?v=2`);
       this.bgmAudio.loop = true;
       this.bgmAudio.volume = 0.55;

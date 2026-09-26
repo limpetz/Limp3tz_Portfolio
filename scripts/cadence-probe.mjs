@@ -7,11 +7,11 @@
  * (~59-73px between the two feet at the footfall poses).
  *
  * Usage: CHROME_PATH=... node scripts/cadence-probe.mjs [url]
- * Defaults to the live GitHub Pages deployment.
+ * Defaults to the local vite preview build (run `npm run build` first).
  */
 import puppeteer from 'puppeteer-core';
 
-const URL = process.argv[2] || 'https://limpetz.github.io/Limp3tz_Portfolio/';
+const URL = process.argv[2] || 'http://localhost:4173/';
 const CHROME = process.env.CHROME_PATH || '/usr/bin/google-chrome';
 const SEL = '[aria-label="Pixel character of Arshad Mohemed"]';
 const BOOT = '[aria-label="Press start to enter the portfolio"]';

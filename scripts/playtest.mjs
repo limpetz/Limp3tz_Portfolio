@@ -7,8 +7,8 @@
  * browser, so the workflows run it after the build gate.
  *
  * Usage: node scripts/playtest.mjs [url]
- *   url defaults to http://localhost:4173/Limp3tz_Portfolio/ (vite preview,
- *   started by the caller). Timing assertions use generous headless margins;
+ *   url defaults to http://localhost:4173/ (vite preview, started by the
+ *   caller). Timing assertions use generous headless margins;
  *   they guard against regressions (pose sequences, cadence parity), not exact
  *   frame timings.
  *
@@ -23,12 +23,16 @@
  *   - Turn poses (3D turn sheet) play row-0 frames for BOTH directions while
  *     the sprite is rotating. Walk parity checks must therefore ignore row-0
  *     frames entirely when validating the left walk row.
+ *   - Mob hazards are disabled for this run: the page is loaded with
+ *     `window.__ARCADE_NO_HAZARDS__ = true`. A slime hit knocks the player back
+ *     and launches them, which then reads as a stomp — so without this the
+ *     stage shows jump frames during a walk-only measurement.
  *
  * Exit code 0 = all assertions passed; nonzero = the site's animation regressed.
  */
 import puppeteer from 'puppeteer-core';
 
-const URL = process.argv[2] || 'http://localhost:4173/Limp3tz_Portfolio/';
+const URL = process.argv[2] || 'http://localhost:4173/';
 const CHROME = process.env.CHROME_PATH || '/usr/bin/google-chrome';
 const SEL = '[aria-label="Pixel character of Arshad Mohemed"]';
 const BOOT = '[aria-label="Press start to enter the portfolio"]';
@@ -52,6 +56,10 @@ const browser = await puppeteer.launch({
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1400, height: 900 });
+  // Keep the animation measurements free of mob contact; see the notes above.
+  await page.evaluateOnNewDocument(() => {
+    window.__ARCADE_NO_HAZARDS__ = true;
+  });
   await page.goto(URL, { waitUntil: 'networkidle2', timeout: 60000 });
   await page.waitForSelector(BOOT, { timeout: 20000 });
   await page.click(BOOT);

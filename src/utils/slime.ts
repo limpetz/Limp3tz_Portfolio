@@ -1,0 +1,301 @@
+/**
+ * Pure Slime hazard logic for the arcade stage.
+ *
+ * Everything that decides *where* a hazard may be and *which frame* it should
+ * show lives here, so the rules can be unit tested without a DOM, a canvas or a
+ * running animation loop. `ArcadeStage.tsx` imports these and only supplies the
+ * per-frame state.
+ *
+ * Two invariants the stage depends on:
+ *
+ * 1. A slime can never end a tick overlapping the safe zone — the repulsion
+ *    resolves it to whichever side of the zone its body came from.
+ * 2. `facing` is always derived from the resolved velocity, never carried over,
+ *    so the patrol always reads direction-consistent (the medium slimes are
+ *    symmetric blobs and don't mirror, but the attack telegraph does use it).
+ *
+ * The safe zone and the stage walls are separate rules; both are clamped
+ * against each other so they can never shove a slime back and forth (which
+ * trapped monsters in a "vibrating" loop on phone-width stages).
+ *
+ * Four slimes patrol the stage — two launched from the left wall and two from
+ * the right — so the spawn helpers are side-aware. See `SLIME_ROSTER`.
+ */
+
+export type SlimeState = 'run' | 'idle' | 'hit' | 'die' | 'attack';
+export type SlimeColor = 'blue' | 'green' | 'red' | 'white';
+export type SlimeSide = 'left' | 'right';
+export type SlimeSlot = 0 | 1;
+
+/** Gameplay (collision-box) size — matches the retired mushroom hazard. */
+export const SLIME_WIDTH = 44;
+export const SLIME_HEIGHT = 48;
+export const SLIME_SPEED = 60;
+export const SLIME_WALL_MARGIN = 24;
+export const SLIME_IDLE_SECONDS = 0.7; // "notice you" pause after spawning
+export const SLIME_ATTACK_RANGE = 130; // px the player must be within to telegraph
+export const SLIME_RESPAWN_MS = 5000;
+export const SPAWN_GRACE_MS = 2000; // no contact damage before the player has control
+
+/** The collision-box width the actor's spawn and safe zone are centred on. */
+export const ACTOR_WIDTH = 72;
+
+/**
+ * Sheet geometry. Every `Slime_Medium_*.png` is a single 128x128 sheet holding a
+ * 4x4 grid of 32x32 frames. Rows 2 and 3 repeat rows 0 and 1 with only a few
+ * shine pixels changed, so the two usable cycles live on:
+ *
+ *   row 0 — idle: a tall, gentle pulse
+ *   row 1 — move: a flatter hop/squash
+ *
+ * The art is a symmetric blob with no eyes, so there is no facing row and the
+ * renderer never mirrors it.
+ */
+export const SLIME_CELL = 32;
+export const SLIME_SHEET_COLS = 4;
+export const SLIME_SHEET_ROWS = 4;
+
+export interface SlimeAnim {
+  /** Sheet row the cycle lives on. */
+  row: number;
+  /** First column of the cycle within that row. */
+  start: number;
+  /** Number of frames in the cycle. */
+  frames: number;
+  fps: number;
+  loop: boolean;
+}
+
+/**
+ * Per-state playback for the medium-slime sheets. The mob keeps all five states;
+ * because a slime ships only an idle and a move cycle, the combat states reuse
+ * those frames:
+ *
+ * - `idle`   → the idle pulse.
+ * - `run`    → the hop cycle.
+ * - `attack` → the hop cycle at 2x, then it clamps on the deepest lunge pose.
+ * - `hit`    → the single flattest (most squashed) frame, held as a stagger.
+ * - `die`    → the hop cycle played fast, then held collapsed.
+ */
+export const SLIME_ANIM: Record<SlimeState, SlimeAnim> = {
+  idle: { row: 0, start: 0, frames: 4, fps: 6, loop: true },
+  run: { row: 1, start: 0, frames: 4, fps: 8, loop: true },
+  attack: { row: 1, start: 0, frames: 4, fps: 16, loop: false },
+  hit: { row: 1, start: 2, frames: 1, fps: 12, loop: false },
+  die: { row: 1, start: 0, frames: 4, fps: 18, loop: false },
+};
+
+/** How long each one-shot state lasts, in seconds; looping states never expire. */
+export const SLIME_STATE_SECONDS: Record<SlimeState, number> = {
+  run: Infinity,
+  idle: Infinity,
+  attack: SLIME_ANIM.attack.frames / SLIME_ANIM.attack.fps,
+  hit: 0.3,
+  die: 1.2,
+};
+
+/**
+ * Flat cell index (row * COLS + col) for a state at `timer` seconds — loops, or
+ * clamps on the final frame for one-shots.
+ */
+export function slimeFrameIndex(state: SlimeState, timer: number): number {
+  const anim = SLIME_ANIM[state];
+  const raw = Math.floor(timer * anim.fps);
+  const idx = anim.loop ? raw % anim.frames : Math.min(anim.frames - 1, raw);
+  return anim.row * SLIME_SHEET_COLS + (anim.start + idx);
+}
+
+/** Split a flat cell index back into sheet row / column for the renderer. */
+export function slimeFrameCell(frameIndex: number): { row: number; col: number } {
+  const safe = Math.max(0, Math.floor(frameIndex));
+  return { row: Math.floor(safe / SLIME_SHEET_COLS), col: safe % SLIME_SHEET_COLS };
+}
+
+export interface SafeZoneBounds {
+  min: number;
+  max: number;
+}
+
+/** Actor spawn x for a stage width, mirroring the stage's layout rule. */
+export function playerSpawnX(stageWidth: number): number {
+  return Math.max(20, stageWidth / 2 - 60);
+}
+
+/**
+ * Safe zone for a given spawn, clamped inside the stage walls.
+ *
+ * The half-width scales with the stage but is capped, and `max` can never pass
+ * the wall the actor itself is clamped to (`stageWidth - actorWidth - 12`), so
+ * a slime bouncing off the right wall can't be pushed back into the zone.
+ */
+export function safeZoneBounds(
+  spawnX: number,
+  stageWidth: number,
+  actorWidth: number = ACTOR_WIDTH,
+): SafeZoneBounds {
+  const half = Math.min(140, Math.max(60, stageWidth * 0.2));
+  const wallRight = stageWidth - actorWidth - 12;
+  const min = Math.max(12, spawnX - half);
+  const max = Math.min(wallRight, Math.max(min + 40, spawnX + half));
+  return { min, max };
+}
+
+export interface SlimeMotion {
+  x: number;
+  vx: number;
+  facing: 1 | -1;
+}
+
+/**
+ * Resolve one tick of a patrolling slime: advance by `vx * dt`, repel it out of
+ * the safe zone, then bounce off the stage walls. Facing follows the final
+ * velocity.
+ */
+export function resolveSlimeMotion(params: {
+  x: number;
+  vx: number;
+  width: number;
+  dt: number;
+  stageWidth: number;
+  safeZone: SafeZoneBounds;
+  wallMargin?: number;
+  speed?: number;
+}): SlimeMotion {
+  const { width, dt, stageWidth, safeZone } = params;
+  const wallMargin = params.wallMargin ?? SLIME_WALL_MARGIN;
+  const speed = params.speed ?? SLIME_SPEED;
+
+  let x = params.x + params.vx * dt;
+  let vx = params.vx;
+
+  // Safe-zone repulsion: push the whole body out before it can enter. Exit
+  // toward the nearer side, but only left when the body actually fits —
+  // otherwise the wall would shove it straight back in.
+  if (x + width >= safeZone.min && x <= safeZone.max) {
+    const bodyCenter = x + width / 2;
+    const zoneCenter = (safeZone.min + safeZone.max) / 2;
+    const canExitLeft = safeZone.min - width >= wallMargin;
+    if (canExitLeft && bodyCenter < zoneCenter) {
+      x = safeZone.min - width;
+      vx = -Math.abs(vx || speed);
+    } else {
+      x = safeZone.max;
+      vx = Math.abs(vx || speed);
+    }
+  }
+
+  // Stage wall bounce, clamped so it can't drop the body back inside the zone.
+  // Because safeZoneBounds() keeps the zone inside the actor's wall, the
+  // slime's wall always sits beyond the zone — the `Math.max/min` guards only
+  // matter for degenerate inputs.
+  const wallLeft = wallMargin;
+  const wallRight = stageWidth - width - wallMargin;
+  if (x <= wallLeft) {
+    x = Math.min(wallLeft, safeZone.min - width);
+    vx = Math.abs(vx || speed);
+  } else if (x >= wallRight) {
+    x = Math.max(wallRight, safeZone.max);
+    vx = -Math.abs(vx || speed);
+  }
+
+  return { x, vx, facing: vx >= 0 ? 1 : -1 };
+}
+
+export interface SlimeSpawn {
+  x: number;
+  y: number;
+  vx: number;
+  facing: 1 | -1;
+  state: SlimeState;
+  frameIndex: number;
+  animTimer: number;
+  stateTimer: number;
+  width: number;
+  height: number;
+  color: SlimeColor;
+  side: SlimeSide;
+  slot: SlimeSlot;
+}
+
+/** Horizontal gap between the two slimes that share a side. */
+export const SLIME_SIDE_STAGGER = 76;
+
+/**
+ * Per-slot patrol speed.
+ *
+ * Two slimes sharing a side must not share a speed: the wall bounce *and* the
+ * safe-zone repulsion both clamp a body to a single x, so equal-speed walkers
+ * would land on the same pixel at every turn and then merge into one sprite.
+ * A slight offset keeps them separate without changing the patrol rules.
+ */
+export const SLIME_SLOT_SPEED: readonly [number, number] = [SLIME_SPEED, SLIME_SPEED * 1.15];
+
+/**
+ * The four medium slimes: two launched from the left wall, two from the right.
+ * Left and right each carry a different colour so the pairs stay readable when
+ * they cross.
+ */
+export const SLIME_ROSTER: ReadonlyArray<{
+  side: SlimeSide;
+  slot: SlimeSlot;
+  color: SlimeColor;
+}> = [
+  { side: 'left', slot: 0, color: 'blue' },
+  { side: 'left', slot: 1, color: 'green' },
+  { side: 'right', slot: 0, color: 'red' },
+  { side: 'right', slot: 1, color: 'white' },
+];
+
+/**
+ * Spawn fields for a slime pinned to `side`'s wall and walking inward, idling
+ * for a beat on arrival. Slot 1 stands one `SLIME_SIDE_STAGGER` further into
+ * the stage so the pair never overlaps, and the spawn is clamped clear of the
+ * safe zone even on a stage too narrow to reach the wall.
+ */
+export function slimeSpawn(params: {
+  side: SlimeSide;
+  slot: SlimeSlot;
+  color: SlimeColor;
+  stageWidth: number;
+  safeZone: SafeZoneBounds;
+  width?: number;
+}): SlimeSpawn {
+  const { side, slot, color, stageWidth, safeZone } = params;
+  const width = params.width ?? SLIME_WIDTH;
+  const speed = SLIME_SLOT_SPEED[slot] ?? SLIME_SPEED;
+
+  const rawX =
+    side === 'left'
+      ? SLIME_WALL_MARGIN + slot * SLIME_SIDE_STAGGER
+      : stageWidth - width - SLIME_WALL_MARGIN - slot * SLIME_SIDE_STAGGER;
+  // Never start inside the zone: the left pair sits left of `min`, the right
+  // pair right of `max`.
+  const clearOfZone =
+    side === 'left' ? Math.min(rawX, safeZone.min - width) : Math.max(rawX, safeZone.max);
+  // Keep the body on-stage even on a degenerate narrow layout; the first
+  // resolved tick still pushes it clear of the zone.
+  const x = Math.max(0, Math.min(clearOfZone, stageWidth - width));
+
+  const vx = (side === 'left' ? 1 : -1) * speed;
+
+  return {
+    x,
+    y: 0,
+    vx,
+    facing: vx >= 0 ? 1 : -1,
+    state: 'idle',
+    frameIndex: 0,
+    animTimer: 0,
+    stateTimer: 0,
+    width,
+    height: SLIME_HEIGHT,
+    color,
+    side,
+    slot,
+  };
+}
+
+/** The full four-slime roster (2 left + 2 right) for a laid-out stage. */
+export function slimeRoster(stageWidth: number, safeZone: SafeZoneBounds): SlimeSpawn[] {
+  return SLIME_ROSTER.map((entry) => slimeSpawn({ ...entry, stageWidth, safeZone }));
+}

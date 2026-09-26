@@ -1,6 +1,14 @@
 /// <reference types="vite/client" />
 
 /**
+ * Set by scripts/playtest.mjs before load to disable mob contact, so the
+ * headless walk/jump assertions can't be perturbed by a slime. See ArcadeStage.
+ */
+interface Window {
+  __ARCADE_NO_HAZARDS__?: boolean;
+}
+
+/**
  * Build identity injected by vite.config.ts `define`. Rendered on the boot
  * screen so a stale deploy is easy to spot at a glance.
  */

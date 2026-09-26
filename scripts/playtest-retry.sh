@@ -10,7 +10,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
-URL="${1:-http://localhost:4173/Limp3tz_Portfolio/}"
+URL="${1:-http://localhost:4173/}"
 
 echo "playtest attempt 1/2:"
 if node scripts/playtest.mjs "$URL"; then

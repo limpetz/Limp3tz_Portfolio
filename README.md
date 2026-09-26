@@ -1,8 +1,8 @@
 # LIMP3TZ // Neon Pixel Arcade Portfolio
 
-| CI | Deploy | Release | Play |
-| :---: | :---: | :---: | :---: |
-| [![CI](https://github.com/limpetz/Limp3tz_Portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/limpetz/Limp3tz_Portfolio/actions/workflows/ci.yml) | [![Deploy to GitHub Pages](https://github.com/limpetz/Limp3tz_Portfolio/actions/workflows/deploy.yml/badge.svg)](https://github.com/limpetz/Limp3tz_Portfolio/actions/workflows/deploy.yml) | [![Latest release](https://img.shields.io/github/v/release/limpetz/Limp3tz_Portfolio?sort=semver&label=release)](https://github.com/limpetz/Limp3tz_Portfolio/releases) | [![▶ Play](https://img.shields.io/badge/%E2%96%B6_PLAY-limpetz.github.io-3dffa2)](https://limpetz.github.io/Limp3tz_Portfolio/) |
+| CI |
+| :---: |
+| [![CI](https://github.com/limpetz/Limp3tz_Portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/limpetz/Limp3tz_Portfolio/actions/workflows/ci.yml) |
 
 An interactive neon-cyberpunk arcade portfolio for **Arshad Mohemed (LIMP3TZ)** —
 Senior Specialist Trainer, Ad Ops @ MarketStar, ex-NVIDIA QA.
@@ -20,7 +20,8 @@ chiptune soundtrack, a skill inventory, a quest log, and a live GitHub radar.
 | Styling | Tailwind CSS v4 via `@tailwindcss/vite` |
 | Audio | Web Audio API synthesis (`src/utils/soundEngine.ts`) |
 | Tests | Vitest (pure logic only — no DOM needed) |
-| CI | GitHub Actions |
+| CI | GitHub Actions (verify only) |
+| Hosting | Google AI Studio (static `dist/`) |
 
 ## Quick start
 
@@ -28,8 +29,11 @@ Requires **Node 22+**.
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
+npm run dev      # http://localhost:3000 — full local simulation
 ```
+
+`npm run dev` serves the site from the origin root, so local testing matches the
+hosted build on Google AI Studio.
 
 ## Scripts
 
@@ -133,34 +137,52 @@ tested in `jumpTurn.test.ts`.
 - `prefers-reduced-motion` swaps directions instantly and skips the turn
   animation; `Esc` cancels a walk or turn and resets the controller
 
-## Mushroom Monster hazards
+## Slime hazards
 
-A patrolling Mushroom Monster guards the far side of the stage. Its rules live
-in the pure `src/utils/mushroom.ts` module — spawn, patrol, safe zone, frame
-timing — so the whole system is unit tested (`mushroom.test.ts`) without a DOM
-or an animation loop.
+Four medium slimes patrol the stage — **two launched from each wall** — guarding
+both approaches to the player's safe zone. Their rules live in the pure
+`src/utils/slime.ts` module — spawn, patrol, safe zone, frame timing — so the
+whole system is unit tested (`slime.test.ts`) without a DOM or an animation loop.
 
-- **Patrol** — the monster spawns pinned to the wall opposite the player and
-  walks the full span at `MUSHROOM_SPEED`, turning at the stage walls and at the
-  edge of the player's **safe zone**
+- **Roster** — `SLIME_ROSTER` sends a blue and a green slime in from the left
+  wall and a red and a white one from the right, all walking inward
+- **Patrol** — each slime walks at its slot's speed (`SLIME_SLOT_SPEED`), turning
+  at its wall and at the edge of the player's **safe zone**. The two slimes
+  sharing a side deliberately take *slightly different* speeds: the wall bounce
+  and the zone repulsion both clamp a body to a single x, so equal-speed walkers
+  would land on the same pixel at every turn and merge into one sprite
 - **Safe zone** — the zone centred on the player's spawn (`safeZoneBounds`) is
-  always safe to stand in. `resolveMushroomMotion` repels the monster out of it
-  toward whichever side its body came from, and clamps the wall bounce against
-  the same boundary, so the two rules can never trap it in a vibrating loop on
-  narrow (phone-width) stages
+  always safe to stand in. `resolveSlimeMotion` repels a slime out of it toward
+  whichever side its body came from, and clamps the wall bounce against the same
+  boundary, so the two rules can never trap it in a vibrating loop on narrow
+  (phone-width) stages. Where a stage is too narrow to fit a 44px body to the
+  left of the zone, the left pair's spawn yields to the on-stage clamp and the
+  first resolved tick ejects it instead
 - **Spawn grace** — contact damage is suppressed for `SPAWN_GRACE_MS` after the
   stage lays out, so a hazard can't hit the player behind the boot screen
-- **Attack telegraph** — within `MUSHROOM_ATTACK_RANGE`, ahead of it and on the
-  same level, the monster lunges and holds its attack pose
-- **Stomp** — jumping onto it while falling plays Hit → Die, bounces the player,
-  awards +350, and respawns a fresh monster clear of the safe zone after
-  `MUSHROOM_RESPAWN_MS`. Pending respawn timers are cleared on unmount
-- **Facing follows velocity** — the sprite can never walk one way while facing
-  the other, since `facing` is derived from the resolved velocity every tick
+- **Attack telegraph** — within `SLIME_ATTACK_RANGE`, ahead of it and on the same
+  level, a slime lunges and holds its attack pose
+- **Stomp** — jumping onto one while falling plays Hit → Die, bounces the player,
+  awards +350, and respawns a fresh slime on the same side and slot, clear of the
+  safe zone, after `SLIME_RESPAWN_MS`. Pending respawn timers are cleared on unmount
+- **Facing follows velocity** — `facing` is derived from the resolved velocity
+  every tick, so the patrol direction and the attack telegraph can never
+  disagree. The medium slimes are symmetric blobs with no facing row, so the
+  renderer never mirrors them
+- **Visible marker** — a neon strip on the ground under the player's spawn,
+  with a centred shield-and-check emblem above a glowing **SAFE ZONE HERE**
+  label (inline SVG + CSS glow, no asset), makes the zone discoverable. It is
+  decorative; the immunity itself is enforced by the hazard loop
 
-Animation is 80×64 sprite sheets (`MushroomMonster.tsx`). Per-state frame counts
-and playback rates live in `MUSHROOM_ANIM`, and one-shot states (attack, hit,
-die) clamp on their final frame.
+Each slime is one 128×128 sheet (`Slime_Medium_{Blue,Green,Red,White}.png`) laid
+out as a **4×4 grid of 32px cells**. Rows 0 and 1 hold an idle pulse and a hop
+cycle; rows 2 and 3 repeat them, so only eight of the sixteen frames are used.
+Because the sheets carry no combat art, the five mob states reuse those two
+cycles — `SLIME_ANIM` in `src/utils/slime.ts` maps them (idle → idle, run → hop,
+attack → hop at 2× held on the lunge, hit → the flattest frame held, die → hop
+fast then held collapsed), and one-shot states clamp on their final frame.
+`SlimeMonster.tsx` draws one cell upscaled 3×, anchored on the cell's centre-x /
+sole so the blob sits on the ground line instead of floating.
 
 ## Contact channels
 
@@ -189,7 +211,7 @@ src/
   index.css               # Tailwind entry + retro theme tokens
   components/
     ArcadeStage.tsx       # The playable stage: physics loop, blocks, slideshow
-    MushroomMonster.tsx   # 80×64 sprite-sheet hazard renderer
+    SlimeMonster.tsx      # 128×128 / 4×4 slime-sheet hazard renderer
     Hud.tsx               # Score / coin header
     BootScreen.tsx        # Retro boot sequence
     CharacterSheet.tsx    # Character stats panel
@@ -210,7 +232,7 @@ src/
     motion.ts             # Reduced-motion preference + helpers
     walk.ts               # Walk-cycle frame selection from the sprite-sheet JSON
     jumpTurn.ts           # Jump lifecycle + 3D turn state machine and anchors
-    mushroom.ts           # Pure hazard patrol/safe-zone/frame logic
+    slime.ts              # Pure hazard patrol/safe-zone/frame logic
     shadow.ts             # Ground shadow sizing helpers
     soundEngine.ts        # Web Audio chiptune synthesis
     particleSystem.ts     # Canvas particle effects
@@ -278,7 +300,7 @@ npx sharp-cli -i src/assets/images/.originals/pixel_arshad_sprite.png \
 ### Walk-sheet pipeline (probe → relayout → gate)
 
 The walk sheet must keep three invariants, and CI enforces all three
-(`npm run gait:check`, run in both workflows):
+(`npm run gait:check`, run in CI):
 
 1. **Gait order** — column N holds the Nth pose of the walk cycle; footfall
    contacts (both feet planted, ≥40px apart) sit at columns 1, 5 and 7.
@@ -370,16 +392,18 @@ npx sharp-cli -i new-sprite.png -o tmp -f png trim   # visible size vs canvas
 ## Social preview
 
 `index.html` carries the Open Graph, Twitter card (`og:image`, `og:url`) and
-JSON-LD `ProfilePage` metadata for
-**https://limpetz.github.io/Limp3tz_Portfolio/**. All of it uses absolute URLs,
-which is what Facebook, LinkedIn and Slack require. If the site ever moves to a
-different origin, update the four absolute URLs in `index.html` (two metas plus
-`url` and the person's `image` in the JSON-LD block).
+JSON-LD `ProfilePage` metadata. All of it uses absolute URLs, which is what
+Facebook, LinkedIn and Slack require.
+
+> The URLs still point at the retired GitHub Pages origin. Once Google AI
+> Studio gives you the live URL, update the four absolute URLs in `index.html`
+> (the two `og:image`/`twitter:image` metas, `og:url`, and the `url` and
+> person's `image` in the JSON-LD block), then host `public/og-image.jpg` there.
 
 ## Testing
 
 Logic that isn't tied to React or the DOM is extracted into pure modules(`src/utils/physics.ts`, `src/utils/input.ts`, `src/utils/blocks.ts`,
-  `src/utils/mushroom.ts`, `src/utils/motion.ts`, `src/data/backgrounds.ts`) and
+  `src/utils/slime.ts`, `src/utils/motion.ts`, `src/data/backgrounds.ts`) and
 covered by Vitest:
 
 ```bash
@@ -396,6 +420,13 @@ and the left-row mirror — so a re-baked sheet can't silently permute cells or
 break the gait. `scripts/foot-probe.mjs` prints the same data per cell for
 diagnosis, and `scripts/relayout-walk-sheet.mjs` documents how the sheet was
 restored to true gait order.
+
+The browser playtest (`npm run playtest`, run in CI after the build) drives the
+stage with a synthetic keyboard through `puppeteer-core`. It loads the page with
+`window.__ARCADE_NO_HAZARDS__ = true`, which suppresses the slime hazards for
+that run only: a slime hit knocks the player back and launches them, which then
+reads as a stomp and would show jump frames during a walk-only measurement. The
+hook has no UI or URL surface — only an injected script can set it.
 
 ## Accessibility
 
@@ -427,49 +458,38 @@ or derivative work. The owner holds common-law rights from use; a formal
 registration (e.g. with the USPTO) is a separate legal process and is not
 granted or implied by anything here.
 
-## CI and deployment
+## CI
 
-Both workflows share the same gate — `npm ci` → `npm run typecheck` →
-`npm test` → `npm run build`:
+`.github/workflows/ci.yml` is **verify-only**. It runs on every push to `main`
+and every pull request, and shares the same gate the old deploy job used:
+`npm ci` → `npm run typecheck` → `npm test` → `node scripts/check-gait.mjs` →
+`npm run build` → the headless playtest against `vite preview`.
 
-| Workflow | Trigger | Purpose |
-| --- | --- | --- |
-| `.github/workflows/ci.yml` | push to `main`, every pull request | verify only |
-| `.github/workflows/deploy.yml` | push to `main`, or manual dispatch | verify, publish `dist/` to GitHub Pages, then cut an automatic patch release |
-
-After a successful deploy from `main`, the workflow's `release` job tags the
-built commit `auto/vX.Y.Z+<short-sha>` (or `vX.Y.Z` when a repo variable
-`PKG_VERSION` was set to match a `package.json` bump in that push) and
-publishes a GitHub release — unless a tag at that commit already exists, in
-which case it skips. Manual `vX.Y.Z` tags and releases (like `v1.1.0`) are
-always cut by hand.
+It publishes nothing. Pushing to `main` just updates the source and runs the
+checks — the repo is the source of truth, not a host.
 
 > `package-lock.json` must stay committed, otherwise `npm ci` fails.
 
-**One-time setup:** in the repo's *Settings → Pages*, set **Source** to
-*GitHub Actions*. `public/.nojekyll` ships with the build so Pages serves it
-verbatim.
+## Deployment (Google AI Studio)
 
-## Deployment
+The build is a fully static `dist/` folder. Nothing in this repo hosts it: there
+is no Pages workflow, so a push to `main` only updates the repo and runs CI.
 
-The build is a fully static `dist/` folder. This repo targets a **GitHub Pages
-project site**, so `vite.config.ts` sets:
+The live site is published from **Google AI Studio**, which serves the app from
+the origin root. `vite.config.ts` therefore sets:
 
 ```ts
-base: '/Limp3tz_Portfolio/'
+base: '/'
 ```
 
-Without it every asset 404s on Pages. Dev mirrors the sub-path on purpose, so
-base-path mistakes show up locally instead of only after deploying —
-`npm run dev` still works from `http://localhost:3000`, which **302-redirects**
-to `http://localhost:3000/Limp3tz_Portfolio/`.
-
-Deployment is automatic — pushing to `main` publishes `dist/` via
-`deploy.yml`. If you later move to a **user** site (`https://user.github.io/`)
-or a custom domain, change `base` back to `'/'` and update the absolute URLs in
-`index.html`.
+That is also Vite's dev default, so `npm run dev` serves
+`http://localhost:3000` directly — no sub-path redirect — and the local
+simulation matches the hosted origin. Keep using `npm run dev` for local
+testing; publish from AI Studio when you want the live site updated.
 
 Anything you add that references a public asset by URL must go through
-`import.meta.env.BASE_URL` — see `soundEngine.ts`, where the chiptune track is
-loaded. A root-relative `/background_music.mp3` silently fails under a
-sub-path.
+`import.meta.env.BASE_URL` (or a root-relative path) so it keeps working at the
+origin root — see `soundEngine.ts`, where the chiptune track is loaded.
+
+> GitHub Pages is intentionally retired. If you ever want to go back, restore a
+> Pages deploy workflow and set `base` back to the repo sub-path.
