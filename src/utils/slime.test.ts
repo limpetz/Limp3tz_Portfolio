@@ -1,14 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import {
+  ACTOR_WIDTH,
   SLIME_ANIM,
   SLIME_CELL,
+  SLIME_CORRIDOR_TRAVEL,
   SLIME_ROSTER,
   SLIME_SHEET_COLS,
   SLIME_SHEET_ROWS,
+  SLIME_HEIGHT,
+  SLIME_NARROW_HEIGHT,
+  SLIME_NARROW_STAGE_WIDTH,
+  SLIME_NARROW_WIDTH,
   SLIME_SIDE_STAGGER,
   SLIME_SLOT_SPEED,
   SLIME_STATE_SECONDS,
   SLIME_WIDTH,
+  slimeBoxFor,
   playerSpawnX,
   resolveSlimeMotion,
   safeZoneBounds,
@@ -70,11 +77,61 @@ describe('safeZoneBounds', () => {
     for (const w of [375, 768, 1366, 1920]) {
       const spawnX = playerSpawnX(w);
       const { max } = safeZoneBounds(spawnX, w);
-      const slimeWall = w - SLIME_WIDTH - 24;
+      const slimeWall = w - slimeBoxFor(w).width - 24;
       // The slime's wall must sit beyond the zone, or the two rules would
       // fight and trap the slime (the narrow-screen bug).
       expect(slimeWall).toBeGreaterThan(max);
     }
+  });
+
+  it('leaves the left pair a lane to patrol on phone-width stages', () => {
+    for (const w of [320, 360, 375, 390, 414, 428, 480, 620, 768]) {
+      const spawnX = playerSpawnX(w);
+      const { min, max } = safeZoneBounds(spawnX, w);
+      // The zone's left edge must sit clear of the body by a full run, or the
+      // wall and zone rules clamp a left-side slime to one x and it burns every
+      // tick "walking" into the wall instead of patrolling.
+      expect(min - slimeBoxFor(w).width).toBeGreaterThanOrEqual(SLIME_CORRIDOR_TRAVEL);
+      // ... and the player still spawns inside their own safe zone.
+      expect(min).toBeLessThanOrEqual(spawnX);
+      expect(max).toBeGreaterThanOrEqual(spawnX);
+    }
+  });
+
+  it('keeps its full right half on a phone-width stage', () => {
+    for (const w of [320, 360, 375, 390, 414, 428, 480]) {
+      const spawnX = playerSpawnX(w);
+      const { min, max } = safeZoneBounds(spawnX, w);
+      const half = Math.min(140, Math.max(60, w * 0.2));
+      // Only the left half is ever trimmed — the right half is room the
+      // right-hand pair can spare, so the zone keeps all of it.
+      expect(max - spawnX).toBeGreaterThanOrEqual(half - 1e-6);
+      // And the whole zone still comfortably holds the actor.
+      expect(max - min).toBeGreaterThanOrEqual(ACTOR_WIDTH);
+    }
+  });
+
+  it('gives the slimes a smaller body on narrow stages', () => {
+    expect(slimeBoxFor(SLIME_NARROW_STAGE_WIDTH - 1)).toEqual({
+      width: SLIME_NARROW_WIDTH,
+      height: SLIME_NARROW_HEIGHT,
+    });
+    expect(slimeBoxFor(SLIME_NARROW_STAGE_WIDTH)).toEqual({
+      width: SLIME_WIDTH,
+      height: SLIME_HEIGHT,
+    });
+  });
+
+  it('trades hazard size, not safe-zone width, on a phone-width stage', () => {
+    // Without the narrow body the left lane would have to come out of the
+    // zone's own half-width; with it the zone is back to its full reach.
+    const w = 375;
+    const spawnX = playerSpawnX(w);
+    const half = Math.min(140, Math.max(60, w * 0.2));
+    const { min, max } = safeZoneBounds(spawnX, w);
+    expect(spawnX - min).toBeLessThan(half);
+    expect(spawnX - min).toBeGreaterThan(half - 5);
+    expect(max - spawnX).toBeGreaterThanOrEqual(half);
   });
 });
 
@@ -195,10 +252,12 @@ describe('slimeSpawn', () => {
   it('starts every slime clear of the safe zone on real stages', () => {
     for (const w of [375, 768, 1366, 1920, 2560]) {
       const stageZone = safeZoneBounds(playerSpawnX(w), w);
+      const box = slimeBoxFor(w);
       for (const entry of SLIME_ROSTER) {
         const spawn = slimeSpawn({ ...entry, stageWidth: w, safeZone: stageZone });
+        expect(spawn.width).toBe(box.width);
         if (entry.side === 'left') {
-          expect(spawn.x + SLIME_WIDTH).toBeLessThanOrEqual(stageZone.min);
+          expect(spawn.x + box.width).toBeLessThanOrEqual(stageZone.min + 1e-6);
         } else {
           expect(spawn.x).toBeGreaterThanOrEqual(stageZone.max);
         }
@@ -218,7 +277,7 @@ describe('slimeSpawn', () => {
       safeZone: { min: 25, max: 200 },
     });
     expect(spawn.x).toBeGreaterThanOrEqual(0);
-    expect(spawn.x).toBeLessThanOrEqual(100 - SLIME_WIDTH);
+    expect(spawn.x).toBeLessThanOrEqual(100 - slimeBoxFor(100).width);
   });
 
   it('keeps every spawned body on-stage across real widths', () => {
@@ -227,7 +286,7 @@ describe('slimeSpawn', () => {
       for (const entry of SLIME_ROSTER) {
         const spawn = slimeSpawn({ ...entry, stageWidth: w, safeZone: zone2 });
         expect(spawn.x).toBeGreaterThanOrEqual(0);
-        expect(spawn.x).toBeLessThanOrEqual(w - SLIME_WIDTH);
+        expect(spawn.x).toBeLessThanOrEqual(w - slimeBoxFor(w).width);
       }
     }
   });
@@ -413,6 +472,55 @@ describe('resolveSlimeMotion', () => {
     expect(maxX).toBeGreaterThanOrEqual(wallRight - 2);
     expect(sawLeft).toBe(true);
     expect(sawRight).toBe(true);
+  });
+
+  it('patrols in both directions on every laid-out width', () => {
+    for (const stageWidth of [320, 375, 390, 414, 428, 480, 768, 1366]) {
+      const stageZone = safeZoneBounds(playerSpawnX(stageWidth), stageWidth);
+      const box = slimeBoxFor(stageWidth).width;
+      const inside = (x: number) => x + box > stageZone.min && x < stageZone.max;
+      const zoneCenter = (stageZone.min + stageZone.max) / 2;
+
+      for (const entry of SLIME_ROSTER) {
+        let { x, vx } = slimeSpawn({ ...entry, stageWidth, safeZone: stageZone });
+        const side = x + box / 2 < zoneCenter ? -1 : 1;
+        let minX = x;
+        let maxX = x;
+        let flips = 0;
+        let prevSign = Math.sign(vx);
+
+        for (let i = 0; i < 60 * 30; i++) {
+          const step = Math.abs(vx) / 60;
+          const out = resolveSlimeMotion({
+            x,
+            vx,
+            width: box,
+            dt: 1 / 60,
+            stageWidth,
+            safeZone: stageZone,
+            speed: Math.abs(vx),
+          });
+          // No tick may teleport the body — a jump bigger than one frame of
+          // walk plus clamp slack is the bug where slimes crossed the zone.
+          expect(Math.abs(out.x - x)).toBeLessThanOrEqual(step + 1);
+          if (Math.sign(out.vx) !== prevSign) flips++;
+          prevSign = Math.sign(out.vx);
+          x = out.x;
+          vx = out.vx;
+          minX = Math.min(minX, x);
+          maxX = Math.max(maxX, x);
+          expect(inside(x)).toBe(false);
+          // It never ends up on the far side of the zone from where it started.
+          expect(Math.sign(x + box / 2 - zoneCenter)).toBe(side);
+        }
+
+        // A real patrol: it covers ground and turns at its wall and at the zone
+        // — but not on every tick, which is how a pinned slime looks.
+        expect(maxX - minX).toBeGreaterThan(SLIME_CORRIDOR_TRAVEL / 2);
+        expect(flips).toBeGreaterThan(0);
+        expect(flips).toBeLessThan(60 * 30 / 4);
+      }
+    }
   });
 
   it('keeps a left-side slime on the left of the zone on a wide stage', () => {

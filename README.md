@@ -146,18 +146,29 @@ whole system is unit tested (`slime.test.ts`) without a DOM or an animation loop
 
 - **Roster** — `SLIME_ROSTER` sends a blue and a green slime in from the left
   wall and a red and a white one from the right, all walking inward
+- **Body size** — `slimeBoxFor` keeps the full 44×48 box down to
+  `SLIME_NARROW_STAGE_WIDTH`, then drops to a 32×34 box on narrower stages,
+  where the full-size body and the safe zone would otherwise fight over the same
+  few pixels. `SlimeMonster` draws the narrow box at 2× instead of 3×, so the
+  drawn slime covers the same share of its hitbox at either size
 - **Patrol** — each slime walks at its slot's speed (`SLIME_SLOT_SPEED`), turning
   at its wall and at the edge of the player's **safe zone**. The two slimes
   sharing a side deliberately take *slightly different* speeds: the wall bounce
   and the zone repulsion both clamp a body to a single x, so equal-speed walkers
   would land on the same pixel at every turn and merge into one sprite
 - **Safe zone** — the zone centred on the player's spawn (`safeZoneBounds`) is
-  always safe to stand in. `resolveSlimeMotion` repels a slime out of it toward
-  whichever side its body came from, and clamps the wall bounce against the same
-  boundary, so the two rules can never trap it in a vibrating loop on narrow
-  (phone-width) stages. Where a stage is too narrow to fit a 44px body to the
-  left of the zone, the left pair's spawn yields to the on-stage clamp and the
-  first resolved tick ejects it instead
+  always safe to stand in. `resolveSlimeMotion` bounces a slime back off the zone
+  edge its body approached from, and clamps the wall bounce against the same
+  boundary, so a slime can never be carried through the zone (which used to read
+  as a body blinking ~190px across it on phone-width stages) and the two rules
+  can never trap it in a vibrating loop. `safeZoneBounds` also reserves a lane of
+  at least `SLIME_CORRIDOR_TRAVEL` off the left wall for the left-hand pair,
+  taking it out of the zone's *left* half only — the right half is room the
+  right-hand pair can spare, so a phone-width stage ends up with a zone offset
+  to the right of the spawn rather than a uniformly shrunken one. The spawn
+  always stays inside it. Where even the narrower body leaves less than
+  `SLIME_CORRIDOR_TRAVEL` of run, the patrol drops the 24px wall margin and
+  patrols from the true stage edge instead of pinning the body to one clamped x
 - **Spawn grace** — contact damage is suppressed for `SPAWN_GRACE_MS` after the
   stage lays out, so a hazard can't hit the player behind the boot screen
 - **Attack telegraph** — within `SLIME_ATTACK_RANGE`, ahead of it and on the same

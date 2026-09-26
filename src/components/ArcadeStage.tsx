@@ -2074,6 +2074,8 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           color={s.color}
           state={s.state}
           frameIndex={s.frameIndex}
+          width={s.width}
+          height={s.height}
         />
       ))}
 

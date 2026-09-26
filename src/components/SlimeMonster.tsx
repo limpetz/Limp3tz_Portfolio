@@ -16,6 +16,9 @@ interface SlimeMonsterProps {
   color: SlimeColor;
   state?: SlimeState;
   frameIndex?: number;
+  /** Collision-box size — narrow stages use a smaller body (see `slimeBoxFor`). */
+  width?: number;
+  height?: number;
 }
 
 /** One sheet per colour; all four share an identical 4x4 / 32px frame grid. */
@@ -28,8 +31,14 @@ const SLIME_SHEETS: Record<SlimeColor, string> = {
 
 const CELL = 32; // sheet cell, px
 const SHEET = 128; // full sheet, px
-/** Integer upscale keeps the 14x13px art crisp (no half-pixel sampling). */
-const SCALE = 3;
+/**
+ * Integer upscale keeps the 14x13px art crisp (no half-pixel sampling): 3x for
+ * the full-size body, 2x for the narrow one, so the drawn slime always covers
+ * about the same share of its collision box.
+ */
+function scaleFor(width: number): number {
+  return Math.max(1, Math.round((width / SLIME_WIDTH) * 3));
+}
 // The art is only ~14x13px inside its 32px cell, centred horizontally with the
 // sole on y=23. Anchoring those two points onto the collision box (centre-x,
 // bottom) is what makes the slime sit on the ground line instead of floating.
@@ -49,8 +58,11 @@ export const SlimeMonster: React.FC<SlimeMonsterProps> = ({
   color,
   state = 'run',
   frameIndex = 0,
+  width = SLIME_WIDTH,
+  height = SLIME_HEIGHT,
 }) => {
   const { row, col } = slimeFrameCell(frameIndex);
+  const SCALE = scaleFor(width);
   const cell = CELL * SCALE;
 
   return (
@@ -59,8 +71,8 @@ export const SlimeMonster: React.FC<SlimeMonsterProps> = ({
       style={{
         left: `${x}px`,
         bottom: `${y}px`,
-        width: `${SLIME_WIDTH}px`,
-        height: `${SLIME_HEIGHT}px`,
+        width: `${width}px`,
+        height: `${height}px`,
       }}
       aria-label={`Slime Hazard: ${color}`}
     >
@@ -69,8 +81,8 @@ export const SlimeMonster: React.FC<SlimeMonsterProps> = ({
         style={{
           position: 'absolute',
           // Anchor cell point (ANCHOR_X, ANCHOR_Y) on the box centre-x / bottom.
-          left: `${SLIME_WIDTH / 2 - ANCHOR_X * SCALE}px`,
-          top: `${SLIME_HEIGHT - ANCHOR_Y * SCALE}px`,
+          left: `${width / 2 - ANCHOR_X * SCALE}px`,
+          top: `${height - ANCHOR_Y * SCALE}px`,
           width: `${cell}px`,
           height: `${cell}px`,
           backgroundImage: `url(${SLIME_SHEETS[color]})`,

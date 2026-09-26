@@ -9,7 +9,8 @@
  * Two invariants the stage depends on:
  *
  * 1. A slime can never end a tick overlapping the safe zone — the repulsion
- *    resolves it to whichever side of the zone its body came from.
+ *    bounces it back off the edge it approached from, so a body is never
+ *    carried across the zone (which read as a teleport on phone-width stages).
  * 2. `facing` is always derived from the resolved velocity, never carried over,
  *    so the patrol always reads direction-consistent (the medium slimes are
  *    symmetric blobs and don't mirror, but the attack telegraph does use it).
@@ -30,6 +31,29 @@ export type SlimeSlot = 0 | 1;
 /** Gameplay (collision-box) size — matches the retired mushroom hazard. */
 export const SLIME_WIDTH = 44;
 export const SLIME_HEIGHT = 48;
+
+/**
+ * Hazard box (and matching sprite scale) used on narrow stages.
+ *
+ * Below `SLIME_NARROW_STAGE_WIDTH` a full-size body plus its lane needs more
+ * room than the stage can spare beside the safe zone, so the two would trade
+ * the same few pixels and either the patrol or the zone would give way. A
+ * smaller box hands the room back to the zone: the lane requirement
+ * (`width + SLIME_CORRIDOR_TRAVEL`) shrinks with it, so a phone-width stage
+ * keeps its full half-width. `SlimeMonster` draws the narrow box at 2x instead
+ * of 3x, keeping the visible art and the collision box in the same proportion.
+ */
+export const SLIME_NARROW_WIDTH = 32;
+export const SLIME_NARROW_HEIGHT = 34;
+/** Stage width below which the full-size body starts squeezing the safe zone. */
+export const SLIME_NARROW_STAGE_WIDTH = 448;
+
+/** Hazard box for a stage width: the full-size body, or the narrow variant. */
+export function slimeBoxFor(stageWidth: number): { width: number; height: number } {
+  return stageWidth < SLIME_NARROW_STAGE_WIDTH
+    ? { width: SLIME_NARROW_WIDTH, height: SLIME_NARROW_HEIGHT }
+    : { width: SLIME_WIDTH, height: SLIME_HEIGHT };
+}
 export const SLIME_SPEED = 60;
 export const SLIME_WALL_MARGIN = 24;
 export const SLIME_IDLE_SECONDS = 0.7; // "notice you" pause after spawning
@@ -122,20 +146,43 @@ export function playerSpawnX(stageWidth: number): number {
 }
 
 /**
- * Safe zone for a given spawn, clamped inside the stage walls.
+ * Smallest left-hand lane the safe zone must leave a slime.
+ *
+ * A left-side slime patrols between the stage's left wall and the zone's left
+ * edge. If the zone crowds the wall closer than a body-width plus this much
+ * run, the two rules clamp the body to the same x on every tick: it turns
+ * around constantly without ever moving, which reads as a slime walking into
+ * the wall. The zone therefore gives up part of its *left* half on narrow
+ * stages; where that still isn't enough the patrol drops the wall margin too.
+ */
+export const SLIME_CORRIDOR_TRAVEL = 24;
+
+/**
+ * Safe zone for a given spawn, clamped inside the stage walls — and offset so a
+ * patrol still has a lane beside it.
  *
  * The half-width scales with the stage but is capped, and `max` can never pass
  * the wall the actor itself is clamped to (`stageWidth - actorWidth - 12`), so
  * a slime bouncing off the right wall can't be pushed back into the zone.
+ *
+ * Only the *left* half is ever trimmed. A body-width plus `SLIME_CORRIDOR_TRAVEL`
+ * of lane belongs to the slimes off the left wall, so a phone-width stage ends
+ * up with a zone that reaches less far left of the spawn than right of it
+ * rather than a uniformly shrunken one — the right half is room the right-hand
+ * pair can spare, and the spawn always stays inside the zone.
  */
 export function safeZoneBounds(
   spawnX: number,
   stageWidth: number,
   actorWidth: number = ACTOR_WIDTH,
 ): SafeZoneBounds {
-  const half = Math.min(140, Math.max(60, stageWidth * 0.2));
   const wallRight = stageWidth - actorWidth - 12;
-  const min = Math.max(12, spawnX - half);
+  const half = Math.min(140, Math.max(60, stageWidth * 0.2));
+  // Narrow stages use the smaller hazard box, so their lane costs less and the
+  // zone keeps more of its left half.
+  const laneCost = slimeBoxFor(stageWidth).width + SLIME_CORRIDOR_TRAVEL;
+  const leftHalf = Math.max(0, Math.min(half, spawnX - laneCost));
+  const min = Math.max(12, spawnX - leftHalf);
   const max = Math.min(wallRight, Math.max(min + 40, spawnX + half));
   return { min, max };
 }
@@ -168,15 +215,19 @@ export function resolveSlimeMotion(params: {
   let x = params.x + params.vx * dt;
   let vx = params.vx;
 
-  // Safe-zone repulsion: push the whole body out before it can enter. Exit
-  // toward the nearer side, but only left when the body actually fits —
-  // otherwise the wall would shove it straight back in.
+  // Safe-zone repulsion: bounce the whole body back off the edge it came from.
+  // The body is never carried through the zone — on a stage too narrow to hold
+  // a slime on one side, the teleport used to blink it ~190px across the safe
+  // zone mid-patrol. A left-side bounce is only legal when the body can sit
+  // on-stage to the left of the zone; otherwise the right-side exit is the only
+  // position that keeps both the stage and zone invariants.
   if (x + width >= safeZone.min && x <= safeZone.max) {
     const bodyCenter = x + width / 2;
     const zoneCenter = (safeZone.min + safeZone.max) / 2;
-    const canExitLeft = safeZone.min - width >= wallMargin;
-    if (canExitLeft && bodyCenter < zoneCenter) {
-      x = safeZone.min - width;
+    const cameFromLeft = bodyCenter < zoneCenter;
+    const leftBounceX = safeZone.min - width;
+    if (cameFromLeft && leftBounceX >= 0) {
+      x = leftBounceX;
       vx = -Math.abs(vx || speed);
     } else {
       x = safeZone.max;
@@ -187,9 +238,15 @@ export function resolveSlimeMotion(params: {
   // Stage wall bounce, clamped so it can't drop the body back inside the zone.
   // Because safeZoneBounds() keeps the zone inside the actor's wall, the
   // slime's wall always sits beyond the zone — the `Math.max/min` guards only
-  // matter for degenerate inputs.
-  const wallLeft = wallMargin;
-  const wallRight = stageWidth - width - wallMargin;
+  // matter for degenerate inputs. When the margin would leave a lane shorter
+  // than a run, the wall moves out to the true stage edge instead — a body
+  // pinned between the wall and the zone turns around forever without ever
+  // travelling, and that is what read as a slime walking into the wall.
+  const marginLaneLeft = safeZone.min - width - wallMargin;
+  const wallLeft = marginLaneLeft >= SLIME_CORRIDOR_TRAVEL ? wallMargin : 0;
+  const marginLaneRight = stageWidth - width - wallMargin - safeZone.max;
+  const wallRight =
+    marginLaneRight >= SLIME_CORRIDOR_TRAVEL ? stageWidth - width - wallMargin : stageWidth - width;
   if (x <= wallLeft) {
     x = Math.min(wallLeft, safeZone.min - width);
     vx = Math.abs(vx || speed);
@@ -259,9 +316,12 @@ export function slimeSpawn(params: {
   stageWidth: number;
   safeZone: SafeZoneBounds;
   width?: number;
+  height?: number;
 }): SlimeSpawn {
   const { side, slot, color, stageWidth, safeZone } = params;
-  const width = params.width ?? SLIME_WIDTH;
+  const box = slimeBoxFor(stageWidth);
+  const width = params.width ?? box.width;
+  const height = params.height ?? box.height;
   const speed = SLIME_SLOT_SPEED[slot] ?? SLIME_SPEED;
 
   const rawX =
@@ -288,7 +348,7 @@ export function slimeSpawn(params: {
     animTimer: 0,
     stateTimer: 0,
     width,
-    height: SLIME_HEIGHT,
+    height,
     color,
     side,
     slot,
