@@ -10,6 +10,8 @@ class RetroSoundEngine {
   public musicEnabled: boolean = true;
   private bgmAudio: HTMLAudioElement | null = null;
   private masterGain: GainNode | null = null;
+  /** False while the owning scene is off-screen; see setSceneActive(). */
+  private sceneActive: boolean = true;
 
   private getBgm(): HTMLAudioElement | null {
     if (typeof window === 'undefined') return null;
@@ -49,6 +51,9 @@ class RetroSoundEngine {
   }
 
   public playMusic() {
+    // Never start the soundtrack while the owning scene is off-screen —
+    // `setSceneActive` decides when it may play.
+    if (!this.sceneActive) return;
     const bgm = this.getBgm();
     if (bgm && bgm.paused) {
       bgm.play().catch(() => {
@@ -61,6 +66,31 @@ class RetroSoundEngine {
     const bgm = this.getBgm();
     if (bgm) {
       bgm.pause();
+    }
+  }
+
+  /**
+   * Tell the engine whether the scene that owns the soundtrack is on screen.
+   *
+   * When the arcade stage scrolls out of view (or the tab is hidden) the
+   * chiptune is paused and the synth context suspended, so nothing keeps
+   * playing off-screen. The user's `musicEnabled` toggle is deliberately left
+   * untouched, so returning to the stage restores exactly the state they chose
+   * — turning music off in the HUD still keeps it off.
+   */
+  public setSceneActive(active: boolean) {
+    this.sceneActive = active;
+    const bgm = this.getBgm();
+    if (!active) {
+      if (bgm && !bgm.paused) bgm.pause();
+      if (this.ctx && this.ctx.state === 'running') {
+        this.ctx.suspend().catch(() => {});
+      }
+      return;
+    }
+    if (this.musicEnabled) this.playMusic();
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
     }
   }
 
@@ -232,33 +262,6 @@ class RetroSoundEngine {
     this.playTone(880, t + 0.06, 0.15, 'square', 0.09);
   }
 
-  public playDroneHum() {
-    if (!this.sfxEnabled) return;
-    const ctx = this.getContext();
-    if (!ctx || !this.masterGain) return;
-    try {
-      const t = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(110, t);
-      osc.frequency.linearRampToValueAtTime(140, t + 0.12);
-      osc.frequency.linearRampToValueAtTime(110, t + 0.25);
-
-      gain.gain.setValueAtTime(0.015, t);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
-
-      osc.connect(gain);
-      gain.connect(this.masterGain);
-
-      osc.start(t);
-      osc.stop(t + 0.3);
-    } catch {
-      // Audio safety catch
-    }
-  }
-
   public playStart() {
     if (!this.sfxEnabled) return;
     const ctx = this.getContext();
@@ -302,6 +305,8 @@ class RetroSoundEngine {
     this.musicEnabled = nextState;
 
     if (this.musicEnabled) {
+      // playMusic() no-ops while the scene is off-screen; stopMusic() below
+      // still silences an already-playing track when the user toggles off.
       this.playMusic();
     } else {
       this.stopMusic();

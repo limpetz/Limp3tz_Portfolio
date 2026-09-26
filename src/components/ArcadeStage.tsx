@@ -54,7 +54,21 @@ import jumpControlsImg from '../assets/images/jump.webp';
 import bumpBlocksImg from '../assets/images/bump-blocks.webp';
 import clickMeImg from '../assets/images/click-me.webp';
 import { PixelHeart } from './PixelHeart';
-import { MushroomMonster, type MushroomState } from './MushroomMonster';
+import { MushroomMonster } from './MushroomMonster';
+import {
+  type MushroomState,
+  MUSHROOM_ATTACK_RANGE,
+  MUSHROOM_IDLE_SECONDS,
+  MUSHROOM_RESPAWN_MS,
+  MUSHROOM_SPEED,
+  MUSHROOM_STATE_SECONDS,
+  SPAWN_GRACE_MS,
+  mushroomFrameIndex,
+  mushroomSpawn,
+  playerSpawnX,
+  resolveMushroomMotion,
+  safeZoneBounds,
+} from '../utils/mushroom';
 
 interface ArcadeStageProps {
   onAddScore: (amount: number) => void;
@@ -89,6 +103,8 @@ interface MushroomHazard {
   state: MushroomState;
   frameIndex: number;
   animTimer: number;
+  /** Seconds spent in the current animation state — drives state transitions. */
+  stateTimer: number;
   width: number;
   height: number;
 }
@@ -135,43 +151,30 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   const [fallingHearts, setFallingHearts] = useState<FallingHeart[]>([]);
   const fallingHeartsRef = useRef<FallingHeart[]>([]);
 
-  // Mushroom Hazards replacing old drone/bug
+  // Mushroom Hazards replacing old drone/bug. The x here is only a placeholder
+  // that can't overlap the default spawn; the sizing effect repositions every
+  // monster from the real camera width and safe zone once layout exists.
   const [mushrooms, setMushrooms] = useState<MushroomHazard[]>([
-    {
-      id: 1,
-      x: 620,
-      y: 0,
-      vx: -60,
-      facing: -1,
-      state: 'run',
-      frameIndex: 0,
-      animTimer: 0,
-      width: 44,
-      height: 48,
-    },
+    { id: 1, ...mushroomSpawn(1000, 340) },
   ]);
   const mushroomsRef = useRef<MushroomHazard[]>([
-    {
-      id: 1,
-      x: 620,
-      y: 0,
-      vx: -60,
-      facing: -1,
-      state: 'run',
-      frameIndex: 0,
-      animTimer: 0,
-      width: 44,
-      height: 48,
-    },
+    { id: 1, ...mushroomSpawn(1000, 340) },
   ]);
 
   const [invulnerable, setInvulnerable] = useState(false);
   const invulnerableRef = useRef(false);
   const [partyMode, setPartyMode] = useState(false);
 
-  // Player Start Safe Zone: centered at initial actor position (200px ± 140px)
-  const SAFE_ZONE_MIN = 60;
-  const SAFE_ZONE_MAX = 340;
+  // Pending respawn timers, tracked so they can be cleared on unmount instead
+  // of firing setState into a dead component.
+  const mushroomRespawnTimeoutsRef = useRef<number[]>([]);
+  // Contact damage is suppressed until this timestamp, so a hazard can't hit
+  // the player during startup (and behind the boot screen).
+  const spawnGraceUntilRef = useRef(0);
+
+  // Renderable mirror of the derived safe zone, kept in sync by
+  // applyStageLayout (the loop reads the refs, the floor panel reads this).
+  const [safeZone, setSafeZone] = useState({ min: 60, max: 340 });
 
   // --- Off-screen pause -------------------------------------------------
   // The stage is a full-height section pinned to the top of the page, so once
@@ -187,6 +190,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
     const sync = () => {
       stageVisibleRef.current = stageOnScreenRef.current && document.visibilityState !== 'hidden';
+      // Mirror the same signal onto the soundtrack: the arcade owns the
+      // chiptune, so it stops when the stage leaves the viewport or the tab is
+      // hidden instead of playing on over the chapters below.
+      sound.setSceneActive(stageVisibleRef.current);
     };
 
     let observer: IntersectionObserver | undefined;
@@ -412,6 +419,11 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     landingTimer: 0,
     landingIntensity: 1,
     stageWidth: 1000,
+    // Safe zone derived from the real spawn point (see applyStageLayout). The
+    // zone is centred on the actor's initial x and clamped inside the walls.
+    spawnX: 200,
+    safeZoneMin: 60,
+    safeZoneMax: 340,
     actorWidth: ACTOR_W,
     // Visible character height, which is what head-bump detection should use.
     actorHeight: SPRITE_VISIBLE_H,
@@ -453,6 +465,40 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     }
   }, []);
 
+  /**
+   * Recompute the stage width, the actor spawn point and the safe zone.
+   *
+   * The safe zone is *derived from the real spawn* — not hard-coded — and is
+   * clamped so it can never butt against a stage wall. That matters because
+   * the wall-bounce and the safe-zone repulsion are separate rules: if the
+   * wall sits inside the zone they shove a monster back and forth every frame
+   * and it gets stuck "vibrating" at the edge (which is exactly what happened
+   * on phone-width stages before).
+   *
+   * `placePlayer` is only true on the first layout; later resizes keep the
+   * player where they are and just move the zone around them.
+   */
+  const applyStageLayout = useCallback((placePlayer: boolean) => {
+    const el = containerRef.current;
+    if (!el) return;
+    const w = el.clientWidth || 1;
+    const spawnX = playerSpawnX(w);
+    stateRef.current.stageWidth = w;
+    stateRef.current.spawnX = spawnX;
+
+    const { min: zoneMin, max: zoneMax } = safeZoneBounds(spawnX, w, ACTOR_W);
+    stateRef.current.safeZoneMin = zoneMin;
+    stateRef.current.safeZoneMax = zoneMax;
+    setSafeZone((prev) =>
+      prev.min === zoneMin && prev.max === zoneMax ? prev : { min: zoneMin, max: zoneMax },
+    );
+
+    if (placePlayer) {
+      stateRef.current.x = spawnX;
+      setPosX(spawnX);
+    }
+  }, []);
+
   // Say something in speech bubble
   const say = useCallback((text: string, durationMs: number = 2400) => {
     if (typingTimerRef.current) clearInterval(typingTimerRef.current);
@@ -486,12 +532,15 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     const handleResize = () => {
       particleSys.current.resize();
       measureBlocks();
+      // Keep the safe zone in step with the stage width (player stays put).
+      applyStageLayout(false);
     };
     window.addEventListener('resize', handleResize);
 
     const ro = new ResizeObserver(() => {
       particleSys.current.resize();
       measureBlocks();
+      applyStageLayout(false);
     });
     if (containerRef.current) {
       ro.observe(containerRef.current);
@@ -508,7 +557,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       window.removeEventListener('resize', handleResize);
       ro.disconnect();
     };
-  }, [measureBlocks]);
+  }, [measureBlocks, applyStageLayout]);
 
   // Relocation edits move blocks without resizing anything, so the geometry
   // must be re-measured whenever the saved positions change.
@@ -1291,52 +1340,89 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         const actorBottom = GROUND_H + stateRef.current.y;
         const actorTop = actorBottom + stateRef.current.actorHeight;
         const stageH = containerRef.current?.clientHeight || 800;
+        const playerCenter = stateRef.current.x + stateRef.current.actorWidth / 2;
+        const zoneMin = stateRef.current.safeZoneMin;
+        const zoneMax = stateRef.current.safeZoneMax;
+        // Standing inside the zone is always safe, and the opening grace window
+        // covers the frames before the first layout has run.
+        const playerInSafeZone = playerCenter >= zoneMin - 8 && playerCenter <= zoneMax + 8;
+        const spawnGrace = performance.now() < spawnGraceUntilRef.current;
 
         const nextMushrooms: MushroomHazard[] = [];
 
         for (let i = 0; i < currentMushrooms.length; i++) {
           const m = currentMushrooms[i];
+          const stateTimer = m.stateTimer + dt;
 
-          // If dying, advance die animation frames and despawn
+          // --- Death: play the sheet out, then despawn ------------------
           if (m.state === 'die') {
-            const nextTimer = m.animTimer + dt;
-            const nextFrame = Math.floor(nextTimer / 0.08);
-            if (nextFrame < 15) {
-              nextMushrooms.push({ ...m, animTimer: nextTimer, frameIndex: nextFrame });
+            if (stateTimer < MUSHROOM_STATE_SECONDS.die) {
+              nextMushrooms.push({
+                ...m,
+                stateTimer,
+                frameIndex: mushroomFrameIndex('die', stateTimer),
+              });
             }
             continue;
           }
 
-          // Advance running animation
-          const nextAnimTimer = m.animTimer + dt;
-          const nextFrame = Math.floor(nextAnimTimer / 0.1) % 8;
-
-          let nextX = m.x + m.vx * dt;
-          let nextVx = m.vx;
-          let facing = m.facing;
-
-          // Safe zone repulsion: monsters bounce back before entering the player's initial spawn zone (60px - 340px)
-          if (nextX <= SAFE_ZONE_MAX && nextX >= SAFE_ZONE_MIN) {
-            if (m.vx < 0) {
-              nextX = SAFE_ZONE_MAX;
-              nextVx = Math.abs(m.vx);
-              facing = 1;
+          // --- Hit stagger: a stomp plays Hit before falling into Die ----
+          if (m.state === 'hit') {
+            if (stateTimer >= MUSHROOM_STATE_SECONDS.hit) {
+              nextMushrooms.push({ ...m, state: 'die', stateTimer: 0, frameIndex: 0 });
             } else {
-              nextX = SAFE_ZONE_MIN;
-              nextVx = -Math.abs(m.vx);
-              facing = -1;
+              nextMushrooms.push({
+                ...m,
+                stateTimer,
+                frameIndex: mushroomFrameIndex('hit', stateTimer),
+              });
             }
+            continue;
           }
 
-          // Stage boundary bounce
-          if (nextX <= 24) {
-            nextX = 24;
-            nextVx = Math.abs(m.vx);
-            facing = 1;
-          } else if (nextX >= stageW - m.width - 24) {
-            nextX = stageW - m.width - 24;
-            nextVx = -Math.abs(m.vx);
-            facing = -1;
+          // --- Spawn beat: idle for a moment, then start patrolling ------
+          if (m.state === 'idle' && stateTimer < MUSHROOM_IDLE_SECONDS) {
+            nextMushrooms.push({
+              ...m,
+              stateTimer,
+              frameIndex: mushroomFrameIndex('idle', stateTimer),
+            });
+            continue;
+          }
+
+          // `idle` falls through here once its beat elapses; the patrol starts
+          // fresh from frame 0 instead of inheriting the idle clock.
+          let nextState: MushroomState = 'run';
+          let nextStateTimer = m.state === 'idle' ? 0 : stateTimer;
+
+          // Advance + resolve safe-zone repulsion and wall bounces as one
+          // tested step; `facing` always follows the resolved velocity, so the
+          // sprite can't face one way while the monster moves the other.
+          const motion = resolveMushroomMotion({
+            x: m.x,
+            vx: m.vx,
+            width: m.width,
+            dt,
+            stageWidth: stageW,
+            safeZone: { min: zoneMin, max: zoneMax },
+            speed: MUSHROOM_SPEED,
+          });
+          const nextX = motion.x;
+          const nextVx = motion.vx;
+          const facing = motion.facing;
+
+          // --- Attack telegraph -----------------------------------------
+          // Lunge when the player is ahead and on the same level; the pose
+          // holds its final frame for as long as the player stays in range.
+          const monsterCenter = nextX + m.width / 2;
+          const dxPlayer = playerCenter - monsterCenter;
+          const inAttackRange =
+            Math.abs(dxPlayer) <= MUSHROOM_ATTACK_RANGE &&
+            Math.sign(dxPlayer) === facing &&
+            Math.abs(stateRef.current.y) < 140;
+          if (inAttackRange) {
+            nextState = 'attack';
+            nextStateTimer = m.state === 'attack' ? stateTimer : 0;
           }
 
           const mLeft = nextX;
@@ -1358,36 +1444,33 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               particleSys.current.triggerLandingDust(nextX + m.width / 2, stageH - mBottom);
               say('MUSHROOM STOMPED! +350 PTS!', 1600);
 
-              // Put into dying animation
+              // Stagger (Hit) first; the loop transitions it into Die.
               nextMushrooms.push({
                 ...m,
                 x: nextX,
-                state: 'die',
+                vx: nextVx,
+                facing,
+                state: 'hit',
                 frameIndex: 0,
                 animTimer: 0,
+                stateTimer: 0,
               });
 
-              // Respawn mushroom after 5s delay on the opposite side of stage
-              setTimeout(() => {
+              // Respawn a fresh monster clear of the safe zone after a delay.
+              const timeoutId = window.setTimeout(() => {
+                const spawn = mushroomSpawn(
+                  stateRef.current.stageWidth || 1000,
+                  stateRef.current.safeZoneMax,
+                );
                 mushroomsRef.current = [
                   ...mushroomsRef.current,
-                  {
-                    id: Math.random() + Date.now(),
-                    x: Math.random() > 0.5 ? Math.max(SAFE_ZONE_MAX + 120, (stateRef.current.stageWidth || 800) - 120) : SAFE_ZONE_MAX + 80,
-                    y: 0,
-                    vx: Math.random() > 0.5 ? 60 : -60,
-                    facing: Math.random() > 0.5 ? 1 : -1,
-                    state: 'run',
-                    frameIndex: 0,
-                    animTimer: 0,
-                    width: 44,
-                    height: 48,
-                  },
+                  { id: Date.now() + Math.random(), ...spawn },
                 ];
                 setMushrooms(mushroomsRef.current);
-              }, 5000);
+              }, MUSHROOM_RESPAWN_MS);
+              mushroomRespawnTimeoutsRef.current.push(timeoutId);
               continue;
-            } else if (!invulnerableRef.current) {
+            } else if (!invulnerableRef.current && !playerInSafeZone && !spawnGrace) {
               // Player contact damage from mushroom
               if (onTakeDamage) {
                 onTakeDamage(1);
@@ -1398,7 +1481,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               stateRef.current.vy = 360;
               stateRef.current.grounded = false;
               say('OUCH! MUSHROOM MONSTER!', 1800);
-              setTimeout(() => {
+              window.setTimeout(() => {
                 invulnerableRef.current = false;
                 setInvulnerable(false);
               }, 1200);
@@ -1410,8 +1493,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             x: nextX,
             vx: nextVx,
             facing,
-            frameIndex: nextFrame,
-            animTimer: nextAnimTimer,
+            state: nextState,
+            stateTimer: nextStateTimer,
+            frameIndex: mushroomFrameIndex(nextState, nextStateTimer),
+            animTimer: m.animTimer + dt,
           });
         }
 
@@ -1429,14 +1514,29 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     return () => cancelAnimationFrame(animId);
   }, [openBlock, onAddScore, onAddCoin, doJump]);
 
-  // Initial sizing + block position setup
+  // Initial sizing + block position setup. Also places every pre-spawned
+  // hazard clear of the freshly-computed safe zone and opens the damage-free
+  // grace window, so the player is never hit before they take control.
   useEffect(() => {
-    if (containerRef.current) {
-      const w = containerRef.current.clientWidth;
-      stateRef.current.stageWidth = w;
-      stateRef.current.x = Math.max(20, w / 2 - 60);
-      setPosX(stateRef.current.x);
-    }
+    applyStageLayout(true);
+
+    const { stageWidth, safeZoneMax } = stateRef.current;
+    mushroomsRef.current = mushroomsRef.current.map((m) =>
+      m.state === 'die' ? m : { id: m.id, ...mushroomSpawn(stageWidth, safeZoneMax) },
+    );
+    setMushrooms(mushroomsRef.current);
+
+    spawnGraceUntilRef.current = performance.now() + SPAWN_GRACE_MS;
+  }, [applyStageLayout]);
+
+  // Clear any pending mushroom respawns on unmount so their timers can't fire
+  // setState into a torn-down component.
+  useEffect(() => {
+    const pending = mushroomRespawnTimeoutsRef.current;
+    return () => {
+      pending.forEach((id) => clearTimeout(id));
+      pending.length = 0;
+    };
   }, []);
 
   // --- Ground shadows ---
@@ -1707,9 +1807,9 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               className={`${savedDx ? 'absolute' : 'relative'} w-12 h-12 sm:w-14 sm:h-14 font-pixel transition-all cursor-pointer select-none border-2 flex items-center justify-center ${
                 isBumped
                   ? 'animate-mystery-bump z-40'
-                  : !isUsed
-                  ? 'animate-mystery-idle'
-                  : ''
+                  : isUsed
+                  ? 'animate-mystery-revealed'
+                  : 'animate-mystery-idle'
               } ${
                 isUsed
                   ? 'bg-[#0c0a18] border-[#241c42] text-[#7d7aa3] shadow-[0_4px_10px_rgba(0,0,0,0.6)]'
@@ -1761,11 +1861,11 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                   <img
                     src={block.image}
                     alt={block.label}
-                    className="w-8 h-8 sm:w-10 sm:h-10 object-contain pixel-art drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)] animate-in zoom-in-75 duration-200"
+                    className="w-8 h-8 sm:w-10 sm:h-10 object-contain pixel-art drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)] animate-mystery-item"
                   />
                 ) : (
                   <span
-                    className={`font-pixel font-bold tracking-tight uppercase leading-none block px-0.5 text-center ${
+                    className={`font-pixel font-bold tracking-tight uppercase leading-none block px-0.5 text-center animate-mystery-item ${
                       block.label.length >= 8
                         ? 'text-[6.5px] sm:text-[7.5px]'
                         : block.label.length >= 6
@@ -1961,6 +2061,29 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#0a0817] border-b-2 border-r-2 border-[#00e5ff] rotate-45" />
         </div>
       )}
+
+      {/* Safe-zone floor panel: a neon strip on the ground directly under the
+          player's spawn, labelled so the safe area is discoverable. Purely
+          decorative — the immunity itself is enforced by the hazard loop. It
+          sits above the backdrop but below the actor, shadows and hazards. */}
+      <div
+        aria-hidden="true"
+        className="absolute z-[5] pointer-events-none"
+        style={{
+          left: `${safeZone.min}px`,
+          width: `${Math.max(0, safeZone.max - safeZone.min)}px`,
+          bottom: 0,
+          height: `${GROUND_H}px`,
+        }}
+      >
+        <div className="absolute inset-x-0 top-0 h-[2px] bg-[#3dffa2] shadow-[0_0_12px_rgba(61,255,162,0.9)] animate-safe-zone" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#3dffa2]/20 via-[#3dffa2]/5 to-transparent" />
+        <div className="absolute left-0 top-0 bottom-0 w-px bg-[#3dffa2]/50" />
+        <div className="absolute right-0 top-0 bottom-0 w-px bg-[#3dffa2]/50" />
+        <span className="absolute inset-x-0 bottom-1.5 text-center font-pixel text-[7px] sm:text-[8px] tracking-[0.25em] text-[#3dffa2] drop-shadow-[0_0_6px_rgba(61,255,162,0.8)] animate-safe-zone">
+          SAFE ZONE
+        </span>
+      </div>
 
       {/* Actor Shadow on Ground — feathered so it reads as light falloff instead
           of a flat black pill, which barely showed against the asphalt. */}

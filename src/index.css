@@ -232,6 +232,97 @@
   animation: mysteryBump 0.38s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards !important;
 }
 
+/* Revealed block: a one-shot pop into place (scale + brightness flash),
+   followed by a slow accent-coloured glow pulse. The pulse only animates
+   box-shadow, so it never fights the reveal's transform. `currentColor` tracks
+   each block's own accent set inline via `style.color`. */
+@keyframes mysteryReveal {
+  0% {
+    transform: scale(0.55) rotate(-8deg);
+    filter: brightness(2.6);
+  }
+  60% {
+    transform: scale(1.14) rotate(3deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    filter: brightness(1);
+  }
+}
+
+@keyframes mysteryRevealedPulse {
+  0%, 100% {
+    box-shadow: 0 0 8px currentColor, inset 0 0 6px transparent;
+  }
+  50% {
+    box-shadow: 0 0 20px currentColor, inset 0 0 12px currentColor;
+  }
+}
+
+.animate-mystery-revealed {
+  animation: mysteryReveal 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28),
+    mysteryRevealedPulse 2.8s ease-in-out 0.5s infinite;
+}
+
+/* The revealed icon/label scales in just behind the block's pop. */
+@keyframes mysteryItem {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-mystery-item {
+  animation: mysteryItem 0.42s cubic-bezier(0.18, 0.89, 0.32, 1.28) both;
+}
+
+/* ---------------------------------------------------------------------------
+   Safe-zone floor panel
+
+   A slow neon breathing on the ground strip under the player's spawn so the
+   safe area reads as "live" without being distracting.
+   --------------------------------------------------------------------------- */
+@keyframes safeZonePulse {
+  0%, 100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-safe-zone {
+  animation: safeZonePulse 2.4s ease-in-out infinite;
+}
+
+/* ---------------------------------------------------------------------------
+   Footer arcade marquee
+
+   The footer renders two identical copies of the ticker text in a `w-max`
+   flex row; shifting the row by -50% moves it by exactly one copy, so the
+   loop is seamless. Each copy owns its trailing spacing (no flex gap), since
+   a gap would leave -50% short of a full copy and cause a visible jump.
+   --------------------------------------------------------------------------- */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 35s linear infinite;
+}
+
 /* ---------------------------------------------------------------------------
    Slideshow progress
 
@@ -279,7 +370,11 @@
   .animate-health-pulse,
   .animate-mystery-idle,
   .animate-mystery-question,
-  .animate-mystery-bump {
+  .animate-mystery-bump,
+  .animate-mystery-revealed,
+  .animate-mystery-item,
+  .animate-safe-zone,
+  .animate-marquee {
     /* The nudge stops blinking but keeps its neon glow, so it stays legible. */
     animation: none !important;
   }

@@ -1,11 +1,14 @@
 import React from 'react';
+import type { MushroomState } from '../utils/mushroom';
 import mushroomRunImg from '../assets/images/mushroom/Mushroom-Run.png';
 import mushroomIdleImg from '../assets/images/mushroom/Mushroom-Idle.png';
 import mushroomHitImg from '../assets/images/mushroom/Mushroom-Hit.png';
 import mushroomDieImg from '../assets/images/mushroom/Mushroom-Die.png';
 import mushroomAttackImg from '../assets/images/mushroom/Mushroom-Attack.png';
 
-export type MushroomState = 'run' | 'idle' | 'hit' | 'die' | 'attack';
+// Re-exported so consumers can keep importing the state union from here while
+// the single source of truth lives in the pure utils module.
+export type { MushroomState };
 
 interface MushroomMonsterProps {
   x: number;

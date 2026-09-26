@@ -133,6 +133,35 @@ tested in `jumpTurn.test.ts`.
 - `prefers-reduced-motion` swaps directions instantly and skips the turn
   animation; `Esc` cancels a walk or turn and resets the controller
 
+## Mushroom Monster hazards
+
+A patrolling Mushroom Monster guards the far side of the stage. Its rules live
+in the pure `src/utils/mushroom.ts` module — spawn, patrol, safe zone, frame
+timing — so the whole system is unit tested (`mushroom.test.ts`) without a DOM
+or an animation loop.
+
+- **Patrol** — the monster spawns pinned to the wall opposite the player and
+  walks the full span at `MUSHROOM_SPEED`, turning at the stage walls and at the
+  edge of the player's **safe zone**
+- **Safe zone** — the zone centred on the player's spawn (`safeZoneBounds`) is
+  always safe to stand in. `resolveMushroomMotion` repels the monster out of it
+  toward whichever side its body came from, and clamps the wall bounce against
+  the same boundary, so the two rules can never trap it in a vibrating loop on
+  narrow (phone-width) stages
+- **Spawn grace** — contact damage is suppressed for `SPAWN_GRACE_MS` after the
+  stage lays out, so a hazard can't hit the player behind the boot screen
+- **Attack telegraph** — within `MUSHROOM_ATTACK_RANGE`, ahead of it and on the
+  same level, the monster lunges and holds its attack pose
+- **Stomp** — jumping onto it while falling plays Hit → Die, bounces the player,
+  awards +350, and respawns a fresh monster clear of the safe zone after
+  `MUSHROOM_RESPAWN_MS`. Pending respawn timers are cleared on unmount
+- **Facing follows velocity** — the sprite can never walk one way while facing
+  the other, since `facing` is derived from the resolved velocity every tick
+
+Animation is 80×64 sprite sheets (`MushroomMonster.tsx`). Per-state frame counts
+and playback rates live in `MUSHROOM_ANIM`, and one-shot states (attack, hit,
+die) clamp on their final frame.
+
 ## Contact channels
 
 The FINAL LEVEL section renders five pixel-art icon buttons — Email, LinkedIn,
@@ -160,6 +189,7 @@ src/
   index.css               # Tailwind entry + retro theme tokens
   components/
     ArcadeStage.tsx       # The playable stage: physics loop, blocks, slideshow
+    MushroomMonster.tsx   # 80×64 sprite-sheet hazard renderer
     Hud.tsx               # Score / coin header
     BootScreen.tsx        # Retro boot sequence
     CharacterSheet.tsx    # Character stats panel
@@ -180,6 +210,7 @@ src/
     motion.ts             # Reduced-motion preference + helpers
     walk.ts               # Walk-cycle frame selection from the sprite-sheet JSON
     jumpTurn.ts           # Jump lifecycle + 3D turn state machine and anchors
+    mushroom.ts           # Pure hazard patrol/safe-zone/frame logic
     shadow.ts             # Ground shadow sizing helpers
     soundEngine.ts        # Web Audio chiptune synthesis
     particleSystem.ts     # Canvas particle effects
@@ -347,9 +378,9 @@ different origin, update the four absolute URLs in `index.html` (two metas plus
 
 ## Testing
 
-Logic that isn't tied to React or the DOM is extracted into pure modules
-(`src/utils/physics.ts`, `src/utils/input.ts`, `src/utils/blocks.ts`,
-`src/utils/motion.ts`, `src/data/backgrounds.ts`) and covered by Vitest:
+Logic that isn't tied to React or the DOM is extracted into pure modules(`src/utils/physics.ts`, `src/utils/input.ts`, `src/utils/blocks.ts`,
+  `src/utils/mushroom.ts`, `src/utils/motion.ts`, `src/data/backgrounds.ts`) and
+covered by Vitest:
 
 ```bash
 npm test
