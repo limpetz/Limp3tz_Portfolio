@@ -488,6 +488,51 @@
 }
 
 /* ---------------------------------------------------------------------------
+   INSERT COIN tactile burst
+
+   Clicking the floating INSERT COIN button sprays ~14 coin glyphs (¤) from
+   the click point. Each particle is a span.coin-burst-particle appended to
+   the button by burstCoins() in App.tsx, animated by these keyframes with
+   its random velocity fed through --burst-dx/--burst-dy custom properties;
+   the span removes itself on animationend. overflow visible on the host so
+   coins can fly past the button's own box. Under prefers-reduced-motion the
+   burst freezes (and its fades hold), so the flag guard in burstCoins() —
+   which relies on animationend — is backed by a 900ms timeout there.
+   --------------------------------------------------------------------------- */
+.coin-burst-host {
+  overflow: visible;
+}
+
+.coin-burst-particle {
+  position: absolute;
+  pointer-events: none;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1;
+  color: #ffd23f;
+  text-shadow: 0 0 6px rgba(255, 210, 63, 0.9), 0 0 12px rgba(255, 210, 63, 0.5);
+  transform: translate(-50%, -50%);
+  animation: coinBurst 0.65s cubic-bezier(0.15, 0.6, 0.4, 1) forwards;
+}
+
+@keyframes coinBurst {
+  from {
+    transform: translate(-50%, -50%) translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, -50%)
+      translate(var(--burst-dx, 0px), var(--burst-dy, 0px))
+      scale(0.4);
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Mystery-block bump hint
 
    The "jump to bump" affordance: when the player stands within reach of an
@@ -578,9 +623,17 @@
   .animate-block-idle,
   .animate-block-bump,
   .collectible-icon--coin,
-  .collectible-icon--heart {
+  .collectible-icon--heart,
+  .coin-burst-particle {
     /* The nudge stops blinking but keeps its neon glow, so it stays legible. */
     animation: none !important;
+  }
+
+  /* Freeze the coin burst at its first frame instead of letting the (already
+     animation:none) particle sit fully visible forever — the flag timeout in
+     burstCoins() cleans the spans up either way. */
+  .coin-burst-particle {
+    opacity: 0;
   }
 }
 

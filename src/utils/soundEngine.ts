@@ -131,6 +131,25 @@ class RetroSoundEngine {
     this.playTone(freq, ctx.currentTime, duration, 'square', vol);
   }
 
+  /**
+   * Soft two-note tick for pointer hover on interactive controls.
+   *
+   * Deliberately much quieter than every press sound (0.02–0.025 vs 0.06+)
+   * and high-pitched so it reads as a cabinet's menu tick rather than an
+   * action. Triangle wave keeps it soft — a square at this volume would
+   * buzz. Before the boot-screen gesture the AudioContext is still suspended;
+   * getContext()'s resume attempt is rejected and swallowed, so early hovers
+   * are silently silent (browsers forbid sound before a gesture anyway).
+   */
+  public playHover() {
+    if (!this.sfxEnabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    this.playTone(740, t, 0.03, 'triangle', 0.025);
+    this.playTone(1100, t + 0.035, 0.03, 'triangle', 0.02);
+  }
+
   public playJump() {
     if (!this.sfxEnabled) return;
     const ctx = this.getContext();

@@ -89,6 +89,70 @@ export default function App() {
     setCoins((prev) => prev + amount);
   }, []);
 
+  /**
+   * Pointer hover on INSERT COIN: a soft two-note menu tick from the
+   * soundEngine. `onFocus` shares the handler so keyboard users hear the
+   * same affordance. No-op before the boot-screen gesture unlocks audio —
+   * browsers forbid sound until then, and getContext() swallows the resume
+   * rejection.
+   */
+  const handleCoinHover = useCallback(() => {
+    sound.playHover();
+  }, []);
+
+  /**
+   * Tactile coin burst on INSERT COIN: spawns ~14 absolutely-positioned
+   * coin glyphs around the click point with per-coin random velocity, then
+   * removes them when their animation ends (auto-cleanup — no timers, no
+   * state, nothing left in the DOM).
+   *
+   * CSS-animated (`coin-burst` keyframes in index.css via a WAAPI-compatible
+   * CSS custom property) so it composites off the main thread and freezes
+   * under prefers-reduced-motion via the shared media query.
+   *
+   * The stage's canvas particle system is not used here on purpose: it lives
+   * inside ArcadeStage's layout, while this button is `fixed` at the app root
+   * — feeding it would need a second full-screen canvas attached at the root,
+   * more infrastructure than a 700ms one-shot burst warrants.
+   */
+  const burstCoins = useCallback((clientX: number, clientY: number) => {
+    if (typeof document === 'undefined') return;
+    const host = document.querySelector<HTMLElement>('.coin-burst-host');
+    if (!host) return;
+    // Don't double-burst while the previous wave is still visible; the 900ms
+    // safety valve below always clears the flag.
+    if (host.dataset.bursting === 'true') return;
+
+    const rect = host.getBoundingClientRect();
+    const originX = clientX - rect.left;
+    const originY = clientY - rect.top;
+
+    host.dataset.bursting = 'true';
+    const COUNT = 14;
+    for (let i = 0; i < COUNT; i++) {
+      const coin = document.createElement('span');
+      coin.textContent = '¤';
+      coin.setAttribute('aria-hidden', 'true');
+      coin.className = 'coin-burst-particle';
+      // Random outward velocity: angle spread over the full circle, biased up
+      // (coins pop UP out of a slot, so negative vy bias).
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 40 + Math.random() * 70;
+      coin.style.setProperty('--burst-dx', `${Math.cos(angle) * speed}px`);
+      coin.style.setProperty('--burst-dy', `${Math.sin(angle) * speed - 55}px`);
+      coin.style.left = `${originX}px`;
+      coin.style.top = `${originY}px`;
+      coin.addEventListener('animationend', () => coin.remove(), { once: true });
+      host.appendChild(coin);
+    }
+    // Safety valve: the keyframes always run to completion, but a suspended
+    // tab could hold the last wave forever and lock the guard flag.
+    window.setTimeout(() => {
+      host.dataset.bursting = 'false';
+      host.querySelectorAll('.coin-burst-particle').forEach((el) => el.remove());
+    }, 900);
+  }, []);
+
   const handleTakeDamage = useCallback((amount: number = 1) => {
     setHealth((prev) => {
       const next = Math.max(0, prev - amount);
@@ -259,11 +323,22 @@ export default function App() {
       <div className="fixed bottom-4 left-4 z-40 hidden sm:flex items-center gap-2">
         <button
           type="button"
-          onClick={() => {
+          onMouseEnter={handleCoinHover}
+          onFocus={handleCoinHover}
+          onClick={(e) => {
             sound.playPower();
             handleAddScore(100);
+            burstCoins(e.clientX, e.clientY);
           }}
-          className="font-pixel text-[7px] px-2.5 py-1.5 border border-[#ffd23f] text-[#ffd23f] bg-[#0a0817] hover:bg-[#ffd23f] hover:text-black transition-colors cursor-pointer shadow-[0_2px_0_#000]"
+          onKeyDown={(e) => {
+            // Enter fires click (with coordinates) automatically; Space fires
+            // only keydown with no pointer event, so burst at the button.
+            if (e.key === ' ') {
+              const r = e.currentTarget.getBoundingClientRect();
+              burstCoins(r.left + r.width / 2, r.top + r.height / 2);
+            }
+          }}
+          className="coin-burst-host relative font-pixel text-[7px] px-2.5 py-1.5 border border-[#ffd23f] text-[#ffd23f] bg-[#0a0817] hover:bg-[#ffd23f] hover:text-black transition-colors cursor-pointer shadow-[0_2px_0_#000]"
           title="Easter egg: Instant 100 points!"
         >
           INSERT COIN
