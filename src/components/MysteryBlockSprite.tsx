@@ -38,12 +38,14 @@ const STATIC_POSITION: Record<MysteryBlockVisualState, string> = {
 };
 
 /**
- * Per-sheet size compensation. The four sheets draw their block at slightly
- * different widths inside the 362px frame — measured content widths are
- * ~291px (name), ~285px (role), ~235px (location) and ~227px (status) — so
- * at one shared scale the LOCATION and STATUS blocks read visibly smaller
- * than the rest of the row. Each sheet scales up by NAME's width divided by
- * its own, normalising the drawn blocks to the same visual size.
+ * Per-sheet fill compensation. The four sheets draw their block at different
+ * widths inside the 362px frame — measured content widths are ~291px (name),
+ * ~285px (role), ~235px (location) and ~227px (status) — so at one shared
+ * scale the LOCATION and STATUS blocks read visibly smaller and their
+ * revealed labels too. Each sheet scales so its content fills the same share
+ * of the button (name's 291/362 ≈ 0.80 of the frame): location lands at
+ * ~1.24x and status at ~1.28x, which also grows the revealed label art by
+ * the same ratio. Transform-only, so hitboxes and neighbours never reflow.
  */
 const SHEET_COMPENSATION: Record<MysteryBlockKey, number> = {
   name: 1,

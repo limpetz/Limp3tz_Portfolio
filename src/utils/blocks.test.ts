@@ -11,9 +11,9 @@ import {
   nearestBumpTarget,
 } from './blocks';
 // Centres as actually measured from the rendered flex row in a 1440px stage:
-// four 56px blocks with 24px gaps, so the pitch is 80px, not the 70px the old
-// duplicated spacing constant assumed.
-const MEASURED = [600, 680, 760, 840];
+// four 64px blocks with 32px desktop gaps, so the pitch is 96px — the row the
+// collision maths actually plays against.
+const MEASURED = [576, 672, 768, 864];
 
 // Collision half-width derived from the measured block width plus a 4px grace.
 const RADIUS = 56 / 2 + 4;
@@ -26,9 +26,9 @@ const STAGE = {
 
 describe('findHeadBumpedBlock', () => {
   it('reports the block directly overhead', () => {
-    expect(findHeadBumpedBlock({ ...STAGE, actorCenterX: 600, actorHead: 280 })).toEqual({
+    expect(findHeadBumpedBlock({ ...STAGE, actorCenterX: 576, actorHead: 280 })).toEqual({
       index: 0,
-      centerX: 600,
+      centerX: 576,
     });
   });
 
@@ -40,17 +40,17 @@ describe('findHeadBumpedBlock', () => {
   });
 
   it('still collides when the actor is slightly off-centre', () => {
-    expect(findHeadBumpedBlock({ ...STAGE, actorCenterX: 615, actorHead: 280 })?.index).toBe(0);
+    expect(findHeadBumpedBlock({ ...STAGE, actorCenterX: 591, actorHead: 280 })?.index).toBe(0);
   });
 
   it('misses when the actor is in the gap between two blocks', () => {
-    // 640 is exactly between 600 and 680 — 40px from each, outside the radius.
-    expect(findHeadBumpedBlock({ ...STAGE, actorCenterX: 640, actorHead: 280 })).toBeNull();
+    // 624 is exactly between 576 and 672 — 48px from each, outside the radius.
+    expect(findHeadBumpedBlock({ ...STAGE, actorCenterX: 624, actorHead: 280 })).toBeNull();
   });
 
   it('treats the block radius as exclusive at the exact edge', () => {
-    expect(findHeadBumpedBlock({ ...STAGE, actorCenterX: 632, actorHead: 280 })).toBeNull();
-    expect(findHeadBumpedBlock({ ...STAGE, actorCenterX: 631, actorHead: 280 })?.index).toBe(0);
+    expect(findHeadBumpedBlock({ ...STAGE, actorCenterX: 608, actorHead: 280 })).toBeNull();
+    expect(findHeadBumpedBlock({ ...STAGE, actorCenterX: 607, actorHead: 280 })?.index).toBe(0);
   });
 
   it('never bumps a block the side collision would reject (same box)', () => {
@@ -89,9 +89,11 @@ describe('findHeadBumpedBlock', () => {
   // 840 (spanning 812-868). Everything right of 848 was unreachable — a 20px
   // strip of a visible block that could not be bumped.
   it('registers bumps in the zone the old fixed-spacing layout left dead', () => {
-    const deadBefore = 860; // inside the drawn block, 44px from the old centre
+    // Block 4 now centres at 864 (drawn 832-896); both points sit well inside
+    // the drawn block and within the bump radius.
+    const deadBefore = 890;
     expect(findHeadBumpedBlock({ ...STAGE, actorCenterX: deadBefore, actorHead: 280 })?.index).toBe(3);
-    expect(findHeadBumpedBlock({ ...STAGE, actorCenterX: 820, actorHead: 280 })?.index).toBe(3);
+    expect(findHeadBumpedBlock({ ...STAGE, actorCenterX: 838, actorHead: 280 })?.index).toBe(3);
   });
 
   it('uses the centres it is given, at whatever spacing', () => {
@@ -141,15 +143,15 @@ describe('nearestBumpTarget', () => {
   });
 
   it('picks the first block in a tie', () => {
-    // 640 sits exactly between 600 and 680 — reachable only with a widened
+    // 624 sits exactly between 576 and 672 — reachable only with a widened
     // range, since the default 30 leaves it in the gap.
-    expect(nearestBumpTarget(640, MEASURED, 40)).toBe(0);
+    expect(nearestBumpTarget(624, MEASURED, 48)).toBe(0);
   });
 
   it('honours a custom range', () => {
-    // 610 is 10px from block 0 and 70px from anything else.
-    expect(nearestBumpTarget(610, MEASURED, 10)).toBe(0);
-    expect(nearestBumpTarget(610, MEASURED, 9)).toBeNull();
+    // 586 is 10px from block 0 and 86px from anything else.
+    expect(nearestBumpTarget(586, MEASURED, 10)).toBe(0);
+    expect(nearestBumpTarget(586, MEASURED, 9)).toBeNull();
   });
 
   it('hints nothing when there are no blocks', () => {

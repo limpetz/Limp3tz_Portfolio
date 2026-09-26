@@ -1885,7 +1885,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           a saved position flow through the centred flex (the default spread). */}
       <div
         ref={blocksRowRef}
-        className="absolute left-0 right-0 flex justify-center gap-4 sm:gap-6 z-30"
+        className="absolute left-0 right-0 flex justify-center gap-4 sm:gap-8 z-30"
         style={{ bottom: `${GROUND_H + stateRef.current.blocksLift}px` }}
       >
         {MYSTERY_BLOCKS_DATA.map((block, idx) => {
@@ -2022,7 +2022,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           by saved position) so relocated blocks shadow in the right spot. */}
       <div
         aria-hidden="true"
-        className="absolute left-0 right-0 flex justify-center gap-4 sm:gap-6 z-10 pointer-events-none"
+        className="absolute left-0 right-0 flex justify-center gap-4 sm:gap-8 z-10 pointer-events-none"
         style={{ bottom: `${GROUND_H - 6}px`, opacity: blockShadow.opacity.toFixed(3) }}
       >
         {MYSTERY_BLOCKS_DATA.map((block) => {
