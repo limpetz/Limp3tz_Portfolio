@@ -376,14 +376,14 @@ export const STOMP_CHAIN_STEP = 150;
 /**
  * Longest rewarded chain; later stomps in one flight keep this link's value.
  *
- * Tuning note (checked against the stage physics, final): a stomp relaunches
- * the player at 880 px/s from about the slime's 48px top, so each link costs
- * ~0.9s of flight while the arc drifts at the player's air speed — linking is
- * about steering to the next patrolling slime. Two to four links is a normal
- * skilled flight; x8 demands every one of the four hazards lined up under the
- * arc, so the cap is a safety ceiling against degenerate multi-hits, not a
- * limit anyone regularly feels. Revisit only if players start seeing x8
- * shouts routinely; the fix would be a higher cap, not a smaller step.
+ * Tuning note (checked against the stage layout, final): the deepest chain
+ * any player can reach is x2. The two slime pairs patrol zone-locked regions
+ * roughly 500px apart, while one stomp flight covers ~230px (0.88s of flight
+ * at the player's air speed), so the third stomp of a "chain" is always
+ * geometrically impossible — after a pair is cleared the next live slime is
+ * beyond the arc's reach. x2 (both slimes of one pair in a single flight) is
+ * the top of real skill and earns the coin burst + screen shake; the cap
+ * above that is a pure safety ceiling against degenerate multi-hits.
  */
 export const STOMP_CHAIN_MAX = 8;
 

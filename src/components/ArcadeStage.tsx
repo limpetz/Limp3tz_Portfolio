@@ -1481,11 +1481,15 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               const chain = stompChainRef.current;
               onAddScore(stompChainScore(chain));
               particleSys.current.triggerLandingDust(nextX + m.width / 2, stageH - mBottom);
-              // Big combos celebrate: from link 3 the dying slime bursts coins
-              // and adds a coin chime, so a loud chain reads louder than the
-              // shout alone. The sparkle carries no floating score — the chain
-              // shout already announces the number.
-              if (chain >= 3) {
+              // Big combos celebrate: the deepest reachable chain is x2 —
+              // the two slime pairs patrol zone-locked regions ~500px apart
+              // while one stomp flight covers ~230px, so a third airborne
+              // stomp is geometrically impossible for any player. x2 (both
+              // slimes of one pair in one flight) is therefore the top of
+              // real skill, and it earns the coin burst, chime and shake.
+              // The sparkle carries no floating score — the chain shout
+              // already announces the number.
+              if (chain >= 2) {
                 sound.playCoin();
                 particleSys.current.triggerCoinSparkle(
                   nextX + m.width / 2,
@@ -1495,7 +1499,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                 );
                 // The bigger the chain, the harder the cabinet shakes.
                 shakeUntilRef.current = performance.now() + SHAKE_MS;
-                shakePowerRef.current = Math.min(1.5, 1 + (chain - 3) * 0.25);
+                shakePowerRef.current = Math.min(1.5, 0.75 + (chain - 2) * 0.25);
               }
               say(stompChainLabel(chain), 1600);
 
