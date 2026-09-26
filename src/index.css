@@ -389,7 +389,10 @@
 
 .collectible-icon--coin {
   transform-origin: center;
-  animation: collectible-coin-spin 900ms steps(8, end) infinite;
+  /* 1.1s at double spawn density: the sky is busier, so the spin reads as a
+     calm shimmer instead of a frantic flicker. The heart glow shares the
+     rhythm so both collectibles pulse together. */
+  animation: collectible-coin-spin 1100ms steps(8, end) infinite;
 }
 
 @keyframes collectible-coin-spin {
@@ -422,7 +425,7 @@
 
 .collectible-icon--heart {
   transform-origin: center;
-  animation: collectible-heart-glow 900ms ease-in-out infinite;
+  animation: collectible-heart-glow 1100ms ease-in-out infinite;
 }
 
 @keyframes collectible-heart-glow {
