@@ -20,7 +20,7 @@
 import puppeteer from 'puppeteer-core';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const URL = process.argv[2] || 'http://localhost:4173/';
@@ -48,7 +48,9 @@ if (!existsSync(FFMPEG)) {
 }
 
 /** Raw screencast frames (base64 jpeg) with arrival timestamps. */
-const frames = [];  const browser = await puppeteer.launch({
+const frames = [];
+/** Completed chain shouts with capture timestamps, for the highlight trim. */
+const chainEvents = [];  const browser = await puppeteer.launch({
   executablePath: CHROME,
   headless: 'new',
   args: ['--no-sandbox', '--disable-gpu', '--window-size=1400,900'],
@@ -137,7 +139,6 @@ try {
   let steer = null;
   let stomps = 0;
   let lastCompleted = '';
-  let chainSeen = 0;
   const CHAIN_MS = 45000;
   const chainStart = Date.now();
 
@@ -208,7 +209,7 @@ try {
         stomps += 1;
         const chain = /x(\d+)/.exec(shout);
         if (chain) {
-          chainSeen = Math.max(chainSeen, parseInt(chain[1], 10));
+          chainEvents.push({ t: Date.now(), text: shout, x: parseInt(chain[1], 10) });
           console.log(`  chain link: ${shout}`);
         } else {
           console.log(`  stomp ${stomps}: ${shout}`);
@@ -223,7 +224,7 @@ try {
   // Tail so the last coin burst and shake finish on camera.
   await sleep(1500);
 
-  console.log(`\ncompleted shouts: ${stomps}, deepest chain: x${chainSeen}`);
+  console.log(`\ncompleted shouts: ${stomps}, deepest chain: x${Math.max(0, ...chainEvents.map((e) => e.x))}`);
   console.log(`last shout: ${lastCompleted || '(none)'}`);
   console.log(`collected ${frames.length} screencast frames`);
 } finally {
@@ -240,6 +241,7 @@ if (frames.length < 30) {
 // play at that speed instead of a made-up constant.
 const spanS = (frames[frames.length - 1].t - frames[0].t) / 1000;
 const fps = Math.min(30, Math.max(10, Math.round(frames.length / Math.max(1, spanS))));
+const t0 = frames[0].t;
 
 const work = join(tmpdir(), 'stomp-chain-frames');
 rmSync(work, { recursive: true, force: true });
@@ -248,30 +250,60 @@ frames.forEach((f, i) =>
   writeFileSync(join(work, `f${String(i).padStart(5, '0')}.jpg`), Buffer.from(f.data, 'base64')),
 );
 
+/** Encode frames [startIdx, endIdx) to `out`, scaled to even dimensions. */
+function encode(startIdx, endIdx, out) {
+  execFileSync(
+    FFMPEG,
+    [
+      '-y',
+      '-framerate',
+      String(fps),
+      '-start_number',
+      String(startIdx),
+      '-i',
+      join(work, 'f%05d.jpg'),
+      '-frames:v',
+      String(endIdx - startIdx),
+      // yuv420p needs even dimensions; Chrome's screencast scaling happily
+      // produces odd ones (e.g. 900x553 from a 1400x860 viewport).
+      '-vf',
+      'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+      '-c:v',
+      'libx264',
+      '-pix_fmt',
+      'yuv420p',
+      '-crf',
+      '23',
+      '-movflags',
+      '+faststart',
+      out,
+    ],
+    { stdio: ['ignore', 'ignore', 'inherit'] },
+  );
+}
+
 console.log(`\nencoding ${frames.length} frames at ${fps} fps...`);
-execFileSync(
-  FFMPEG,
-  [
-    '-y',
-    '-framerate',
-    String(fps),
-    '-i',
-    join(work, 'f%05d.jpg'),
-    // yuv420p needs even dimensions; Chrome's screencast scaling happily
-    // produces odd ones (e.g. 900x553 from a 1400x860 viewport).
-    '-vf',
-    'scale=trunc(iw/2)*2:trunc(ih/2)*2',
-    '-c:v',
-    'libx264',
-    '-pix_fmt',
-    'yuv420p',
-    '-crf',
-    '23',
-    '-movflags',
-    '+faststart',
-    OUT,
-  ],
-  { stdio: ['ignore', 'ignore', 'inherit'] },
-);
-rmSync(work, { recursive: true, force: true });
+encode(0, frames.length, OUT);
 console.log(`\nWrote ${OUT}`);
+
+// --- Highlight ---------------------------------------------------------------
+// Trim the deepest chain shout into a short clip: 4s before the shout so the
+// steered arc that produced it is on camera, 3s after for the coin burst and
+// shake. Falls back to the full video's directory when OUT is a bare filename.
+if (chainEvents.length > 0) {
+  const best = chainEvents.reduce((b, e) => (e.x > b.x ? e : b));
+  const shoutIdx = Math.max(0, frames.findIndex((f) => f.t >= best.t));
+  const startIdx = Math.max(0, shoutIdx - Math.round(4 * fps));
+  const endIdx = Math.min(frames.length, shoutIdx + Math.round(3 * fps));
+  const HL = join(
+    OUT.includes('/') || OUT.includes('\\') ? dirname(OUT) : '.',
+    'stomp-chain-highlight.mp4',
+  );
+  encode(startIdx, endIdx, HL);
+  console.log(
+    `Wrote ${HL} (x${best.x} shout: "${best.text}", ${((endIdx - startIdx) / fps).toFixed(1)}s)`,
+  );
+} else {
+  console.log('No chain shouts captured — no highlight clip.');
+}
+rmSync(work, { recursive: true, force: true });

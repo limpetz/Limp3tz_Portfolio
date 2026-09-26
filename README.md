@@ -48,6 +48,7 @@ hosted build on Google AI Studio.
 | `npm run playtest` | Drive the built site with headless Chrome and assert the walk/bounce animation (needs `vite preview` running) |
 | `npm run playtest:ci` | Same, with one automatic retry on failure — what CI runs |
 | `npm run playtest:slime` | Phone-width hazard playtest: patrol corridor, narrow body, facing eyes (pass a URL, or it defaults to `:4173`) |
+| `node scripts/capture-stomp.mjs [url] [out.mp4]` | Record a scripted stomp-chain demo (needs `vite preview` + `FFMPEG_PATH`); also writes a 7s `stomp-chain-highlight.mp4` beside the output |
 
 ## Controls
 
@@ -273,6 +274,7 @@ src/
 public/
   background_music.mp3    # Looping chiptune track
   og-image.jpg            # Social preview card (og:image / twitter:image)
+  stomp-chain-highlight.mp4 # 7s scripted x2 stomp chain (coin burst + shake); regenerate via scripts/capture-stomp.mjs
 ```
 
 ## Hero background slideshow
