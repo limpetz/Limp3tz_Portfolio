@@ -479,6 +479,11 @@
 }
 
 .animate-marquee {
+  /* Deliberately exempt from the reduced-motion freeze below: the scrolling
+     IS the marquee — a frozen ticker is just a footer wall of text. Product
+     call by the owner; the real contact/info content lives in the footer
+     beneath it, so nothing is unreachable, only decorative motion.
+     (WCAG 2.2.2 targets exactly this pattern — an accepted trade-off.) */
   animation: marquee 35s linear infinite;
 }
 
@@ -537,8 +542,7 @@
   .animate-block-idle,
   .animate-block-bump,
   .collectible-icon--coin,
-  .collectible-icon--heart,
-  .animate-marquee {
+  .collectible-icon--heart {
     /* The nudge stops blinking but keeps its neon glow, so it stays legible. */
     animation: none !important;
   }
