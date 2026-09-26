@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   ACTOR_WIDTH,
   SLIME_ANIM,
-  SLIME_CELL,
   SLIME_CORRIDOR_TRAVEL,
+  SLIME_FRAME,
   SLIME_ROSTER,
   SLIME_SHEET_COLS,
   SLIME_SHEET_ROWS,
@@ -141,10 +141,10 @@ describe('safeZoneBounds', () => {
 });
 
 describe('slime sheets', () => {
-  it('is a 4x4 grid of 32px cells', () => {
-    expect(SLIME_CELL).toBe(32);
+  it('is a 4x3 grid of 362px frames', () => {
+    expect(SLIME_FRAME).toBe(362);
     expect(SLIME_SHEET_COLS).toBe(4);
-    expect(SLIME_SHEET_ROWS).toBe(4);
+    expect(SLIME_SHEET_ROWS).toBe(3);
   });
 
   it('slimeFrameCell splits a flat index back into row / column', () => {
@@ -157,28 +157,28 @@ describe('slime sheets', () => {
 });
 
 describe('slimeFrameIndex', () => {
-  it('loops the idle pulse on sheet row 0 (4 frames @ 6fps)', () => {
+  it('loops idle on the movement row (4 frames @ 4fps)', () => {
     expect(slimeFrameIndex('idle', 0)).toBe(0);
-    expect(slimeFrameIndex('idle', 1 / 6)).toBe(1);
-    expect(slimeFrameIndex('idle', 0.5)).toBe(3);
-    expect(slimeFrameIndex('idle', 4 / 6)).toBe(0);
-    expect(slimeFrameIndex('idle', 0.7)).toBe(0);
+    expect(slimeFrameIndex('idle', 0.25)).toBe(1);
+    expect(slimeFrameIndex('idle', 0.75)).toBe(3);
+    expect(slimeFrameIndex('idle', 1)).toBe(0);
   });
 
-  it('loops the move cycle on sheet row 1 (4 frames @ 8fps)', () => {
-    expect(slimeFrameIndex('run', 0)).toBe(4);
-    expect(slimeFrameIndex('run', 0.125)).toBe(5);
-    expect(slimeFrameIndex('run', 0.3)).toBe(6);
-    expect(slimeFrameIndex('run', 0.5)).toBe(4);
+  it('loops the hop cycle on the movement row (4 frames @ 8fps)', () => {
+    expect(slimeFrameIndex('run', 0)).toBe(0);
+    expect(slimeFrameIndex('run', 0.125)).toBe(1);
+    expect(slimeFrameIndex('run', 0.3)).toBe(2);
+    expect(slimeFrameIndex('run', 0.5)).toBe(0);
   });
 
   it('clamps one-shot states on their final frame', () => {
     expect(slimeFrameIndex('attack', 0)).toBe(4);
     expect(slimeFrameIndex('attack', 2)).toBe(7);
-    expect(slimeFrameIndex('hit', 0)).toBe(6);
-    expect(slimeFrameIndex('hit', 2)).toBe(6);
-    expect(slimeFrameIndex('die', 0)).toBe(4);
-    expect(slimeFrameIndex('die', 5)).toBe(7);
+    // hit holds the first squish frame; die plays out the squish row.
+    expect(slimeFrameIndex('hit', 0)).toBe(8);
+    expect(slimeFrameIndex('hit', 2)).toBe(8);
+    expect(slimeFrameIndex('die', 0)).toBe(8);
+    expect(slimeFrameIndex('die', 5)).toBe(11);
   });
 
   it('always maps a state to a valid cell on that state’s own row', () => {
@@ -215,8 +215,8 @@ describe('slimeSpawn', () => {
   const zone = { min: 300, max: 580 };
 
   it('starts the left pair on the left wall, walking inward', () => {
-    const a = slimeSpawn({ side: 'left', slot: 0, color: 'blue', stageWidth: 1000, safeZone: zone });
-    const b = slimeSpawn({ side: 'left', slot: 1, color: 'green', stageWidth: 1000, safeZone: zone });
+    const a = slimeSpawn({ side: 'left', slot: 0, color: 'emerald', stageWidth: 1000, safeZone: zone });
+    const b = slimeSpawn({ side: 'left', slot: 1, color: 'violet', stageWidth: 1000, safeZone: zone });
     expect(a.x).toBe(24);
     expect(b.x).toBe(24 + SLIME_SIDE_STAGGER);
     expect(a.vx).toBeGreaterThan(0);
@@ -228,8 +228,8 @@ describe('slimeSpawn', () => {
   });
 
   it('starts the right pair on the right wall, walking inward', () => {
-    const a = slimeSpawn({ side: 'right', slot: 0, color: 'red', stageWidth: 1000, safeZone: zone });
-    const b = slimeSpawn({ side: 'right', slot: 1, color: 'white', stageWidth: 1000, safeZone: zone });
+    const a = slimeSpawn({ side: 'right', slot: 0, color: 'amber', stageWidth: 1000, safeZone: zone });
+    const b = slimeSpawn({ side: 'right', slot: 1, color: 'cyan', stageWidth: 1000, safeZone: zone });
     expect(a.x).toBe(1000 - SLIME_WIDTH - 24);
     expect(b.x).toBe(1000 - SLIME_WIDTH - 24 - SLIME_SIDE_STAGGER);
     expect(a.vx).toBeLessThan(0);
@@ -240,7 +240,7 @@ describe('slimeSpawn', () => {
   });
 
   it('idles on arrival at frame 0', () => {
-    const spawn = slimeSpawn({ side: 'left', slot: 0, color: 'blue', stageWidth: 1000, safeZone: zone });
+    const spawn = slimeSpawn({ side: 'left', slot: 0, color: 'emerald', stageWidth: 1000, safeZone: zone });
     expect(spawn.state).toBe('idle');
     expect(spawn.frameIndex).toBe(0);
     expect(spawn.animTimer).toBe(0);
@@ -248,8 +248,8 @@ describe('slimeSpawn', () => {
   });
 
   it('carries its colour, side and slot so a respawn can rebuild it', () => {
-    const spawn = slimeSpawn({ side: 'right', slot: 1, color: 'white', stageWidth: 1000, safeZone: zone });
-    expect(spawn.color).toBe('white');
+    const spawn = slimeSpawn({ side: 'right', slot: 1, color: 'cyan', stageWidth: 1000, safeZone: zone });
+    expect(spawn.color).toBe('cyan');
     expect(spawn.side).toBe('right');
     expect(spawn.slot).toBe(1);
   });
@@ -277,7 +277,7 @@ describe('slimeSpawn', () => {
     const spawn = slimeSpawn({
       side: 'right',
       slot: 0,
-      color: 'red',
+      color: 'amber',
       stageWidth: 100,
       safeZone: { min: 25, max: 200 },
     });
@@ -300,8 +300,8 @@ describe('slimeSpawn', () => {
     // Equal speeds would land both bodies on the same clamped x at every turn
     // and merge them into one sprite.
     expect(SLIME_SLOT_SPEED[0]).not.toBe(SLIME_SLOT_SPEED[1]);
-    const a = slimeSpawn({ side: 'left', slot: 0, color: 'blue', stageWidth: 1000, safeZone: zone });
-    const b = slimeSpawn({ side: 'left', slot: 1, color: 'green', stageWidth: 1000, safeZone: zone });
+    const a = slimeSpawn({ side: 'left', slot: 0, color: 'emerald', stageWidth: 1000, safeZone: zone });
+    const b = slimeSpawn({ side: 'left', slot: 1, color: 'violet', stageWidth: 1000, safeZone: zone });
     expect(Math.abs(a.vx)).not.toBe(Math.abs(b.vx));
   });
 });
@@ -316,7 +316,7 @@ describe('slimeRoster', () => {
     expect(roster.filter((s) => s.side === 'right')).toHaveLength(2);
     expect(new Set(roster.map((s) => s.color)).size).toBe(4);
     expect(new Set(roster.map((s) => s.color))).toEqual(
-      new Set(['blue', 'green', 'red', 'white']),
+      new Set(['emerald', 'violet', 'amber', 'cyan']),
     );
   });
 
@@ -443,7 +443,7 @@ describe('resolveSlimeMotion', () => {
     let { x, vx } = slimeSpawn({
       side: 'right',
       slot: 0,
-      color: 'red',
+      color: 'amber',
       stageWidth,
       safeZone: zone,
     });
@@ -534,7 +534,7 @@ describe('resolveSlimeMotion', () => {
     let { x, vx } = slimeSpawn({
       side: 'left',
       slot: 0,
-      color: 'blue',
+      color: 'emerald',
       stageWidth,
       safeZone: zone,
     });

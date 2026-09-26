@@ -988,9 +988,13 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       }
 
       // Only block horizontal movement when the player is actually moving
-      // sideways into a block. Jumping straight up (vx ~ 0) should bump the
-      // block from below instead of being shoved out sideways.
-      if (inBlockBand && Math.abs(stateRef.current.vx) > 1) {
+      // sideways into a block — OR rising through its band with the body
+      // clipping its corner (residual walk velocity curls a "jump beside the
+      // block" arc into it; without this the corner-clip either falls through
+      // or, worse, reads as a head bump). A true under-block jump (centre
+      // inside the block column) skips this and bumps from below instead.
+      const rising = stateRef.current.vy > 0;
+      if (inBlockBand && (Math.abs(stateRef.current.vx) > 1 || rising)) {
         // Prefer the per-block band test (relocation-aware); fall back to the
         // shared-band test when vertical measurements are not ready yet.
         const hitIndex = perBlockBands
@@ -1006,6 +1010,13 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
             )
           : findOverlappingBlock(actorL, actorR, blocks, blockRadius);
 
+        // A rising actor with no input has no movement direction to resolve
+        // against — shove toward the side of the block they are on.
+        const movingRight =
+          Math.abs(stateRef.current.vx) > 1
+            ? stateRef.current.vx > 0
+            : stateRef.current.x + stateRef.current.actorWidth / 2 < blocks[hitIndex];
+
         if (hitIndex !== -1) {
           stateRef.current.x = clampToStage(
             resolveBlockCollision(
@@ -1013,7 +1024,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               stateRef.current.actorWidth,
               blocks[hitIndex],
               blockRadius,
-              stateRef.current.vx > 0
+              movingRight
             ),
             stageW,
             stateRef.current.actorWidth
@@ -1057,15 +1068,23 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         stateRef.current.vy -= GRAVITY * apexFactor * dt;
         stateRef.current.y += stateRef.current.vy * dt;
 
-        // Check head collision with mystery blocks while moving UP or near apex
-        if (stateRef.current.vy > -60) {
+        // Check head collision with mystery blocks while actually RISING.
+        // A bump is an upward head contact: gating on vy > 0 keeps a falling
+        // arc from phantom-bumping a block it is drifting past, and keeps the
+        // bump from double-firing after HEAD_BOUNCE_V sends the player down.
+        if (stateRef.current.vy > 0) {
           const hit = findHeadBumpedBlock({
             actorCenterX: stateRef.current.x + stateRef.current.actorWidth / 2,
             actorHead: stateRef.current.y + stateRef.current.actorHeight,
             blockCentres: stateRef.current.blockCentres,
             blockLift: stateRef.current.blocksLift,
             blockBottoms: stateRef.current.blockBottoms,
-            radius: stateRef.current.blockHalfWidth + 10,
+            // The block's TRUE half width, no grace: the bump box must sit
+            // strictly inside the side-collision box (which adds
+            // BLOCK_BUMP_GRACE), so a jump at the block's EDGE is a sideways
+            // shove, never a head bump — and a residual-velocity drift that
+            // curls the arc into the corner still shoves instead of bouncing.
+            radius: stateRef.current.blockHalfWidth,
             tolerance: 50,
           });
 
@@ -2129,7 +2148,6 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           frameIndex={s.frameIndex}
           width={s.width}
           height={s.height}
-          facing={s.facing}
         />
       ))}
 

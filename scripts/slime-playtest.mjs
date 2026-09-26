@@ -1,6 +1,6 @@
 /**
  * Phone-width playtest: verifies the slime hazards on a 375px viewport, where
- * the narrow-stage rules apply (`slimeBoxFor` drops to the 32x34 body and the
+ * the narrow-stage rules apply (`slimeBoxFor` drops to the 32x29 body and the
  * safe zone reserves a left patrol lane).
  *
  * Unlike `playtest.mjs` (which suppresses hazards to measure the walk), this
@@ -77,11 +77,6 @@ try {
           h: el.offsetHeight,
         }),
       );
-      // Renderer-drawn eyes: the sheet art is a symmetric blob, so the gaze is
-      // a DOM overlay whose state should track the patrol direction.
-      const eyes = [...document.querySelectorAll('[data-slime-eye]')].map((el) =>
-        el.getAttribute('data-slime-eye'),
-      );
       // Safe zone: climb from the "SAFE ZONE HERE" label to the positioned
       // band that carries the zone's left/width styles.
       const span = [...document.querySelectorAll('span')].find((s) =>
@@ -91,22 +86,18 @@ try {
       const zone = band
         ? { left: band.offsetLeft, width: band.offsetWidth }
         : null;
-      return { slimes, eyes, zone };
+      return { slimes, zone };
     });
 
   console.log('slime roster:');
   const first = await readSlimes();
   assert(first.slimes.length === 4, `four slimes rendered (got ${first.slimes.length})`);
-  assert(
-    first.eyes.length === 8,
-    `each slime draws two eyes (got ${first.eyes.length} across 4 slimes)`,
-  );
 
   console.log('narrow-stage body:');
-  const narrow = first.slimes.every((s) => s.w === 32 && s.h === 34);
+  const narrow = first.slimes.every((s) => s.w === 32 && s.h === 29);
   assert(
     narrow,
-    `every slime uses the 32x34 narrow box (${first.slimes
+    `every slime uses the 32x29 narrow box (${first.slimes
       .map((s) => `${s.w}x${s.h}`)
       .join(', ')})`,
   );
@@ -118,24 +109,16 @@ try {
 
   console.log(`patrol over ${SAMPLE_SECONDS}s:`);
   const seen = new Map(first.slimes.map((s) => [s.label, [s]]));
-  const eyeStates = new Set(first.eyes);
   const t0 = Date.now();
   while (Date.now() - t0 < SAMPLE_SECONDS * 1000) {
     await new Promise((r) => setTimeout(r, SAMPLE_MS));
-    const { slimes, eyes, zone } = await readSlimes();
+    const { slimes, zone } = await readSlimes();
     for (const s of slimes) {
       const list = seen.get(s.label) ?? [];
       list.push({ ...s, zone });
       seen.set(s.label, list);
     }
-    for (const e of eyes) eyeStates.add(e);
   }
-
-  console.log('facing eyes:');
-  assert(
-    eyeStates.has('left') && eyeStates.has('right'),
-    `eyes track the patrol both ways (saw: ${[...eyeStates].join(', ')})`,
-  );
 
   let anyViolation = false;
   for (const [label, samples] of seen) {

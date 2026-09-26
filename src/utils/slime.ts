@@ -24,13 +24,19 @@
  */
 
 export type SlimeState = 'run' | 'idle' | 'hit' | 'die' | 'attack';
-export type SlimeColor = 'blue' | 'green' | 'red' | 'white';
+export type SlimeColor = 'emerald' | 'violet' | 'amber' | 'cyan';
 export type SlimeSide = 'left' | 'right';
 export type SlimeSlot = 0 | 1;
 
-/** Gameplay (collision-box) size — matches the retired mushroom hazard. */
+/**
+ * Gameplay (collision-box) size. The new sheets draw a wide, flat blob — the
+ * base body is 274x173 art px (aspect ~1.6) — so the box is wide and short to
+ * hug the visible silhouette: at `slimeScaleFor` the tallest used frame (the
+ * hop rise, 246px) tops out ~40px for the full body and ~29px for the narrow
+ * one. Fairer than the old tall box, whose top 20px was empty air.
+ */
 export const SLIME_WIDTH = 44;
-export const SLIME_HEIGHT = 48;
+export const SLIME_HEIGHT = 40;
 
 /**
  * Hazard box (and matching sprite scale) used on narrow stages.
@@ -44,7 +50,7 @@ export const SLIME_HEIGHT = 48;
  * of 3x, keeping the visible art and the collision box in the same proportion.
  */
 export const SLIME_NARROW_WIDTH = 32;
-export const SLIME_NARROW_HEIGHT = 34;
+export const SLIME_NARROW_HEIGHT = 29;
 /** Stage width below which the full-size body starts squeezing the safe zone. */
 export const SLIME_NARROW_STAGE_WIDTH = 448;
 
@@ -65,19 +71,74 @@ export const SPAWN_GRACE_MS = 2000; // no contact damage before the player has c
 export const ACTOR_WIDTH = 72;
 
 /**
- * Sheet geometry. Every `Slime_Medium_*.png` is a single 128x128 sheet holding a
- * 4x4 grid of 32x32 frames. Rows 2 and 3 repeat rows 0 and 1 with only a few
- * shine pixels changed, so the two usable cycles live on:
+ * Sheet geometry. Every slime sheet is 1448x1086 holding a 4x3 grid of 362px
+ * frames:
  *
- *   row 0 — idle: a tall, gentle pulse
- *   row 1 — move: a flatter hop/squash
+ *   row 0 — movement: a 4-frame hop cycle (squat → rise → stretch → land)
+ *   row 1 — attack: a 4-frame lunge, holding its deepest pose
+ *   row 2 — squished-death: flatten, flatten harder, splat, thin splat
  *
- * The art is a symmetric blob with no eyes, so there is no facing row and the
- * renderer never mirrors it.
+ * The art carries its own face (eyes and mouth are drawn in), so the renderer
+ * never overlays eyes and never mirrors the sheets.
  */
-export const SLIME_CELL = 32;
+export const SLIME_FRAME = 362;
+export const SLIME_SHEET_W = 1448;
+export const SLIME_SHEET_H = 1086;
 export const SLIME_SHEET_COLS = 4;
-export const SLIME_SHEET_ROWS = 4;
+export const SLIME_SHEET_ROWS = 3;
+
+/**
+ * Content bounding boxes, measured from the Emerald sheet (the four colours
+ * share one layout within ~10 art px). Values are frame-relative art pixels:
+ * `rx`/`ry` = opaque top-left inside the 362px frame, `w`/`h` = opaque size,
+ * `baseSole` = the row's ground line (the largest `ry + h` in the row), so
+ * airborne frames keep their hop while grounded frames sit on the sole.
+ */
+export interface SlimeFrameContent {
+  rx: number;
+  ry: number;
+  w: number;
+  h: number;
+  baseSole: number;
+}
+
+const FRAME_CONTENT: readonly SlimeFrameContent[] = [
+  // row 0 — movement
+  { rx: 34, ry: 181, w: 274, h: 173, baseSole: 354 },
+  { rx: 45, ry: 141, w: 269, h: 211, baseSole: 354 },
+  { rx: 41, ry: 89, w: 263, h: 246, baseSole: 354 },
+  { rx: 10, ry: 206, w: 331, h: 146, baseSole: 354 },
+  // row 1 — attack
+  { rx: 34, ry: 127, w: 283, h: 201, baseSole: 328 },
+  { rx: 46, ry: 159, w: 316, h: 168, baseSole: 328 },
+  { rx: 0, ry: 144, w: 362, h: 183, baseSole: 328 },
+  { rx: 0, ry: 144, w: 319, h: 183, baseSole: 328 },
+  // row 2 — squished-death
+  { rx: 49, ry: 94, w: 269, h: 203, baseSole: 308 },
+  { rx: 45, ry: 108, w: 276, h: 199, baseSole: 308 },
+  { rx: 8, ry: 204, w: 329, h: 104, baseSole: 308 },
+  { rx: 47, ry: 246, w: 267, h: 62, baseSole: 308 },
+];
+
+/** Content box (in art px) of a flat frame index — the renderer's anchor data. */
+export function slimeFrameContent(frameIndex: number): SlimeFrameContent {
+  const safe = Math.max(0, Math.min(FRAME_CONTENT.length - 1, Math.floor(frameIndex)));
+  return FRAME_CONTENT[safe];
+}
+
+/**
+ * Reference content width the drawn slime is scaled by: the base movement
+ * frame's opaque body is 274 art px wide, and the renderer draws every frame
+ * at `boxWidth / SLIME_REF_CONTENT_W` of its art size — so a body fills the
+ * 44px collision box and the squash cycle keeps its drawn proportions
+ * (flatter frames spread wider, taller hops rise higher, as authored).
+ */
+export const SLIME_REF_CONTENT_W = 274;
+
+/** Drawn scale for a collision-box width: hi-res art, so this is < 1. */
+export function slimeScaleFor(boxWidth: number): number {
+  return boxWidth / SLIME_REF_CONTENT_W;
+}
 
 export interface SlimeAnim {
   /** Sheet row the cycle lives on. */
@@ -91,22 +152,22 @@ export interface SlimeAnim {
 }
 
 /**
- * Per-state playback for the medium-slime sheets. The mob keeps all five states;
- * because a slime ships only an idle and a move cycle, the combat states reuse
- * those frames:
+ * Per-state playback for the sheets. The art ships three rows — movement,
+ * attack and squished-death — and the five mob states map onto them:
  *
- * - `idle`   → the idle pulse.
- * - `run`    → the hop cycle.
- * - `attack` → the hop cycle at 2x, then it clamps on the deepest lunge pose.
- * - `hit`    → the single flattest (most squashed) frame, held as a stagger.
- * - `die`    → the hop cycle played fast, then held collapsed.
+ * - `idle`   → the movement cycle, slowed to a lazy blob rest.
+ * - `run`    → the movement hop cycle.
+ * - `attack` → the attack lunge at 2x, then it clamps on the deepest pose.
+ * - `hit`    → the first squish frame, held as a stagger.
+ * - `die`    → the full squish cycle played fast, then held collapsed
+ *              (the state outlives the cycle, so the corpse stays flat).
  */
 export const SLIME_ANIM: Record<SlimeState, SlimeAnim> = {
-  idle: { row: 0, start: 0, frames: 4, fps: 6, loop: true },
-  run: { row: 1, start: 0, frames: 4, fps: 8, loop: true },
+  idle: { row: 0, start: 0, frames: 4, fps: 4, loop: true },
+  run: { row: 0, start: 0, frames: 4, fps: 8, loop: true },
   attack: { row: 1, start: 0, frames: 4, fps: 16, loop: false },
-  hit: { row: 1, start: 2, frames: 1, fps: 12, loop: false },
-  die: { row: 1, start: 0, frames: 4, fps: 18, loop: false },
+  hit: { row: 2, start: 0, frames: 1, fps: 12, loop: false },
+  die: { row: 2, start: 0, frames: 4, fps: 8, loop: false },
 };
 
 /** How long each one-shot state lasts, in seconds; looping states never expire. */
@@ -288,19 +349,19 @@ export const SLIME_SIDE_STAGGER = 76;
 export const SLIME_SLOT_SPEED: readonly [number, number] = [SLIME_SPEED, SLIME_SPEED * 1.15];
 
 /**
- * The four medium slimes: two launched from the left wall, two from the right.
- * Left and right each carry a different colour so the pairs stay readable when
- * they cross.
+ * The four slimes: two launched from the left wall, two from the right.
+ * Left and right each carry a different colour pair so the sides stay readable
+ * when they cross.
  */
 export const SLIME_ROSTER: ReadonlyArray<{
   side: SlimeSide;
   slot: SlimeSlot;
   color: SlimeColor;
 }> = [
-  { side: 'left', slot: 0, color: 'blue' },
-  { side: 'left', slot: 1, color: 'green' },
-  { side: 'right', slot: 0, color: 'red' },
-  { side: 'right', slot: 1, color: 'white' },
+  { side: 'left', slot: 0, color: 'emerald' },
+  { side: 'left', slot: 1, color: 'violet' },
+  { side: 'right', slot: 0, color: 'amber' },
+  { side: 'right', slot: 1, color: 'cyan' },
 ];
 
 /**

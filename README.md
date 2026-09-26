@@ -141,18 +141,19 @@ tested in `jumpTurn.test.ts`.
 
 ## Slime hazards
 
-Four medium slimes patrol the stage — **two launched from each wall** — guarding
+Four slimes patrol the stage — **two launched from each wall** — guarding
 both approaches to the player's safe zone. Their rules live in the pure
 `src/utils/slime.ts` module — spawn, patrol, safe zone, frame timing — so the
 whole system is unit tested (`slime.test.ts`) without a DOM or an animation loop.
 
-- **Roster** — `SLIME_ROSTER` sends a blue and a green slime in from the left
-  wall and a red and a white one from the right, all walking inward
-- **Body size** — `slimeBoxFor` keeps the full 44×48 box down to
-  `SLIME_NARROW_STAGE_WIDTH`, then drops to a 32×34 box on narrower stages,
+- **Roster** — `SLIME_ROSTER` sends an emerald and a violet slime in from the
+  left wall and an amber and a cyan one from the right, all walking inward
+- **Body size** — `slimeBoxFor` keeps the full 44×40 box down to
+  `SLIME_NARROW_STAGE_WIDTH`, then drops to a 32×29 box on narrower stages,
   where the full-size body and the safe zone would otherwise fight over the same
-  few pixels. `SlimeMonster` draws the narrow box at 2× instead of 3×, so the
-  drawn slime covers the same share of its hitbox at either size
+  few pixels. The boxes are wide and short to hug the sheets' silhouette (the
+  base body is 274×173 art px, aspect ~1.6), so the stomp line matches what you
+  see; `SlimeMonster` draws the narrow body at a proportionally smaller scale
 - **Patrol** — each slime walks at its slot's speed (`SLIME_SLOT_SPEED`), turning
   at its wall and at the edge of the player's **safe zone**. The two slimes
   sharing a side deliberately take *slightly different* speeds: the wall bounce
@@ -174,24 +175,15 @@ whole system is unit tested (`slime.test.ts`) without a DOM or an animation loop
 - **Spawn grace** — contact damage is suppressed for `SPAWN_GRACE_MS` after the
   stage lays out, so a hazard can't hit the player behind the boot screen
 - **Attack telegraph** — within `SLIME_ATTACK_RANGE`, ahead of it and on the same
-  level, a slime lunges and holds its attack pose
+  level, a slime lunges and holds its attack pose — the sheets' dedicated
+  attack row, clamped on its deepest lunge frame
 - **Stomp** — jumping onto one while falling plays Hit → Die, bounces the player,
   awards +350, and respawns a fresh slime on the same side and slot, clear of the
   safe zone, after `SLIME_RESPAWN_MS`. Pending respawn timers are cleared on unmount
 - **Facing follows velocity** — `facing` is derived from the resolved velocity
   every tick, so the patrol direction and the attack telegraph can never
-  disagree. The medium slimes are symmetric blobs with no facing row, so the
-  renderer never mirrors them
-- **Renderer-drawn eyes** — because the sheets carry no face, `SlimeMonster`
-  draws two pixel eyes on top of the body, leaning one art-pixel toward
-  `facing` (the same value the physics loop derived from the velocity, so the
-  gaze always points where the slime is going). On `hit` and `die` the eyes
-  swap to flat 2px dazed lids with no lean; during the **attack telegraph**
-  they light up amber with a neon glow so a lunge reads from across the stage
-  (the glow never blinks — the warning must stay steady). While patrolling,
-  the eyes **blink** on a 4.6s loop with a per-colour delay, so the four
-  hazards never squint in sync. The eyes are anchored on the same cell points
-  as the sprite, so they stay put at either body scale
+  disagree. The sheets carry drawn faces, so the renderer never mirrors them
+  and never overlays eyes
 - **Stomp chains** — consecutive airborne stomps escalate: the first pays the
   classic +350, and each further link without touching the ground adds
   +150 (350 → 500 → 650 …), capped at link 8 (+1,400) so a glitched multi-hit
@@ -209,15 +201,17 @@ whole system is unit tested (`slime.test.ts`) without a DOM or an animation loop
   label (inline SVG + CSS glow, no asset), makes the zone discoverable. It is
   decorative; the immunity itself is enforced by the hazard loop
 
-Each slime is one 128×128 sheet (`Slime_Medium_{Blue,Green,Red,White}.png`) laid
-out as a **4×4 grid of 32px cells**. Rows 0 and 1 hold an idle pulse and a hop
-cycle; rows 2 and 3 repeat them, so only eight of the sixteen frames are used.
-Because the sheets carry no combat art, the five mob states reuse those two
-cycles — `SLIME_ANIM` in `src/utils/slime.ts` maps them (idle → idle, run → hop,
-attack → hop at 2× held on the lunge, hit → the flattest frame held, die → hop
-fast then held collapsed), and one-shot states clamp on their final frame.
-`SlimeMonster.tsx` draws one cell upscaled 3×, anchored on the cell's centre-x /
-sole so the blob sits on the ground line instead of floating.
+Each slime is one 1448×1086 sheet (`{Emerald,violet,Amber,Cyan}_slime.png`) laid
+out as a **4×3 grid of 362px frames**: row 0 movement, row 1 attack, row 2
+squished-death. `SLIME_ANIM` in `src/utils/slime.ts` maps the five mob states
+onto those rows (idle → movement slowed, run → the hop cycle, attack → the
+lunge at 2× held on its deepest pose, hit → the first squish frame held, die →
+the full squish cycle then held collapsed). The art carries its own face, so
+`SlimeMonster.tsx` draws one frame's opaque content — anchored on the collision
+box's centre-x and the row's measured sole — with each frame's bounding box
+recorded in `slime.ts` (`slimeFrameContent`), so the hop rises, the lunge
+lunges and the corpse flattens exactly as authored, always sitting on the
+ground line instead of floating.
 
 ## Contact channels
 
@@ -246,7 +240,7 @@ src/
   index.css               # Tailwind entry + retro theme tokens
   components/
     ArcadeStage.tsx       # The playable stage: physics loop, blocks, slideshow
-    SlimeMonster.tsx      # 128×128 / 4×4 slime-sheet hazard renderer
+    SlimeMonster.tsx      # 1448×1086 / 4×3 slime-sheet hazard renderer
     Hud.tsx               # Score / coin header
     BootScreen.tsx        # Retro boot sequence
     CharacterSheet.tsx    # Character stats panel

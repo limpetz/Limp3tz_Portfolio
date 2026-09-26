@@ -53,6 +53,37 @@ describe('findHeadBumpedBlock', () => {
     expect(findHeadBumpedBlock({ ...STAGE, actorCenterX: 631, actorHead: 280 })?.index).toBe(0);
   });
 
+  it('never bumps a block the side collision would reject (same box)', () => {
+    // The side-collision box is |dx| < radius (half width + grace). A rising
+    // jump whose centre sits outside it — the classic "jumped at the block's
+    // edge" case — must not head-bump, or the physics tick shoves the actor
+    // sideways AND bounces them down in the same frame. The stage must pass
+    // the SAME radius to this helper and to the side-collision resolver.
+    for (let dx = RADIUS; dx <= RADIUS + 12; dx++) {
+      expect(
+        findHeadBumpedBlock({ ...STAGE, actorCenterX: MEASURED[0] + dx, actorHead: 280 }),
+      ).toBeNull();
+      expect(
+        findHeadBumpedBlock({ ...STAGE, actorCenterX: MEASURED[0] - dx, actorHead: 280 }),
+      ).toBeNull();
+    }
+  });
+
+  it('bumps only while the head is inside the block band', () => {
+    const bandBottom = STAGE.blockLift;
+    expect(
+      findHeadBumpedBlock({ ...STAGE, actorCenterX: MEASURED[0], actorHead: bandBottom + 1 }),
+    ).not.toBeNull();
+    // Below the band: still rising toward it, nothing to hit yet.
+    expect(
+      findHeadBumpedBlock({ ...STAGE, actorCenterX: MEASURED[0], actorHead: bandBottom - 1 }),
+    ).toBeNull();
+    // Above the tolerance window: the head has passed the block.
+    expect(
+      findHeadBumpedBlock({ ...STAGE, actorCenterX: MEASURED[0], actorHead: bandBottom + 51 }),
+    ).toBeNull();
+  });
+
   // The bug this replaced: the collision centres were recomputed from a 70px
   // spacing constant, which put block 4's centre at 816 while it is drawn at
   // 840 (spanning 812-868). Everything right of 848 was unreachable — a 20px
