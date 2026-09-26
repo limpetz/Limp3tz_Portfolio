@@ -28,8 +28,112 @@ import {
   slimeFrameIndex,
   slimeRoster,
   slimeSpawn,
+  STOMP_BOUNCE_V,
+  STOMP_FROM_ABOVE_GRACE,
+  isSlimeStomp,
   type SlimeState,
 } from './slime';
+
+describe('STOMP_BOUNCE_V', () => {
+  // The stage's gravity (px/s²) — kept in sync by hand; if ArcadeStage retunes
+  // GRAVITY this tripwire must be revisited alongside it.
+  const GRAVITY = 2000;
+  const apex = (v: number) => (v * v) / (2 * GRAVITY);
+
+  it('clears the slime body plus a full body-height of headroom', () => {
+    // The pop must carry the player clear of the 40px hazard with room to
+    // spare, or a held bounce re-collides with the same box mid-rise.
+    expect(apex(STOMP_BOUNCE_V)).toBeGreaterThan(SLIME_HEIGHT + 150);
+  });
+
+  it('stays well under the full jump apex so a stomp reads as a pop', () => {
+    // JUMP_V is 1250 on the stage → ~391px apex. A stomp launch noticeably
+    // smaller than that keeps the two verbs feeling different.
+    expect(apex(STOMP_BOUNCE_V)).toBeLessThan(apex(1250) * 0.75);
+  });
+});
+
+describe('isSlimeStomp', () => {
+  // Stage convention: larger = higher, vy negative = falling. A slime standing
+  // on the ground (bottom 92) with a 40px box has its top at 132.
+  const SLIME_TOP = 132;
+  const base = {
+    slimeTop: SLIME_TOP,
+  };
+
+  it('squashes a confident fast fall onto the slime head', () => {
+    // Feet crossed from above the box into overlap between frames.
+    expect(
+      isSlimeStomp({ ...base, playerBottom: 100, prevPlayerBottom: 140, playerVy: -600 }),
+    ).toBe(true);
+  });
+
+  it('squashes a gentle apex drift (the old vy < -40 rejected this)', () => {
+    // Falling at just -5 px/s but clearly coming down from above the head.
+    expect(
+      isSlimeStomp({ ...base, playerBottom: 130, prevPlayerBottom: 135, playerVy: -5 }),
+    ).toBe(true);
+  });
+
+  it('squashes a tunnelled fall that sank deep into the box in one tick', () => {
+    // Feet were above the top last frame but are near the slime's BOTTOM now
+    // — the old test failed this case and unfairly bit the player.
+    expect(
+      isSlimeStomp({ ...base, playerBottom: 95, prevPlayerBottom: 136, playerVy: -900 }),
+    ).toBe(true);
+  });
+
+  it('does not squash a walk-in from the side', () => {
+    // Overlapping while grounded and never having been above the top.
+    expect(
+      isSlimeStomp({ ...base, playerBottom: 92, prevPlayerBottom: 92, playerVy: 0 }),
+    ).toBe(false);
+  });
+
+  it('does not squash a rising jump into the body', () => {
+    expect(
+      isSlimeStomp({ ...base, playerBottom: 110, prevPlayerBottom: 100, playerVy: 500 }),
+    ).toBe(false);
+  });
+
+  it('does not squash a fall whose feet were already deep inside the box last frame', () => {
+    // Ambiguous entry (e.g. spawned overlapping): feet far below the top one
+    // tick ago and still falling — treated as contact damage.
+    expect(
+      isSlimeStomp({ ...base, playerBottom: 100, prevPlayerBottom: 100, playerVy: -300 }),
+    ).toBe(false);
+  });
+
+  it('still counts when feet were up to the grace depth below the top last frame', () => {
+    // The one-frame contact gap: feet already grazed the box, overlap judged
+    // this frame, fall continues.
+    expect(
+      isSlimeStomp({
+        ...base,
+        playerBottom: 110,
+        prevPlayerBottom: SLIME_TOP - STOMP_FROM_ABOVE_GRACE,
+        playerVy: -200,
+      }),
+    ).toBe(true);
+  });
+
+  it('rejects feet just past the grace depth below the top', () => {
+    expect(
+      isSlimeStomp({
+        ...base,
+        playerBottom: 110,
+        prevPlayerBottom: SLIME_TOP - STOMP_FROM_ABOVE_GRACE - 1,
+        playerVy: -200,
+      }),
+    ).toBe(false);
+  });
+
+  it('treats exactly-zero vy as falling (apex freeze-frame)', () => {
+    expect(
+      isSlimeStomp({ ...base, playerBottom: 128, prevPlayerBottom: 136, playerVy: 0 }),
+    ).toBe(true);
+  });
+});
 
 describe('playerSpawnX', () => {
   it('centres the player, offset for the actor box', () => {

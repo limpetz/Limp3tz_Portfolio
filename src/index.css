@@ -488,6 +488,42 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Mystery-block bump hint
+
+   The "jump to bump" affordance: when the player stands within reach of an
+   unopened block, it glows amber and a ▼ marker bounces beneath it. The glow
+   breathes so the attract reads as alive on the busy stage; the keyframes own
+   the box-shadow because the element's inline style no longer sets one. The
+   bouncing ▼ uses .animate-bounce (frozen under reduced motion); here the
+   pulse freezes on its brightest frame so the glow alone still guides.
+   --------------------------------------------------------------------------- */
+@keyframes hintPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 14px rgba(255, 210, 63, 0.55),
+      inset 0 0 10px rgba(255, 210, 63, 0.25);
+  }
+  50% {
+    box-shadow:
+      0 0 26px rgba(255, 210, 63, 0.95),
+      inset 0 0 16px rgba(255, 210, 63, 0.45);
+  }
+}
+
+.animate-hint-pulse {
+  animation: hintPulse 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-hint-pulse {
+    animation: none;
+    box-shadow:
+      0 0 18px rgba(255, 210, 63, 0.8),
+      inset 0 0 12px rgba(255, 210, 63, 0.35);
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Slideshow progress
 
    The hero slideshow's neon sweep: it fills the 3px bar across the current

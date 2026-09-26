@@ -9,10 +9,17 @@ import { isHeadBump } from './physics';
 
 /**
  * How close the actor's centre must be to a block's centre, in px, for the
- * "jump to bump" hint to light up. Slightly tighter than the collision grace so
- * the hint never promises a bump that the collision then rejects.
+ * "jump to bump" hint to light up.
+ *
+ * This is the horizontal reach of a head bump: the collision accepts a bump
+ * whenever the actor's centre is within a block's true half-width (32px on a
+ * 64px block), so the hint lights at exactly that reach. It was previously 30px
+ * — tighter than the collision on phone widths (28px half-width), where the
+ * glow promised a bump the collision then rejected. Deriving the default from
+ * the block size keeps the hint and the mechanic in agreement if the block art
+ * or its CSS size ever changes.
  */
-export const BUMP_HINT_RANGE = 30;
+export const BUMP_HINT_RANGE = 32;
 
 /** Points awarded the first time a block is collected. */
 export const BLOCK_SCORE = 50;

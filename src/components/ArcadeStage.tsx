@@ -63,6 +63,8 @@ import {
   type SlimeSlot,
   type SlimeState,
   SLIME_ATTACK_RANGE,
+  isSlimeStomp,
+  STOMP_BOUNCE_V,
   SLIME_IDLE_SECONDS,
   SLIME_RESPAWN_MS,
   SLIME_STATE_SECONDS,
@@ -198,6 +200,13 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   const slimeRespawnTimeoutsRef = useRef<number[]>([]);
   /** Consecutive airborne slime stomps this flight — the stomp-chain combo. */
   const stompChainRef = useRef(0);
+  /**
+   * The player's feet height (GROUND_H + y) at the end of the previous tick.
+   * Stomp detection compares this with the slime's top to tell "came down onto
+   * it" from "walked into it", so a slow apex drop or a fast tunnelled fall
+   * both squash instead of unfairly biting.
+   */
+  const prevActorBottomRef = useRef(0);
   /** Chain celebration: shake until this timestamp, at this power multiplier. */
   const shakeUntilRef = useRef(0);
   const shakePowerRef = useRef(1);
@@ -981,11 +990,15 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       const blockBandTop = blockBandBottom + BLOCK_SIZE;
       const inBlockBand = isInVerticalBand(actorBottom, actorTop, blockBandBottom, blockBandTop);
 
-      // Distance from actor center to the nearest solid block (either side)
+      // Distance from actor center to the nearest solid block (either side).
+      // The hint reach tracks the blocks' measured half-width — that IS the
+      // bump reach — so the glow can never promise a bump the collision
+      // rejects (on phone widths the half-width is smaller than the desktop
+      // default, and the fixed hint range used to overshoot it).
       const nextHint = nearestBumpTarget(
         stateRef.current.x + stateRef.current.actorWidth / 2,
         blocks,
-        BUMP_HINT_RANGE,
+        Math.max(BUMP_HINT_RANGE, stateRef.current.blockHalfWidth),
       );
       if (nextHint !== hintedBlock) {
         setHintedBlock(nextHint);
@@ -1400,6 +1413,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
         const actorTop = actorBottom + stateRef.current.actorHeight;
         const stageH = containerRef.current?.clientHeight || 800;
         const playerCenter = stateRef.current.x + stateRef.current.actorWidth / 2;
+        // Feet height last frame — the from-above guard for stomp detection.
+        // Captured at the end of the previous tick, after that tick's physics,
+        // so it is the last position the feet occupied before this overlap.
+        const prevActorBottom = prevActorBottomRef.current;
         const zoneMin = stateRef.current.safeZoneMin;
         const zoneMax = stateRef.current.safeZoneMax;
         // Standing inside the zone is always safe, and the opening grace window
@@ -1493,11 +1510,26 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           const overlapsY = actorBottom <= mTop + 14 && actorTop >= mBottom;
 
           if (overlapsX && overlapsY) {
-            // Player stomped a slime from above while falling down
-            if (stateRef.current.vy < -40 && actorBottom >= mTop - 24) {
+            // Player stomped a slime from above. The feet's last-frame height
+            // decides direction: if they were at the slime's top (within the
+            // contact grace) one tick ago, the player came down onto it —
+            // however slow the fall (an apex drift) or however deep the fall
+            // has since tunnelled, it squashes. Anything else (walk-in, side
+            // clip, rising into the body) stays contact damage.
+            const stomped =
+              isSlimeStomp({
+                playerBottom: actorBottom,
+                prevPlayerBottom: prevActorBottom,
+                slimeTop: mTop,
+                playerVy: stateRef.current.vy,
+              });
+            if (stomped) {
               sound.playBump();
               sound.playPower();
-              stateRef.current.vy = 880; // High bounce upward off slime stomp
+              // Springy pop off the slime: STOMP_BOUNCE_V (tuned in slime.ts)
+              // clears the squashed body so a held bounce or chain stomp can
+              // immediately follow without re-colliding with the same box.
+              stateRef.current.vy = STOMP_BOUNCE_V;
               stateRef.current.grounded = false;
               // Stomp chain: each airborne stomp without landing pays more.
               stompChainRef.current += 1;
@@ -1614,6 +1646,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
       }
 
       animId = requestAnimationFrame(loop);
+      // Capture the end-of-tick feet height for next tick's stomp test. This
+      // runs after all physics and collision work, so it is the position the
+      // player will have been standing in when the next overlap is judged.
+      prevActorBottomRef.current = GROUND_H + stateRef.current.y;
     };
 
     animId = requestAnimationFrame(loop);
@@ -1923,15 +1959,16 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
               data-block-key={block.key}
               className={`${savedDx ? 'absolute' : 'relative'} w-14 h-14 sm:w-16 sm:h-16 transition-all cursor-pointer select-none ${
                 isBumped ? 'z-40' : ''
-              } ${isHinted ? 'ring-2 ring-[#ffd23f] shadow-[0_0_20px_rgba(255,210,63,0.85)]' : ''}`}
+              } ${isHinted ? 'animate-hint-pulse ring-2 ring-[#ffd23f] shadow-[0_0_20px_rgba(255,210,63,0.85)]' : ''}`}
               style={{
                 ...(!isBumped && !isUsed ? { animationDelay: `${idx * 0.28}s` } : {}),
                 ...(isHinted
                   ? {
+                      // The pulsing glow itself lives in .animate-hint-pulse
+                      // (the keyframes must own the shadow so the pulse can
+                      // breathe it); only the stable colours are inline here.
                       borderColor: '#ffd23f',
                       color: '#ffd23f',
-                      boxShadow:
-                        '0 0 18px rgba(255,210,63,0.75), inset 0 0 12px rgba(255,210,63,0.3)',
                     }
                   : {
                       borderColor: isUsed ? '#241c42' : block.color,
@@ -1967,6 +2004,20 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
                 blockKey={block.key as MysteryBlockKey}
                 state={isBumped ? 'bump' : isUsed ? 'revealed' : 'idle'}
               />
+
+              {/* Bump-from-below marker: a bouncing ▼ under the hinted block
+                  shows WHERE the jump starts from, not just that one is
+                  possible. `.animate-bounce` is in the reduced-motion freeze
+                  list, so the marker holds still for visitors who asked for
+                  less motion — the glow alone keeps the affordance visible. */}
+              {isHinted && (
+                <span
+                  aria-hidden="true"
+                  className="animate-bounce pointer-events-none absolute -bottom-7 left-1/2 -translate-x-1/2 text-lg text-[#ffd23f] drop-shadow-[0_0_6px_rgba(255,210,63,0.9)]"
+                >
+                  ▼
+                </span>
+              )}
 
               {/* Arrange Mode Nudge Controls */}
               {arrangeMode && (

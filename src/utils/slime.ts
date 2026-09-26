@@ -64,7 +64,15 @@ export const SLIME_SPEED = 60;
 export const SLIME_WALL_MARGIN = 24;
 export const SLIME_IDLE_SECONDS = 0.7; // "notice you" pause after spawning
 export const SLIME_ATTACK_RANGE = 130; // px the player must be within to telegraph
-export const SLIME_RESPAWN_MS = 5000;
+/**
+ * Delay before a squashed slime respawns on its side/slot, in ms.
+ *
+ * Tuned from 5000 → 4000: at five seconds a cleared lane stayed empty long
+ * enough that players wandered back to blocks and lost the thread of the
+ * hazard loop. Four seconds keeps the pressure on while still giving a full
+ * stomp-flight + block-bump detour before the lane refills.
+ */
+export const SLIME_RESPAWN_MS = 4000;
 export const SPAWN_GRACE_MS = 2000; // no contact damage before the player has control
 
 /** The collision-box width the actor's spawn and safe zone are centred on. */
@@ -429,6 +437,79 @@ export function slimeRoster(stageWidth: number, safeZone: SafeZoneBounds): Slime
  * consecutive airborne stomp is worth `STOMP_CHAIN_BASE` more than the last.
  * Touching the ground (a landing, or a knockback) resets it.
  * ------------------------------------------------------------------------ */
+
+/** Score for the first stomp of a chain — the long-standing flat reward. */
+/**
+ * Falling speed (px/sec) at or below which contact still counts as a stomp.
+ *
+ * The stage's velocity convention is `positive = rising`, so a negative `vy`
+ * is a fall. At the apex of a jump the player can drift down onto a slime at
+ * almost zero vertical speed; requiring a fast fall there would read as an
+ * unfair OUCH. Any downward motion counts as "from above" — the prev-frame
+ * bottom check (see `isSlimeStomp`) is what actually guards against walk-ins.
+ */
+export const STOMP_MAX_FALL_SPEED = 0;
+
+/**
+ * Extra px BELOW the slime's top the player's feet may have been last frame
+ * and still count as "came down onto it" — covers the one-frame contact gap
+ * where the feet already clipped the box but the overlap resolves this frame.
+ */
+export const STOMP_FROM_ABOVE_GRACE = 24;
+
+/**
+ * Whether a player/slime overlap is a stomp (squash from above) or contact
+ * damage.
+ *
+ * The stage previously tested `vy < -40 && bottom >= slimeTop - 24`, which had
+ * two unfair edge cases:
+ *
+ * 1. A gentle apex drop (falling slower than 40px/s) read as damage even when
+ *    the player was clearly landing on the slime's head.
+ * 2. A fast fall could cross the whole 40px-tall box between frames and land
+ *    with its feet deep inside the body — the overlap then looked like a
+ *    walk-in and punished the confident jump.
+ *
+ * The fix tracks the player's feet from the previous frame: if they were at or
+ * above the slime's top (within `grace` px) last frame, the player came down
+ * onto it and the overlap is a stomp no matter how deep they have sunk since.
+ * All vertical values use the stage's convention — larger = higher above
+ * ground, and `playerVy` negative = falling — so the numbers pass straight
+ * through from `ArcadeStage` without flipping signs.
+ */
+export function isSlimeStomp(params: {
+  /** Player's collision-box bottom (stage px, larger = higher) this frame. */
+  playerBottom: number;
+  /** Player's collision-box bottom last frame — the tunneling guard. */
+  prevPlayerBottom: number;
+  /** Slime's collision-box top (stage px, larger = higher). */
+  slimeTop: number;
+  /** Player's vertical velocity (px/sec, negative = falling). */
+  playerVy: number;
+  /**
+   * How far below the slime's top the feet may have been last frame and still
+   * count as from-above; defaults to `STOMP_FROM_ABOVE_GRACE`.
+   */
+  grace?: number;
+}): boolean {
+  const grace = params.grace ?? STOMP_FROM_ABOVE_GRACE;
+  const wasAbove = params.prevPlayerBottom >= params.slimeTop - grace;
+  const falling = params.playerVy <= STOMP_MAX_FALL_SPEED;
+  return wasAbove && falling;
+}
+
+/**
+ * Upward launch velocity (px/sec) off a successful stomp.
+ *
+ * Tuned from 880 → 960: at 880 the pop off a slime (~194px apex at the stage's
+ * GRAVITY 2000) barely cleared the hazard it had just squashed, so a held
+ * bounce immediately re-collided with the same box and the follow-up stomp
+ * felt smothered. 960 gives a ~230px apex — comfortably over the 40px body
+ * while staying under the ~391px full-jump apex, so a stomp reads as a springy
+ * pop rather than a second jump. Chain stomps can then breathe: rise, drift
+ * toward the next slime, fall onto it.
+ */
+export const STOMP_BOUNCE_V = 960;
 
 /** Score for the first stomp of a chain — the long-standing flat reward. */
 export const STOMP_CHAIN_BASE = 350;
