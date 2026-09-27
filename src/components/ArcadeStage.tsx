@@ -58,12 +58,6 @@ import heartSvg from '../assets/images/heart.svg';
 import { SlimeMonster } from './SlimeMonster';
 import { MysteryBlockSprite, type MysteryBlockKey } from './MysteryBlockSprite';
 import {
-  TRAIL_WINDOW_MS,
-  generateCoinTrail,
-  pickTrailShape,
-  type TrailShape,
-} from '../utils/coinTrail';
-import {
   type SlimeColor,
   type SlimeSide,
   type SlimeSlot,
@@ -100,20 +94,6 @@ interface FallingCoin {
   x: number;
   y: number;
   vy: number;
-}
-
-/**
- * A shaped coin trail hanging in the air (see utils/coinTrail.ts). Coins
- * carry their own spawn time so each trail self-expires after its window —
- * late coins visibly pulse to warn they are about to fade.
- */
-interface TrailCoinLive {
-  id: number;
-  x: number;
-  /** Height above the ground line, px (the trail's native coordinate). */
-  h: number;
-  shape: TrailShape;
-  bornAt: number;
 }
 
 interface FallingHeart {
@@ -202,10 +182,6 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   const fallingCoinsRef = useRef<FallingCoin[]>([]);
   const [fallingHearts, setFallingHearts] = useState<FallingHeart[]>([]);
   const fallingHeartsRef = useRef<FallingHeart[]>([]);
-
-  // Coin trails: shaped groups hanging in the air (arc / wave / stairs).
-  const [trailCoins, setTrailCoins] = useState<TrailCoinLive[]>([]);
-  const trailCoinsRef = useRef<TrailCoinLive[]>([]);
 
   // Slime Hazards: four medium slimes, two pinned to each wall. The placeholder
   // positions can't overlap the default spawn; the sizing effect repositions
@@ -693,39 +669,6 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     }
   }, [onAddScore, onAddCoin, say]);
 
-  // Spawn a shaped coin trail: 7 coins hanging in a jump-reachable arc,
-  // wave or staircase for TRAIL_WINDOW_MS. Alternates with the coin rain so
-  // the two systems share the sky instead of competing.
-  const spawnTrail = useCallback(() => {
-    if (!stageVisibleRef.current || trailCoinsRef.current.length > 0) return;
-    const stageW = stateRef.current.stageWidth;
-    if (stageW < 420) return; // phone-width stages keep just the rain
-    const shape = pickTrailShape();
-    const trail = generateCoinTrail(shape, {
-      width: stageW,
-      groundH: GROUND_H,
-      jumpApex: (JUMP_V * JUMP_V) / (2 * GRAVITY),
-    });
-    const now = Date.now();
-    const coins: TrailCoinLive[] = trail.coins.map((c, i) => ({
-      id: now + i,
-      x: c.x,
-      h: c.h,
-      shape,
-      bornAt: now,
-    }));
-    trailCoinsRef.current = coins;
-    setTrailCoins(coins);
-    // Expire only if THIS trail is still the live one: if it was fully
-    // collected and a newer trail spawned, the stale timer must not kill it.
-    setTimeout(() => {
-      if (trailCoinsRef.current[0]?.bornAt === now) {
-        trailCoinsRef.current = [];
-        setTrailCoins([]);
-      }
-    }, TRAIL_WINDOW_MS);
-  }, []);
-
   // Jump trigger. `immediate` (held bounces) skips the anticipation crouch —
   // see startJump in utils/jumpTurn.ts.
   const doJump = useCallback((options?: { immediate?: boolean }) => {
@@ -905,16 +848,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
   // Which block (if any) the player is standing under, for the bump hint.
   const [hintedBlock, setHintedBlock] = useState<number | null>(null);
 
-  // Periodic falling coins generator + shaped trail scheduler. The two
-  // alternate: rain from the sky on even beats, a hanging trail on odd ones.
+  // Periodic falling coins generator
   useEffect(() => {
-    let beat = 0;
     const coinInterval = setInterval(() => {
       if (!stageVisibleRef.current) return;
-      if (beat++ % 2 === 1) {
-        spawnTrail();
-        return;
-      }
       // Collectibles spawn at twice the old rate with twice the on-stage cap,
       // so the sky stays busier without piling up.
       if (fallingCoinsRef.current.length < 10 && Math.random() < 0.7) {
@@ -942,7 +879,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     }, 1900);
 
     return () => clearInterval(coinInterval);
-  }, [health, spawnTrail]);
+  }, [health]);
 
   // Periodic quip generator
   useEffect(() => {
@@ -1436,44 +1373,6 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
 
         fallingCoinsRef.current = remainingCoins;
         setFallingCoins(remainingCoins);
-      }
-
-      // Coin trails: hanging coins are collected on overlap with the hero's
-      // box (they don't fall, so only the horizontal + height band matters).
-      const currentTrail = trailCoinsRef.current;
-      if (currentTrail.length > 0) {
-        const stageH = containerRef.current?.clientHeight || 800;
-        const actorLeft = stateRef.current.x;
-        const actorRight = stateRef.current.x + stateRef.current.actorWidth;
-        const actorBottom = GROUND_H + stateRef.current.y;
-        const actorTop = actorBottom + stateRef.current.actorHeight;
-        let scoreToAdd = 0;
-        let coinsToAdd = 0;
-        const remainingTrail: TrailCoinLive[] = [];
-        for (const c of currentTrail) {
-          // Both sides in "px above the stage bottom": the actor box is
-          // (GROUND_H + y)…+height, and the coin hangs at GROUND_H + h.
-          const coinAboveBottom = GROUND_H + c.h;
-          const inBand = coinAboveBottom >= actorBottom - 12 && coinAboveBottom <= actorTop + 12;
-          if (c.x >= actorLeft - 6 && c.x <= actorRight + 6 && inBand) {
-            scoreToAdd += 100;
-            coinsToAdd += 1;
-            // Particles want canvas coordinates (from the top).
-            particleSys.current.triggerCoinSparkle(c.x + 10, stageH - coinAboveBottom, 24, true);
-          } else {
-            remainingTrail.push(c);
-          }
-        }
-        if (scoreToAdd > 0) {
-          onAddScore(scoreToAdd);
-          onAddCoin(coinsToAdd);
-          sound.playCoin();
-          heroCoinPulse();
-        }
-        if (remainingTrail.length !== currentTrail.length) {
-          trailCoinsRef.current = remainingTrail;
-          setTrailCoins(remainingTrail);
-        }
       }
 
       // Update falling hearts & detect collisions with player
@@ -2254,47 +2153,6 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           />
         </button>
       ))}
-
-      {/* Coin Trails: shaped groups hanging in the air (arc / wave / stairs).
-          Coins born into the last 2.5s of the trail's window pulse as a fade
-          warning; the trail self-expires in the spawn scheduler. */}
-      {trailCoins.map((coin) => {
-        const age = Date.now() - coin.bornAt;
-        const fading = age > TRAIL_WINDOW_MS - 2500;
-        return (
-          <button
-            key={coin.id}
-            type="button"
-            onClick={() => {
-              onAddScore(100);
-              onAddCoin(1);
-              sound.playCoin();
-              heroCoinPulse();
-              const stageH = containerRef.current?.clientHeight || 800;
-              particleSys.current.triggerCoinSparkle(coin.x + 10, stageH - (GROUND_H + coin.h), 24, true);
-              const remaining = trailCoinsRef.current.filter((c) => c.id !== coin.id);
-              trailCoinsRef.current = remaining;
-              setTrailCoins(remaining);
-            }}
-            className={`absolute z-20 w-5 h-5 bg-transparent border-0 p-0 cursor-pointer hover:scale-125 transition-transform ${
-              fading ? 'animate-pulse' : ''
-            }`}
-            style={{
-              left: `${coin.x}px`,
-              bottom: `${GROUND_H + coin.h}px`,
-            }}
-            title="Collect Coin (+100 pts)"
-            aria-label={`Collect trail coin (${coin.shape} pattern)`}
-          >
-            <img
-              src={coinSvg}
-              alt=""
-              className="collectible-icon collectible-icon--coin"
-              draggable={false}
-            />
-          </button>
-        );
-      })}
 
       {/* Falling Hearts (1UP Health Recovery) */}
       {fallingHearts.map((heart) => (
