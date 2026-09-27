@@ -3,17 +3,19 @@
    workflow in the root README — so the strips are referenced directly;
    a PNG fallback here would 404 on browsers without WebP support.)
 
-   Geometry: the stage shows the cell at exactly 1.0 — every frame step is a
-   whole 176px and the browser does NO resampling. The earlier 0.96 stage
-   (169×326.4) made each step land on 168.96 CSS px, so every frame
-   rasterized on a different sub-pixel phase: the whole character shimmered
-   frame to frame. Integer scale = stable frames. (1.0 renders the visible
-   character ~313px vs the old portrait's 301 — +4%, the price of an integer
-   factor; 0.5/0.75 are the only other clean options.) */
+   Geometry: the stage scale must be an INTEGER FRACTION of the cell — 0.96
+   made each 176px frame step land on 168.96 CSS px, so every frame
+   rasterized on a different sub-pixel phase and the whole character
+   shimmered frame to frame. At 0.75 the step is exactly 132px (and 340 →
+   255), so frames stay stable; the character renders ~235px visible (the
+   stage asked 0.75 after the 1.0 layout felt too large). 1.0 (176×340) and
+   0.5 (88×170) are the other clean options. The portrait smooth-scales via
+   the `#about` override in index.css, so the 1.5px-per-art-pixel inside a
+   frame stays even. */
 .arshad-sprite-stage {
   position: relative;
-  width: 176px;
-  height: 340px;
+  width: 132px;
+  height: 255px;
   overflow: visible;
 }
 .arshad-sprite {
@@ -23,6 +25,8 @@
   display: block;
   width: 176px;
   height: 340px;
+  transform: scale(0.75);
+  transform-origin: top left;
   background-position: 0 0;
   background-repeat: no-repeat;
   image-rendering: pixelated;
@@ -66,13 +70,11 @@
   animation: arshad-look-around 0.8s steps(1, end) 1 both;
 }
 
-/* Looping variant: look-around rotating in as a BASE idle (the one-shot class
-   holds its end pose via `both`). Same strip and keyframes, calm 1.2s cycle. */
-.arshad-sprite--look-around-loop {
-  background-image: url("./look-around.webp");
-  background-size: 400% 100%;
-  animation: arshad-look-around 1.2s steps(1, end) infinite;
-}
+/* NOTE: look-around is a ONE-SHOT by design — its strip ends ON the glance
+   pose and never returns to neutral. A looping variant of it was tried as a
+   base idle and removed: the hero cocked its eye for a quarter of every
+   cycle and snapped back (a visible stutter). Only breathing and weight
+   shift, the strips the pack authors as loops, rotate as base idles. */
 @keyframes arshad-look-around {
   0%   { background-position: 0 0; }
   25%  { background-position: -176px 0; }
@@ -156,8 +158,5 @@
   }
   .arshad-sprite--weight-shift {
     animation: arshad-loop-6 3.6s steps(6, end) infinite !important;
-  }
-  .arshad-sprite--look-around-loop {
-    animation: arshad-look-around 3.6s steps(1, end) infinite !important;
   }
 }

@@ -7,9 +7,9 @@ import React, {
 import {
   GREETING_DELAY_MS,
   IDLE_ACTION_CLASS,
+  IDLE_ACTION_HOLD_MS,
   IDLE_ACTION_MS,
   IDLE_BASE_CLASS,
-  ONE_SHOT_HOLD_MS,
   firstOneShotDelayMs,
   nextBaseLoop,
   nextOneShotDelayMs,
@@ -40,8 +40,10 @@ import '../assets/images/idle-sprites/character-sprites.css';
  * Behaviour (cadence constants live in utils/idleDirector.ts, lockstep-tested
  * against this pack CSS):
  * - **greets** with the wave ~0.8s after mount;
- * - the base state **rotates the calm loops** (breathing → weight-shift →
- *   look-around-loop) each time an action returns to base;
+ * - the base state **rotates the calm loops** (breathing ↔ weight-shift —
+ *   the two strips the pack authors as loops; look-around ends ON the glance
+ *   pose, so looping it left the hero cocking its eye) each time an action
+ *   returns to base;
  * - self-directed one-shots (blink, check-watch, …) start after a short first
  *   beat, then on the resting cadence;
  * - **hover** greets with the wave;
@@ -110,9 +112,10 @@ export const IdleSprite: React.FC<IdleSpriteProps> = ({ signal, className }) => 
     return () => window.clearInterval(iv);
   }, [reduced]);
 
-  // The scheduler, keyed on phase: actions time their return to base; base
-  // schedules the next self-directed one-shot. `first` is consumed when the
-  // fidget actually FIRES, not when scheduled: the mount greeting (or a
+  // The scheduler, keyed on phase: actions time their return to base (their
+  // own duration + a per-action end-pose hold — a blink must not linger);
+  // base schedules the next self-directed one-shot. `first` is consumed when
+  // the fidget actually FIRES, not when scheduled: the mount greeting (or a
   // hover) cancels this timer, and the beat after that interruption should
   // still be the short one.
   const hadFirstFidget = useRef(false);
@@ -123,7 +126,7 @@ export const IdleSprite: React.FC<IdleSpriteProps> = ({ signal, className }) => 
         // Each return to base advances the calm-loop rotation.
         setBaseLoop((b) => nextBaseLoop(b));
         setPhase({ kind: 'base' });
-      }, IDLE_ACTION_MS[phase.action] + ONE_SHOT_HOLD_MS);
+      }, IDLE_ACTION_MS[phase.action] + IDLE_ACTION_HOLD_MS[phase.action]);
       return () => window.clearTimeout(t);
     }
     const first = !hadFirstFidget.current;

@@ -7,12 +7,12 @@ import {
   FIRST_GAP_MIN_MS,
   GREETING_DELAY_MS,
   IDLE_ACTION_CLASS,
+  IDLE_ACTION_HOLD_MS,
   IDLE_ACTION_MS,
   IDLE_BASE_CLASS,
   IDLE_BASE_CYCLE_MS,
   ONE_SHOT_GAP_MAX_MS,
   ONE_SHOT_GAP_MIN_MS,
-  ONE_SHOT_HOLD_MS,
   firstOneShotDelayMs,
   nextBaseLoop,
   nextOneShotDelayMs,
@@ -69,10 +69,6 @@ describe('idle director scheduling', () => {
     expect(pickOneShot(() => 8.5 / 9)).toBe('weight-shift');
   });
 
-  it('exposes the end-pose hold constant', () => {
-    expect(ONE_SHOT_HOLD_MS).toBeGreaterThan(0);
-  });
-
   it('rotates the base loops without repeating and always returns home', () => {
     // Deterministic walk through the full cycle.
     let cur = IDLE_BASE_CLASS;
@@ -81,17 +77,24 @@ describe('idle director scheduling', () => {
       cur = nextBaseLoop(cur, () => 0);
       seen.push(cur);
     }
-    expect(seen).toEqual([
-      'breathing',
-      'weight-shift',
-      'look-around-loop',
-      'breathing',
-      'weight-shift',
-      'look-around-loop',
-      'breathing',
-    ]);
+    expect(seen).toEqual(['breathing', 'weight-shift', 'breathing', 'weight-shift', 'breathing']);
     // An unknown previous loop (e.g. a class rename) falls back to the default.
     expect(nextBaseLoop('not-a-loop' as never)).toBe(IDLE_BASE_CLASS);
+  });
+
+  it('only rotates loops the pack authors as loops (no end-pose traps)', () => {
+    // The pack README: "Breathing and weight shift loop." Everything else is
+    // a one-shot whose strip ends on its final pose — looping any of those
+    // trapped the hero on a glance/arm-up pose. This tripwire fails if a
+    // future edit adds one of those to the base rotation.
+    expect(BASE_LOOPS).toEqual(['breathing', 'weight-shift']);
+  });
+
+  it('holds expressive end poses but returns from a blink almost immediately', () => {
+    expect(IDLE_ACTION_HOLD_MS.blink).toBeLessThanOrEqual(100);
+    for (const action of ['look-around', 'check-watch', 'wave', 'quest-complete'] as const) {
+      expect(IDLE_ACTION_HOLD_MS[action]).toBeGreaterThan(200);
+    }
   });
 });
 

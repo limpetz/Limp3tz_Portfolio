@@ -57,13 +57,14 @@ export const IDLE_ACTION_MS: Record<IdleAction, number> = {
 };
 
 /**
- * Base idle rotation. Instead of only ever breathing, the portrait rotates
- * through the calm loops as its resting state — breathing → weight-shift →
- * look-around-loop — picking the next one each time it returns to base.
- * (`look-around-loop` is the pack CSS's looping variant of the look-around
- * strip; the plain class is a one-shot that would hold its end pose.)
+ * Base idle rotation. Instead of only ever breathing, the portrait alternates
+ * the two strips the pack authors as LOOPS — breathing ↔ weight-shift (see
+ * the pack README: "Breathing and weight shift loop"). look-around is a
+ * one-shot by design: its strip ends ON the glance pose and never returns to
+ * neutral, so looping it left the hero cocking its eye for a quarter of every
+ * cycle (and snapping back — a visible stutter).
  */
-export const BASE_LOOPS = ['breathing', 'weight-shift', 'look-around-loop'] as const;
+export const BASE_LOOPS = ['breathing', 'weight-shift'] as const;
 export type BaseLoop = (typeof BASE_LOOPS)[number];
 
 /** The default starting base loop. */
@@ -141,8 +142,18 @@ export function firstOneShotDelayMs(random: () => number = Math.random): number 
 export const GREETING_DELAY_MS = 800;
 
 /**
- * Extra hold after a one-shot's animation finishes before returning to the
- * base loop — the pack CSS keeps the final pose via `both`, so a short beat
- * on the end pose reads intentional instead of snatched away.
+ * Extra hold after each one-shot's animation finishes before returning to
+ * the base loop — the pack CSS keeps the final pose via `both`, so a short
+ * beat on the end pose reads intentional instead of snatched away. Per
+ * action: a blink that lingers 400ms reads as a dead stare, so it returns
+ * almost immediately; expressive end poses (wave arm up, quest fanfare,
+ * watch raised, glance) keep their beat.
  */
-export const ONE_SHOT_HOLD_MS = 400;
+export const IDLE_ACTION_HOLD_MS: Record<IdleAction, number> = {
+  blink: 60,
+  'look-around': 400,
+  'check-watch': 400,
+  wave: 400,
+  'quest-complete': 400,
+  'weight-shift': 400,
+};

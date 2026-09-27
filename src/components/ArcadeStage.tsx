@@ -689,12 +689,26 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     particleSys.current.triggerFootstepDust(feetCanvasX, groundCanvasY, 0);
   }, [JUMP_V]);
 
+  // Coin-collect juice: a short gold aura pulse on the hero sprite (matches
+  // the portrait's heal glow, in the coin/score gold). Remove → reflow → add
+  // restarts the CSS animation so a combo re-triggers cleanly; the class is
+  // self-removing, and the reduced-motion block in index.css kills it.
+  const heroCoinPulse = () => {
+    const el = spriteRef.current;
+    if (!el) return;
+    el.classList.remove('hero-coin-glow');
+    void el.offsetWidth; // force reflow so a re-trigger restarts the animation
+    el.classList.add('hero-coin-glow');
+    window.setTimeout(() => el.classList.remove('hero-coin-glow'), 500);
+  };
+
   // Handle actor click
   const handleActorClick = () => {
     doJump();
     onAddScore(100);
     onAddCoin(1);
     sound.playCoin();
+    heroCoinPulse();
     // A click on the character itself also cancels any pending walk.
     clickDestRef.current = null;
 
@@ -1351,6 +1365,7 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
           onAddScore(scoreToAdd);
           onAddCoin(coinsToAdd);
           sound.playCoin();
+          heroCoinPulse();
           for (const b of burstsToSpawn) {
             particleSys.current.triggerCoinSparkle(b.x, b.y, 24, true);
           }

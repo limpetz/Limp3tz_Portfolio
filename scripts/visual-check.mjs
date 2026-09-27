@@ -302,8 +302,11 @@ try {
     // their loop keyframes) is a valid resting portrait. The portrait renders
     // SMOOTH (image-rendering: auto): the 2x strips downscale at a fractional
     // 0.96x, where nearest-neighbour would draw ragged uneven pixels.
-    const BASE_STRIPS = ['breathing-idle', 'weight-shift', 'look-around'];
-    const BASE_ANIMS = ['arshad-loop-4', 'arshad-loop-6', 'arshad-look-around'];
+    // The pack authors exactly two loops — breathing and weight-shift; the
+    // base rotation alternates those (look-around-loop was removed: its strip
+    // ends on the glance pose and trapped the hero cock-eyed).
+    const BASE_STRIPS = ['breathing-idle', 'weight-shift'];
+    const BASE_ANIMS = ['arshad-loop-4', 'arshad-loop-6'];
     assert(
       typeof portrait.bg === 'string' && BASE_STRIPS.some((s) => portrait.bg.startsWith(s)),
       `portrait uses a rotated base strip (got ${portrait.bg})`,
@@ -371,9 +374,9 @@ try {
       };
     });
     // Whichever calm loop is current, its slowed cadence must be active.
-    const SLOW_DUR = { 'arshad-loop-4': '2.4s', 'arshad-loop-6': '3.6s', 'arshad-look-around': '3.6s' };
+    const SLOW_DUR = { 'arshad-loop-4': '2.4s', 'arshad-loop-6': '3.6s' };
     const slowOk =
-      /arshad-sprite--(breathing|weight-shift|look-around-loop)/.test(reduced.cls) &&
+      /arshad-sprite--(breathing|weight-shift)/.test(reduced.cls) &&
       SLOW_DUR[reduced.anim] === reduced.dur;
     assert(
       slowOk,
