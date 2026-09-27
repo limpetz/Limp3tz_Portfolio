@@ -7,7 +7,7 @@
  *
  * The shipped pack (src/assets/images/idle-sprites/, 88x170 cells):
  *
- *   base loops    breathing-idle (4f, 1.6s) · weight-shift (6f, 2.4s)
+ *   base loops    breathing-idle (4f, 1.6s) · weight-shift (6f, 3.5s)
  *                 — calm by design: their frames sway 1-2 art px, and a
  *                 faster experiment made that sway read as wobble
  *   one-shots     blink (3f, 240ms) · look-around (4f, 0.8s) ·
@@ -55,7 +55,7 @@ export const IDLE_ACTION_MS: Record<IdleAction, number> = {
   'check-watch': 900,
   wave: 700,
   'quest-complete': 900,
-  'weight-shift': 2400,
+  'weight-shift': 3500,
 };
 
 /**

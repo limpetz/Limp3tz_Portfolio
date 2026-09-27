@@ -13,7 +13,7 @@
    the `#about` override in index.css, so the 1.5px-per-art-pixel inside a
    frame stays even.
 
-   Cadence: the AMBIENT LOOPS (breathing 1.6s/4f, weight-shift 2.4s/6f) run
+   Cadence: the AMBIENT LOOPS (breathing 1.6s/4f, weight-shift 3.5s/6f) run
    at a calm pace — their frames sway the body by 1-2 art px, and a brief
    5fps experiment made that sway read as jitter/wobble. The ONE-SHOTS are
    retimed snappier (5-9fps) since those poses are meant to pop.
@@ -48,7 +48,7 @@
 .arshad-sprite--weight-shift {
   background-image: url("./weight-shift.webp");
   background-size: 600% 100%;
-  animation: arshad-loop-6 2.4s steps(6, end) infinite;
+  animation: arshad-loop-6 3.5s steps(6, end) infinite;
 }
 @keyframes arshad-loop-4 {
   from { background-position: 0 0; }
@@ -164,6 +164,6 @@
     animation: arshad-loop-4 2.4s steps(4, end) infinite !important;
   }
   .arshad-sprite--weight-shift {
-    animation: arshad-loop-6 3.6s steps(6, end) infinite !important;
+    animation: arshad-loop-6 5.25s steps(6, end) infinite !important;
   }
 }
