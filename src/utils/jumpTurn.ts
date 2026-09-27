@@ -2,17 +2,17 @@
  * Jump and 3D Turning sprite sheet definitions and animation controller.
  *
  * Provides:
- * - 3D turning animation using arshad-turn.png (grounded) and arshad-air-turn.png (airborne).
- * - Multi-phase directional jumping using arshad-jump.png.
+ * - 3D turning animation using arshad-turn.webp (grounded) and arshad-air-turn.webp (airborne).
+ * - Multi-phase directional jumping using arshad-jump.webp.
  * - Walk cycle support from the compact walk sheet.
  * - Alignment and drawing anchor offsets so switching sheets never jerks the character.
  * - Mid-turn reversal, easing, reduced-motion compatibility, and sharp pixel rendering.
  */
 
-import walkPng from '../assets/images/arshad-sprites-240px/assets/arshad-walk.png';
-import jumpPng from '../assets/images/arshad-sprites-240px/assets/arshad-jump.png';
-import turnPng from '../assets/images/arshad-sprites-240px/assets/arshad-turn.png';
-import airTurnPng from '../assets/images/arshad-sprites-240px/assets/arshad-air-turn.png';
+import walkPng from '../assets/images/arshad-sprites-240px/assets/arshad-walk.webp';
+import jumpPng from '../assets/images/arshad-sprites-240px/assets/arshad-jump.webp';
+import turnPng from '../assets/images/arshad-sprites-240px/assets/arshad-turn.webp';
+import airTurnPng from '../assets/images/arshad-sprites-240px/assets/arshad-air-turn.webp';
 
 export type SpriteSheetKey = 'walk' | 'jump' | 'turn' | 'airTurn';
 

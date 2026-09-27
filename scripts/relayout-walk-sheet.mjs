@@ -18,7 +18,11 @@ import sharp from 'sharp';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const ASSETS = 'src/assets/images/arshad-sprites-240px/assets';
-const PNG_PATH = `${ASSETS}/arshad-walk.png`;
+// The sheet ships as lossless WebP (see convert-gait-webp.mjs); sharp reads
+// and writes it transparently. NOTE: the recomposed output is NOT re-encoded
+// with exact:true — re-run convert-gait-webp.mjs after a relayout to restore
+// the bit-exact shipped encode.
+const PNG_PATH = `${ASSETS}/arshad-walk.webp`;
 const JSON_PATH = `${ASSETS}/arshad-walk.json`;
 
 // Current playback order (cells holding gait pose 1..8), from the gait fix.

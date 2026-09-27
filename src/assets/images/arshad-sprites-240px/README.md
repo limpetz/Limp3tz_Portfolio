@@ -6,10 +6,10 @@ New pixel artwork based on your main-character reference. Render at scale **1.0*
 
 | File in `assets/` | Columns × rows | Cell | Sheet | anchorX | footY |
 | --- | --- | --- | --- | --- | --- |
-| arshad-walk.png | 9 × 2 | 172 × 330 | 1548 × 660 | 86 | 318 |
-| arshad-jump.png | 9 × 2 | 224 × 330 | 2016 × 660 | 112 | 318 |
-| arshad-turn.png | 9 × 1 | 176 × 330 | 1584 × 330 | 88 | 318 |
-| arshad-air-turn.png | 9 × 1 | 224 × 330 | 2016 × 330 | 112 | 318 |
+| arshad-walk.webp | 9 × 2 | 172 × 330 | 1548 × 660 | 86 | 318 |
+| arshad-jump.webp | 9 × 2 | 224 × 330 | 2016 × 660 | 112 | 318 |
+| arshad-turn.webp | 9 × 1 | 176 × 330 | 1584 × 330 | 88 | 318 |
+| arshad-air-turn.webp | 9 × 1 | 224 × 330 | 2016 × 330 | 112 | 318 |
 
 All four are indexed **PNG-8** with a shared palette and transparent background. Equivalent **lossless WebP** files are in `webp/`. Use either format; do not load both. Individual cells are in `frames/`.
 

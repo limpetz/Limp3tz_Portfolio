@@ -81,10 +81,10 @@ Because the art is native, the renderer never upscales it.
 
 | Sheet | Cells | Sheet size | anchorX | Use |
 | --- | --- | --- | --- | --- |
-| `arshad-walk.png` | 172×330, 9×2 | 1548×660 | 86 | Row 0 right, row 1 left; col 0 idle, cols 1–8 walk |
-| `arshad-jump.png` | 224×330, 9×2 | 2016×660 | 112 | Jump lifecycle, same row convention |
-| `arshad-turn.png` | 176×330, 9×1 | 1584×330 | 88 | Grounded turn — 3/4-left → front → 3/4-right |
-| `arshad-air-turn.png` | 224×330, 9×1 | 2016×330 | 112 | Tucked mid-air turn |
+| `arshad-walk.webp` | 172×330, 9×2 | 1548×660 | 86 | Row 0 right, row 1 left; col 0 idle, cols 1–8 walk |
+| `arshad-jump.webp` | 224×330, 9×2 | 2016×660 | 112 | Jump lifecycle, same row convention |
+| `arshad-turn.webp` | 176×330, 9×1 | 1584×330 | 88 | Grounded turn — 3/4-left → front → 3/4-right |
+| `arshad-air-turn.webp` | 224×330, 9×1 | 2016×330 | 112 | Tucked mid-air turn |
 
 Turn and air-turn sheets carry artwork only in columns 2–6; columns 0, 1, 7, 8
 are transparent by design. `arshad-walk.json` (same folder) is the walk sheet's
@@ -340,6 +340,7 @@ Full-resolution sources are **not committed** — they live in `git`-ignored
 | `sprite/.originals/legacy-*/` (the retired 88px sheets) | — replaced by the 240px pack |
 | `images/.originals/slime-block-sheets/*.png` (~7.7 MB) | `images/*.webp` — 4 slime + 4 mystery-block sheets, half-res lossless (~1.8 MB total, ~76% smaller) |
 | `images/.originals/idle-sprites/*.png` (~207 KB) | `images/idle-sprites/*.webp` — 7 portrait idle strips, lossless (~177 KB total, ~15% smaller) |
+| `images/arshad-sprites-240px/assets/.originals/*.png` (~685 KB) | `assets/arshad-*.webp` — 4 hero gait sheets, full-res lossless (~515 KB, ~25% smaller; native scale, so no resize) |
 
 Regenerate any of them with `sharp-cli`:
 

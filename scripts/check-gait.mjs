@@ -18,10 +18,10 @@
  * Requires sharp (devDependency).
  */
 import sharp from 'sharp';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 
 const ASSETS = 'src/assets/images/arshad-sprites-240px/assets';
-const PNG_PATH = process.argv[2] || `${ASSETS}/arshad-walk.png`;
+const PNG_PATH = process.argv[2] || `${ASSETS}/arshad-walk.webp`;
 const JSON_PATH = process.argv[3] || `${ASSETS}/arshad-walk.json`;
 const meta = JSON.parse(readFileSync(JSON_PATH, 'utf8'));
 const { imageWidth, frameWidth, frameHeight, columns, rows, anchor } = meta;
@@ -231,9 +231,14 @@ for (const sectionName of ['jump', 'turn', 'airTurn']) {
     continue;
   }
   // section.file (e.g. "assets/arshad-jump.png") is relative to the pack
+// root and names the ORIGINAL pack art; the shipped re-encode swaps the
+// extension for `.webp` (see scripts/convert-gait-webp.mjs), so probe the
+// exact bytes the site serves when the webp twin exists.
   // root, and ASSETS is that "assets" directory — so go one level up and let
   // the declared prefix resolve naturally.
-  const pngPath = `${ASSETS}/../${section.file}`;
+  const pngPath = existsSync(`${ASSETS}/../${section.file.replace(/\.png$/, '.webp')}`)
+    ? `${ASSETS}/../${section.file.replace(/\.png$/, '.webp')}`
+    : `${ASSETS}/../${section.file}`;
   const fw = section.frameWidth;
   const fh = section.frameHeight;
   const cols = section.columns || 9;

@@ -14,7 +14,7 @@
 import sharp from 'sharp';
 import { readFileSync } from 'node:fs';
 
-const PNG = process.argv[2] || 'src/assets/images/arshad-sprites-240px/assets/arshad-walk.png';
+const PNG = process.argv[2] || 'src/assets/images/arshad-sprites-240px/assets/arshad-walk.webp';
 const JSON_PATH =
   process.argv[3] || 'src/assets/images/arshad-sprites-240px/assets/arshad-walk.json';
 
