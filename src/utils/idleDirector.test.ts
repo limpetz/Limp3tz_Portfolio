@@ -18,7 +18,7 @@ import {
 } from './idleDirector';
 
 describe('idle director scheduling', () => {
-  it('keeps the gap between one-shots in the 9-20s band', () => {
+  it('keeps the gap between one-shots in the 5-11s band', () => {
     for (let i = 0; i < 200; i++) {
       const delay = nextOneShotDelayMs();
       expect(delay).toBeGreaterThanOrEqual(ONE_SHOT_GAP_MIN_MS);
@@ -26,7 +26,7 @@ describe('idle director scheduling', () => {
     }
   });
 
-  it('bounds the first fidget gap to the short 4-9s window', () => {
+  it('bounds the first fidget gap to the short 2.5-5s window', () => {
     for (let i = 0; i < 200; i++) {
       const delay = firstOneShotDelayMs();
       expect(delay).toBeGreaterThanOrEqual(FIRST_GAP_MIN_MS);

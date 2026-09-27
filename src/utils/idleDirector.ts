@@ -12,6 +12,9 @@
  *                 check-watch (6f, 1.2s) · wave (6f, 900ms) ·
  *                 quest-complete (8f, 1.2s) · weight-shift (6f, 1.8s)
  *
+ * Cadence: the first fidget lands 2.5-5s after the mount greeting settles,
+ * later ones every 5-11s.
+ *
  * One-shot durations MUST match the pack CSS keyframe lengths — the component
  * schedules off these numbers, and `idleDirector.test.ts` parses the CSS to
  * hold the two in lockstep.
@@ -78,9 +81,14 @@ export function pickOneShot(random: () => number = Math.random): IdleAction {
   return ONE_SHOT_POOL[0].action; // numeric edge (roll === TOTAL_WEIGHT)
 }
 
-/** Bounds for the quiet gap between one-shots (measured from action end). */
-export const ONE_SHOT_GAP_MIN_MS = 9_000;
-export const ONE_SHOT_GAP_MAX_MS = 20_000;
+/**
+ * Bounds for the quiet gap between one-shots (measured from action end).
+ * Retuned from 9-20s: at the resting cadence the portrait sat still long
+ * enough to read as static between fidgets. 5-11s keeps it clearly alive
+ * while still breathing like a character, not a screensaver.
+ */
+export const ONE_SHOT_GAP_MIN_MS = 5_000;
+export const ONE_SHOT_GAP_MAX_MS = 11_000;
 
 /** Random quiet delay before the next self-directed one-shot, in ms. */
 export function nextOneShotDelayMs(random: () => number = Math.random): number {
@@ -89,11 +97,11 @@ export function nextOneShotDelayMs(random: () => number = Math.random): number {
 
 /**
  * Shorter gap before the FIRST self-directed fidget (after the mount
- * greeting): a portrait that sits perfectly still for its first 20 seconds
+ * greeting): a portrait that sits perfectly still for its first seconds
  * reads as a static image, not a character.
  */
-export const FIRST_GAP_MIN_MS = 4_000;
-export const FIRST_GAP_MAX_MS = 9_000;
+export const FIRST_GAP_MIN_MS = 2_500;
+export const FIRST_GAP_MAX_MS = 5_000;
 
 /** Random short delay before the first self-directed one-shot, in ms. */
 export function firstOneShotDelayMs(random: () => number = Math.random): number {

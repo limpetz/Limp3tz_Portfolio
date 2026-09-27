@@ -18,34 +18,29 @@ import {
 import '../assets/images/idle-sprites/character-sprites.css';
 
 /**
- * Pixel-perfect idle animation system for the portrait in the character
- * sheet, built on the 7 shipped strips in `assets/images/idle-sprites/`
- * (88x170 cells, `.arshad-sprite--*` classes from the pack CSS):
+ * Idle animation system for the portrait in the character sheet, built on
+ * the 7 shipped 2x strips in `assets/images/idle-sprites/` (176x340 cells,
+ * nearest-neighbour upscaled from the approved 88x170 art; bit-exact lossless
+ * WebP shipped, PNG originals in `.originals/idle-sprites/`).
  *
+ * Geometry is owned entirely by the pack CSS: `.arshad-sprite-stage` sizes
+ * the box (169x326.4) and `.arshad-sprite` draws the 176x340 cell at its
+ * 0.96x stage scale — which lands the ~313px character at the historical
+ * ~301px portrait height, and because the source is now 2x art the render
+ * is a slight DOWNSCALE (crisp, like the old hi-res portrait was).
+ * The component only switches the `arshad-sprite--*` modifier class and
+ * restarts one-shots via an epoch key (a repeated action re-fires the CSS
+ * animation).
+ *
+ * Behaviour (cadence constants live in utils/idleDirector.ts, lockstep-tested
+ * against this pack CSS):
  * - **greets** with the wave ~0.8s after mount;
- * - the **breathing** loop plays continuously as the base state;
- * - a director (utils/idleDirector.ts) schedules self-directed one-shots
- *   (blink, look-around, check-watch, weight-shift) — the FIRST one after a
- *   short 4-9s beat so the portrait visibly lives right away, then every
- *   9-20s like a resting character;
+ * - **breathing** loop plays as the base state;
+ * - self-directed one-shots (blink, look-around, check-watch, weight-shift)
+ *   start after a short first beat, then on the resting cadence;
  * - **hover** greets with the wave;
- * - the character sheet's heart buttons drive quest-complete (heal) and
- *   blink (damage) via the `signal` prop.
- *
- * Scaling: the strips are 88x170 with ~157px of character, so the old
- * 301px portrait size implies a fractional ~1.92x upscale — which renders
- * art pixels 1px and 2px wide unevenly (the "heavily pixelated" look).
- * The scale is therefore snapped to a whole 2x: every art pixel renders
- * as exactly 2x2 screen pixels (portrait canvas stays ~301px-era sized at
- * 176x340). TRUE crispness needs higher-resolution source art: re-export
- * the 7 strips at 176x340 per frame (2x) and this component renders them
- * at ~0.96x like the old hi-res portrait.
- *
- * The pack CSS keyframes step `background-position` in absolute 88px cells,
- * so the sprite element itself must stay 88x170; it is transformed inside a
- * wrapper sized to the scaled cell. One-shots hold their final pose via the
- * CSS `both` fill; the director's durations (`IDLE_ACTION_MS`, lockstep-
- * tested against the pack CSS) decide when to swap back to the base loop.
+ * - heart buttons drive quest-complete (heal) and blink (damage) via
+ *   the `signal` prop.
  *
  * Under `prefers-reduced-motion` the pack CSS freezes every strip to frame 0
  * and this component stops scheduling — a static standing pose.
@@ -64,21 +59,6 @@ interface IdleSpriteProps {
   signal?: IdleSpriteSignalEvent | null;
   className?: string;
 }
-
-/** Strip-native cell size (px) — must match the pack CSS `.arshad-sprite`. */
-const CELL_W = 88;
-const CELL_H = 170;
-/** Opaque character height inside one 170px cell (measured from the strips). */
-const CELL_CONTENT_H = 157;
-/** Portrait display height for the visible character, as the old <img> had. */
-const PORTRAIT_H = 301;
-
-/**
- * Whole-integer snap of PORTRAIT_H / CELL_CONTENT_H (≈1.92 → 2). A fractional
- * scale renders art pixels unevenly (some 1px, some 2px wide) — the ragged
- * pixelation. Integer scales keep every art pixel the same size.
- */
-const DISPLAY_SCALE = Math.max(1, Math.ceil(PORTRAIT_H / CELL_CONTENT_H));
 
 type Phase = { kind: 'base' } | { kind: 'action'; action: IdleAction; epoch: number };
 
@@ -108,8 +88,10 @@ export const IdleSprite: React.FC<IdleSpriteProps> = ({ signal, className }) => 
   }, [reduced, beginAction]);
 
   // The scheduler, keyed on phase: actions time their return to base; base
-  // schedules the next self-directed one-shot — the first after the short
-  // 4-9s beat, later ones after the long 9-20s gap.
+  // schedules the next self-directed one-shot. `first` is consumed when the
+  // fidget actually FIRES, not when scheduled: the mount greeting (or a
+  // hover) cancels this timer, and the beat after that interruption should
+  // still be the short one.
   const hadFirstFidget = useRef(false);
   useEffect(() => {
     if (reduced) return undefined;
@@ -120,9 +102,6 @@ export const IdleSprite: React.FC<IdleSpriteProps> = ({ signal, className }) => 
       );
       return () => window.clearTimeout(t);
     }
-    // `first` is consumed when the fidget actually FIRES, not when scheduled:
-    // the mount greeting (or a hover) cancels this timer, and the beat after
-    // that interruption should still be the short one.
     const first = !hadFirstFidget.current;
     const t = window.setTimeout(
       () => {
@@ -149,28 +128,13 @@ export const IdleSprite: React.FC<IdleSpriteProps> = ({ signal, className }) => 
     beginAction('wave');
   };
 
-  const wrapperStyle: React.CSSProperties = {
-    width: Math.round(CELL_W * DISPLAY_SCALE),
-    height: Math.round(CELL_H * DISPLAY_SCALE),
-    maxWidth: '100%',
-    display: 'inline-block',
-    position: 'relative',
-  };
-
   if (reduced) {
     return (
-      <span className={className} style={wrapperStyle}>
+      <span className={`arshad-sprite-stage ${className ?? ''}`}>
         <span
           aria-hidden="true"
           className="arshad-sprite arshad-sprite--breathing"
-          style={{
-            position: 'absolute',
-            left: 0,
-            bottom: 0,
-            transform: `scale(${DISPLAY_SCALE})`,
-            transformOrigin: 'bottom left',
-            animation: 'none',
-          }}
+          style={{ animation: 'none' }}
         />
       </span>
     );
@@ -179,18 +143,11 @@ export const IdleSprite: React.FC<IdleSpriteProps> = ({ signal, className }) => 
   const cssClass = phase.kind === 'action' ? IDLE_ACTION_CLASS[phase.action] : IDLE_BASE_CLASS;
 
   return (
-    <span className={className} style={wrapperStyle} onPointerEnter={onPointerEnter}>
+    <span className={`arshad-sprite-stage ${className ?? ''}`} onPointerEnter={onPointerEnter}>
       <span
         aria-hidden="true"
         key={phase.kind === 'action' ? phase.epoch : 'base'}
         className={`arshad-sprite arshad-sprite--${cssClass}`}
-        style={{
-          position: 'absolute',
-          left: 0,
-          bottom: 0,
-          transform: `scale(${DISPLAY_SCALE})`,
-          transformOrigin: 'bottom left',
-        }}
       />
     </span>
   );
