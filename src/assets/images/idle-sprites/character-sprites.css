@@ -1,11 +1,19 @@
 /* 176×340px source cells, shipped as bit-exact lossless WebP. (The PNG
    originals live in the git-ignored .originals folder — see the asset
    workflow in the root README — so the strips are referenced directly;
-   a PNG fallback here would 404 on browsers without WebP support.) */
+   a PNG fallback here would 404 on browsers without WebP support.)
+
+   Geometry: the stage shows the cell at exactly 1.0 — every frame step is a
+   whole 176px and the browser does NO resampling. The earlier 0.96 stage
+   (169×326.4) made each step land on 168.96 CSS px, so every frame
+   rasterized on a different sub-pixel phase: the whole character shimmered
+   frame to frame. Integer scale = stable frames. (1.0 renders the visible
+   character ~313px vs the old portrait's 301 — +4%, the price of an integer
+   factor; 0.5/0.75 are the only other clean options.) */
 .arshad-sprite-stage {
   position: relative;
-  width: 169px;
-  height: 326.4px;
+  width: 176px;
+  height: 340px;
   overflow: visible;
 }
 .arshad-sprite {
@@ -15,8 +23,6 @@
   display: block;
   width: 176px;
   height: 340px;
-  transform: scale(0.96);
-  transform-origin: top left;
   background-position: 0 0;
   background-repeat: no-repeat;
   image-rendering: pixelated;
@@ -26,12 +32,12 @@
 .arshad-sprite--breathing {
   background-image: url("./breathing-idle.webp");
   background-size: 400% 100%;
-  animation: arshad-loop-4 1.2s steps(4, end) infinite;
+  animation: arshad-loop-4 0.8s steps(4, end) infinite;
 }
 .arshad-sprite--weight-shift {
   background-image: url("./weight-shift.webp");
   background-size: 600% 100%;
-  animation: arshad-loop-6 1.8s steps(6, end) infinite;
+  animation: arshad-loop-6 1.2s steps(6, end) infinite;
 }
 @keyframes arshad-loop-4 {
   from { background-position: 0 0; }
@@ -57,15 +63,15 @@
 .arshad-sprite--look-around {
   background-image: url("./look-around.webp");
   background-size: 400% 100%;
-  animation: arshad-look-around 1.2s steps(1, end) 1 both;
+  animation: arshad-look-around 0.8s steps(1, end) 1 both;
 }
 
 /* Looping variant: look-around rotating in as a BASE idle (the one-shot class
-   holds its end pose via `both`). Same strip and keyframes, calm 2.4s cycle. */
+   holds its end pose via `both`). Same strip and keyframes, calm 1.2s cycle. */
 .arshad-sprite--look-around-loop {
   background-image: url("./look-around.webp");
   background-size: 400% 100%;
-  animation: arshad-look-around 2.4s steps(1, end) infinite;
+  animation: arshad-look-around 1.2s steps(1, end) infinite;
 }
 @keyframes arshad-look-around {
   0%   { background-position: 0 0; }
@@ -78,7 +84,7 @@
 .arshad-sprite--check-watch {
   background-image: url("./check-smartwatch.webp");
   background-size: 600% 100%;
-  animation: arshad-check-watch 1.2s steps(1, end) 1 both;
+  animation: arshad-check-watch 0.9s steps(1, end) 1 both;
 }
 @keyframes arshad-check-watch {
   0%       { background-position: 0 0; }
@@ -93,7 +99,7 @@
 .arshad-sprite--wave {
   background-image: url("./greeting-wave.webp");
   background-size: 600% 100%;
-  animation: arshad-wave 900ms steps(1, end) 1 both;
+  animation: arshad-wave 700ms steps(1, end) 1 both;
 }
 @keyframes arshad-wave {
   0%       { background-position: 0 0; }
@@ -105,10 +111,20 @@
   100%     { background-position: -880px 0; }
 }
 
+/* Quest-complete carries a second, simultaneous animation: a subtle green
+   aura pulse (the site's heal accent, #3dffa2) that swells with the pose and
+   fades with it — read as "quest rewarded" without strobing. Killed by the
+   reduced-motion block below along with the pose itself. */
 .arshad-sprite--quest-complete {
   background-image: url("./quest-complete.webp");
   background-size: 800% 100%;
-  animation: arshad-quest-complete 1.2s steps(1, end) 1 both;
+  animation:
+    arshad-quest-complete 0.9s steps(1, end) 1 both,
+    arshad-quest-glow 0.9s ease-in-out 1;
+}
+@keyframes arshad-quest-glow {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(61, 255, 162, 0)); }
+  45%      { filter: drop-shadow(0 0 12px rgba(61, 255, 162, 0.5)); }
 }
 @keyframes arshad-quest-complete {
   0%      { background-position: 0 0; }
@@ -136,12 +152,12 @@
     background-position: 0 0 !important;
   }
   .arshad-sprite--breathing {
-    animation: arshad-loop-4 3.6s steps(4, end) infinite !important;
+    animation: arshad-loop-4 2.4s steps(4, end) infinite !important;
   }
   .arshad-sprite--weight-shift {
-    animation: arshad-loop-6 5.4s steps(6, end) infinite !important;
+    animation: arshad-loop-6 3.6s steps(6, end) infinite !important;
   }
   .arshad-sprite--look-around-loop {
-    animation: arshad-look-around 7.2s steps(1, end) infinite !important;
+    animation: arshad-look-around 3.6s steps(1, end) infinite !important;
   }
 }

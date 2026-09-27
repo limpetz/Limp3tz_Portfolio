@@ -371,7 +371,7 @@ try {
       };
     });
     // Whichever calm loop is current, its slowed cadence must be active.
-    const SLOW_DUR = { 'arshad-loop-4': '3.6s', 'arshad-loop-6': '5.4s', 'arshad-look-around': '7.2s' };
+    const SLOW_DUR = { 'arshad-loop-4': '2.4s', 'arshad-loop-6': '3.6s', 'arshad-look-around': '3.6s' };
     const slowOk =
       /arshad-sprite--(breathing|weight-shift|look-around-loop)/.test(reduced.cls) &&
       SLOW_DUR[reduced.anim] === reduced.dur;

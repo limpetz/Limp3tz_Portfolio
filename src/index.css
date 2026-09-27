@@ -112,9 +112,10 @@
 }
 
 /* The character-sheet portrait smooth-scales its 2x strips (the pack class
-   defaults to nearest-neighbour). The original portrait's crispness came
-   from smooth-downscaling hi-res art — pixelated on a fractional 0.96x
-   downscale renders ragged, uneven art pixels instead. */
+   defaults to nearest-neighbour). The stage shows the cell at an integer 1.0
+   so frame steps never shimmer, and smooth sampling keeps edges even on
+   fractional-DPR displays (Windows 125%/150% scaling), where pixelated
+   would render ragged device-pixel edges. */
 #about .arshad-sprite {
   image-rendering: auto;
 }

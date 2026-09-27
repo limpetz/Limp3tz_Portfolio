@@ -7,10 +7,13 @@
  *
  * The shipped pack (src/assets/images/idle-sprites/, 88x170 cells):
  *
- *   base loop     breathing-idle (4 frames, 1.2s cycle)
- *   one-shots     blink (3f, 240ms) · look-around (4f, 1.2s) ·
- *                 check-watch (6f, 1.2s) · wave (6f, 900ms) ·
- *                 quest-complete (8f, 1.2s) · weight-shift (6f, 1.8s)
+ *   base loop     breathing-idle (4 frames, 0.8s cycle = 5fps)
+ *   one-shots     blink (3f, 240ms) · look-around (4f, 0.8s) ·
+ *                 check-watch (6f, 0.9s) · wave (6f, 700ms) ·
+ *                 quest-complete (8f, 0.9s) · weight-shift (6f, 1.2s)
+ *
+ * The quest-complete one-shot also pulses a subtle green drop-shadow aura
+ * (arshad-quest-glow in the pack CSS) — the heal reward beat.
  *
  * Cadence: the first fidget lands 2.5-5s after the mount greeting settles,
  * later ones every 5-11s.
@@ -38,14 +41,19 @@ export const IDLE_ACTION_CLASS: Record<IdleAction, string> = {
   'weight-shift': 'weight-shift',
 };
 
-/** How long each one-shot runs, in ms — mirroring the pack CSS durations. */
+/**
+ * How long each one-shot runs, in ms — mirroring the pack CSS durations
+ * (retimed up from the authored ~3fps to a snappier retro 5-9fps; the CSS
+ * comment documents the per-strip numbers and the lockstep test holds the
+ * two files together).
+ */
 export const IDLE_ACTION_MS: Record<IdleAction, number> = {
   blink: 240,
-  'look-around': 1200,
-  'check-watch': 1200,
-  wave: 900,
-  'quest-complete': 1200,
-  'weight-shift': 1800,
+  'look-around': 800,
+  'check-watch': 900,
+  wave: 700,
+  'quest-complete': 900,
+  'weight-shift': 1200,
 };
 
 /**
@@ -60,8 +68,8 @@ export type BaseLoop = (typeof BASE_LOOPS)[number];
 
 /** The default starting base loop. */
 export const IDLE_BASE_CLASS: BaseLoop = 'breathing';
-/** Breathing base loop: one full 4-frame cycle per the pack CSS (1.2s). */
-export const IDLE_BASE_CYCLE_MS = 1200;
+/** Breathing base loop: one full 4-frame cycle per the pack CSS (0.8s). */
+export const IDLE_BASE_CYCLE_MS = 800;
 
 /**
  * The next base loop in the rotation, cycling forever. Injected `random`

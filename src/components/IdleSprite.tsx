@@ -26,10 +26,13 @@ import '../assets/images/idle-sprites/character-sprites.css';
  * WebP shipped, PNG originals in `.originals/idle-sprites/`).
  *
  * Geometry is owned entirely by the pack CSS: `.arshad-sprite-stage` sizes
- * the box (169x326.4) and `.arshad-sprite` draws the 176x340 cell at its
- * 0.96x stage scale — which lands the ~313px character at the historical
- * ~301px portrait height, and because the source is now 2x art the render
- * is a slight DOWNSCALE (crisp, like the old hi-res portrait was).
+ * the box (176x340) and `.arshad-sprite` draws the cell at exactly 1.0 — an
+ * integer scale, so every frame step is a whole 176px and frames never
+ * shimmer (the earlier 0.96 stage rasterized each step on a different
+ * sub-pixel phase: the whole character wobbled). The visible character is
+ * ~313px, a touch larger than the old 301px portrait — the price of an
+ * integer factor. The portrait smooth-scales (`#about` override in
+ * index.css) for even edges on fractional-DPR displays.
  * The component only switches the `arshad-sprite--*` modifier class and
  * restarts one-shots via an epoch key (a repeated action re-fires the CSS
  * animation).
