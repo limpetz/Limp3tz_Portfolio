@@ -1,30 +1,33 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { PORTFOLIO_CONFIG } from '../data/portfolioData';
-import { spriteCanvasSize } from '../data/sprite';
 import { GitHubActivity } from './GitHubActivity';
 import { PixelHeart } from './PixelHeart';
+import { IdleSprite, type IdleSpriteSignalEvent } from './IdleSprite';
 
 interface CharacterSheetProps {
-  spriteUrl: string;
   health: number;
   onAddScore: (amount: number) => void;
   onTakeDamage?: (amount?: number) => void;
   onHeal?: (amount?: number) => void;
 }
 
-// The portrait is sized by its *visible* character, since the sprite canvas is
-// mostly transparent margin. 301px matches the height the original portrait
-// sprite rendered at in this frame. The canvas keeps the artwork's aspect ratio
-// and shrinks together on narrow screens.
-const PORTRAIT = spriteCanvasSize(301);
+// The portrait is the animated IdleSprite (idle-sprites pack): it breathes,
+// schedules idle one-shots, waves on hover and reacts to the heart buttons.
+// Sizing lives in the component, preserving the old 301px visible height.
 
 export const CharacterSheet: React.FC<CharacterSheetProps> = ({
-  spriteUrl,
   health,
   onAddScore,
   onTakeDamage,
   onHeal,
 }) => {
+  // Heart events drive the portrait's reactions: heal → quest-complete,
+  // damage → blink. The counter makes repeat clicks replay the animation.
+  const [spriteSignal, setSpriteSignal] = useState<IdleSpriteSignalEvent | null>(null);
+  const signalSeq = useRef(0);
+  const fireSpriteSignal = (kind: IdleSpriteSignalEvent['kind']) =>
+    setSpriteSignal({ kind, n: ++signalSeq.current });
+
   return (
     <section id="about" className="py-24 px-4 sm:px-8 max-w-6xl mx-auto scroll-mt-16">
       {/* Header */}
@@ -51,11 +54,9 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
           <div className="bg-gradient-to-b from-[#160f33] to-[#241348] border-2 border-[#241c42] p-4 flex items-center justify-center min-h-[320px] overflow-hidden">
             {/* Width only: `h-auto` keeps the artwork's aspect ratio, so the
                 portrait shrinks without distorting when the panel narrows. */}
-            <img
-              src={spriteUrl}
-              alt="Arshad Mohemed pixel character portrait"
-              className="h-auto max-w-full object-contain pixel-art drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)] animate-idle-breathe"
-              style={{ width: `${PORTRAIT.width}px` }}
+            <IdleSprite
+              signal={spriteSignal}
+              className="drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)]"
             />
           </div>
 
@@ -73,8 +74,13 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
                   key={i}
                   type="button"
                   onClick={() => {
-                    if (isFilled && onTakeDamage) onTakeDamage(1);
-                    else if (!isFilled && onHeal) onHeal(1);
+                    if (isFilled) {
+                      fireSpriteSignal('damage');
+                      onTakeDamage?.(1);
+                    } else {
+                      fireSpriteSignal('heal');
+                      onHeal?.(1);
+                    }
                   }}
                   className="inline-flex cursor-pointer hover:scale-125 transition-transform"
                   title={isFilled ? `Heart ${i + 1} (Click to take damage)` : `Heart ${i + 1} empty (Click to heal)`}

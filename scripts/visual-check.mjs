@@ -64,6 +64,11 @@ const browser = await puppeteer.launch({
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1400, height: 900, deviceScaleFactor: 1 });
+  // Headless Chrome reports prefers-reduced-motion: reduce, which would put
+  // the animated portrait (and the pack CSS) into their static reduced state.
+  // The animated path is asserted explicitly; the reduced path gets its own
+  // assertion in the portrait layer.
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
 
   // Track every sheet response so a renamed/404'd asset fails loudly.
   const sheetStatus = new Map();
@@ -244,6 +249,122 @@ try {
     await sharp(buf).toFile(join(OUT_DIR, `${name}-${suffix}.png`));
   }
   await page.screenshot({ path: join(OUT_DIR, 'stage-full.png') });
+
+  // ---------------------------------------------------------------- layer 4
+  // Character-sheet portrait: the IdleSprite (idle-sprites pack) must decode,
+  // sit anchored to the frame floor, and swap to the wave strip on hover.
+  console.log('portrait (character sheet):');
+  const portrait = await page.evaluate(async () => {
+    const section = document.querySelector('#about');
+    if (!section) return { missing: 'no #about section' };
+    section.scrollIntoView();
+    const inner = section.querySelector('.arshad-sprite');
+    if (!inner) return { missing: 'no .arshad-sprite in the character sheet' };
+    const cs = getComputedStyle(inner);
+    const m = (cs.backgroundImage || '').match(/url\("?([^")]+)"?\)/);
+    const url = m ? m[1] : null;
+    let decode = null;
+    if (url) {
+      const img = await new Promise((resolve) => {
+        const im = new Image();
+        im.onload = () => resolve(im);
+        im.onerror = () => resolve(null);
+        im.src = url;
+      });
+      if (img) {
+        const c = document.createElement('canvas');
+        c.width = 88;
+        c.height = 170;
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0);
+        const d = ctx.getImageData(0, 0, 88, 170).data;
+        let opaque = 0;
+        for (let p = 0; p < d.length; p += 4) if (d[p + 3] > 10) opaque++;
+        decode = { ok: opaque > 3000, opaque };
+      }
+    }
+    const r = inner.getBoundingClientRect();
+    const frame = inner.parentElement.getBoundingClientRect();
+    return {
+      cls: inner.className.replace(/\s+/g, ' ').trim(),
+      bg: (cs.backgroundImage.match(/([^/"]+)\.webp/) || [])[1] ?? null,
+      rendering: cs.imageRendering,
+      anim: cs.animationName,
+      decode,
+      floorGap: Math.round(frame.bottom - r.bottom),
+      rect: { x: r.x, y: r.y, w: r.width, h: r.height },
+    };
+  });
+  if (portrait.missing) {
+    assert(false, `portrait: ${portrait.missing}`);
+  } else {
+    assert(
+      typeof portrait.bg === 'string' && portrait.bg.startsWith('breathing-idle'),
+      `portrait uses the breathing strip (got ${portrait.bg})`,
+    );
+    assert(portrait.rendering === 'pixelated', 'portrait samples with image-rendering: pixelated');
+    assert(
+      portrait.anim === 'arshad-loop-4',
+      `portrait runs the 4-frame breathing loop (got ${portrait.anim})`,
+    );
+    assert(
+      portrait.decode?.ok === true,
+      `portrait strip decodes with real art (opaque px: ${portrait.decode?.opaque ?? 'n/a'})`,
+    );
+    assert(
+      portrait.floorGap >= -1 && portrait.floorGap <= 1,
+      `portrait is anchored to the frame floor (gap ${portrait.floorGap}px)`,
+    );
+
+    // Hover → wave: the director must swap strips while the pointer is over
+    // the portrait (transient one-shot; poll briefly so a fast swap can't
+    // race the poll).
+    const box = await page.evaluate(() => {
+      const el = document.querySelector('#about .arshad-sprite');
+      const r = el.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    });
+    await page.mouse.move(box.x, box.y);
+    let waved = false;
+    for (let i = 0; i < 30 && !waved; i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      waved = await page.evaluate(
+        () => (document.querySelector('#about .arshad-sprite')?.className || '').includes('--wave'),
+      );
+    }
+    assert(waved, 'portrait waves on hover');
+    await page.mouse.move(10, 10);
+    const buf = await page.screenshot({
+      clip: await page.evaluate(() => {
+        const r = document.querySelector('#about .arshad-sprite').parentElement.getBoundingClientRect();
+        const pad = 8;
+        return {
+          x: Math.max(0, Math.floor(r.x - pad)),
+          y: Math.max(0, Math.floor(r.y - pad)),
+          width: Math.ceil(r.width + pad * 2),
+          height: Math.ceil(r.height + pad * 2),
+        };
+      }),
+    });
+    await sharp(buf).toFile(join(OUT_DIR, 'portrait.png'));
+
+    // Reduced motion: the pack CSS freezes to frame 0 and the component stops
+    // scheduling (animation: none inline) — the correct static portrait.
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+    await new Promise((r) => setTimeout(r, 200));
+    const reduced = await page.evaluate(() => {
+      const el = document.querySelector('#about .arshad-sprite');
+      return {
+        cls: el?.className || '',
+        anim: el ? getComputedStyle(el).animationName : null,
+      };
+    });
+    assert(
+      reduced.cls.includes('arshad-sprite--breathing') && reduced.anim === 'none',
+      `reduced motion renders the static frame-0 portrait (anim: ${reduced.anim})`,
+    );
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+  }
 
   console.log(
     process.exitCode

@@ -339,6 +339,7 @@ Full-resolution sources are **not committed** — they live in `git`-ignored
 | `sprite/.originals/240px-pack/` (frames, previews, WebP twins, demo) | `arshad-sprites-240px/assets/` — four PNG sheets + walk JSON (603 KB) |
 | `sprite/.originals/legacy-*/` (the retired 88px sheets) | — replaced by the 240px pack |
 | `images/.originals/slime-block-sheets/*.png` (~7.7 MB) | `images/*.webp` — 4 slime + 4 mystery-block sheets, half-res lossless (~1.8 MB total, ~76% smaller) |
+| `images/.originals/idle-sprites/*.png` (~207 KB) | `images/idle-sprites/*.webp` — 7 portrait idle strips, lossless (~177 KB total, ~15% smaller) |
 
 Regenerate any of them with `sharp-cli`:
 

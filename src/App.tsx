@@ -278,7 +278,6 @@ export default function App() {
         {/* Level 1: Character Sheet & Lore */}
         <ErrorBoundary label="CHARACTER SHEET">
           <CharacterSheet
-            spriteUrl={spriteUrl}
             health={health}
             onAddScore={handleAddScore}
             onTakeDamage={handleTakeDamage}

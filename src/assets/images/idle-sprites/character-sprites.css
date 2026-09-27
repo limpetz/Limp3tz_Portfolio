@@ -1,0 +1,108 @@
+/* Arshad pixel sprite animations — every cell is 88×170px. */
+.arshad-sprite {
+  display: inline-block;
+  width: 88px;
+  height: 170px;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  vertical-align: bottom;
+}
+
+/* Continuous idle loops. Each sheet moves exactly one frame per step. */
+.arshad-sprite--breathing {
+  background-image: url("./breathing-idle.webp");
+  background-size: 400% 100%;
+  animation: arshad-loop-4 1.2s steps(4, end) infinite;
+}
+.arshad-sprite--weight-shift {
+  background-image: url("./weight-shift.webp");
+  background-size: 600% 100%;
+  animation: arshad-loop-6 1.8s steps(6, end) infinite;
+}
+@keyframes arshad-loop-4 {
+  from { background-position: 0 0; }
+  to   { background-position: -352px 0; }
+}
+@keyframes arshad-loop-6 {
+  from { background-position: 0 0; }
+  to   { background-position: -528px 0; }
+}
+
+/* One-shot actions. Keep the final pose while the action class is present.
+   Remove that class on animationend to return to the idle sprite. */
+.arshad-sprite--blink {
+  background-image: url("./blink-glasses-glint.webp");
+  background-size: 300% 100%;
+  animation: arshad-blink 240ms steps(1, end) 1 both;
+}
+@keyframes arshad-blink {
+  0%       { background-position: 0 0; }
+  33.333%  { background-position: -88px 0; }
+  66.666%  { background-position: -176px 0; }
+  100%     { background-position: -176px 0; }
+}
+
+.arshad-sprite--look-around {
+  background-image: url("./look-around.webp");
+  background-size: 400% 100%;
+  animation: arshad-look-around 1.2s steps(1, end) 1 both;
+}
+@keyframes arshad-look-around {
+  0%   { background-position: 0 0; }
+  25%  { background-position: -88px 0; }
+  50%  { background-position: -176px 0; }
+  75%  { background-position: -264px 0; }
+  100% { background-position: -264px 0; }
+}
+
+.arshad-sprite--check-watch {
+  background-image: url("./check-smartwatch.webp");
+  background-size: 600% 100%;
+  animation: arshad-check-watch 1.2s steps(1, end) 1 both;
+}
+@keyframes arshad-check-watch {
+  0%       { background-position: 0 0; }
+  16.666%  { background-position: -88px 0; }
+  33.333%  { background-position: -176px 0; }
+  50%      { background-position: -264px 0; }
+  66.666%  { background-position: -352px 0; }
+  83.333%  { background-position: -440px 0; }
+  100%     { background-position: -440px 0; }
+}
+
+.arshad-sprite--wave {
+  background-image: url("./greeting-wave.webp");
+  background-size: 600% 100%;
+  animation: arshad-wave 900ms steps(1, end) 1 both;
+}
+@keyframes arshad-wave {
+  0%       { background-position: 0 0; }
+  16.666%  { background-position: -88px 0; }
+  33.333%  { background-position: -176px 0; }
+  50%      { background-position: -264px 0; }
+  66.666%  { background-position: -352px 0; }
+  83.333%  { background-position: -440px 0; }
+  100%     { background-position: -440px 0; }
+}
+
+.arshad-sprite--quest-complete {
+  background-image: url("./quest-complete.webp");
+  background-size: 800% 100%;
+  animation: arshad-quest-complete 1.2s steps(1, end) 1 both;
+}
+@keyframes arshad-quest-complete {
+  0%      { background-position: 0 0; }
+  12.5%   { background-position: -88px 0; }
+  25%     { background-position: -176px 0; }
+  37.5%   { background-position: -264px 0; }
+  50%     { background-position: -352px 0; }
+  62.5%   { background-position: -440px 0; }
+  75%     { background-position: -528px 0; }
+  87.5%   { background-position: -616px 0; }
+  100%    { background-position: -616px 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arshad-sprite { animation: none !important; background-position: 0 0 !important; }
+}
