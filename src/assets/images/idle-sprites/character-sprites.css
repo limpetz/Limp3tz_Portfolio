@@ -3,26 +3,20 @@
    workflow in the root README — so the strips are referenced directly;
    a PNG fallback here would 404 on browsers without WebP support.)
 
-   Geometry: the stage scale must be an INTEGER FRACTION of the cell — 0.96
-   made each 176px frame step land on 168.96 CSS px, so every frame
-   rasterized on a different sub-pixel phase and the whole character
-   shimmered frame to frame. At 0.75 the step is exactly 132px (and 340 →
-   255), so frames stay stable; the character renders ~235px visible (the
-   stage asked 0.75 after the 1.0 layout felt too large). 1.0 (176×340) and
-   0.5 (88×170) are the other clean options. The portrait smooth-scales via
-   the `#about` override in index.css, so the 1.5px-per-art-pixel inside a
-   frame stays even.
-
-   Cadence: the AMBIENT LOOPS (breathing 1.6s/4f, weight-shift 3.5s/6f) run
-   at a calm pace — their frames sway the body by 1-2 art px, and a brief
-   5fps experiment made that sway read as jitter/wobble. The ONE-SHOTS are
-   retimed snappier (5-9fps) since those poses are meant to pop.
-   utils/idleDirector.ts mirrors every duration; its lockstep test fails if
-   the two files drift apart. */
+   Geometry: the FRAME STEP must land on whole CSS px — 0.96 made each
+   176px step 168.96px, so every frame rasterized on a different sub-pixel
+   phase and the whole character shimmered frame to frame. At 170/176 the
+   step is exactly 170px (176 -> 170, and 340 -> 328.41 for the static box —
+   only the per-frame step matters, the transform itself never moves), so
+   frames are pixel-stable. This scale also returns the visible character
+   to ~302px — the historical portrait height (was ~235px at 0.75, ~313px
+   at 1.0). Other clean steps: 0.75 (132px) and 1.0 (176px). The portrait
+   smooth-scales via the `#about` override in index.css, so the fractional
+   art-pixel size (~1.93 CSS px) stays evenly soft rather than ragged. */
 .arshad-sprite-stage {
   position: relative;
-  width: 132px;
-  height: 255px;
+  width: 170px;
+  height: 328.41px;
   overflow: visible;
 }
 .arshad-sprite {
@@ -32,13 +26,20 @@
   display: block;
   width: 176px;
   height: 340px;
-  transform: scale(0.75);
+  transform: scale(calc(170 / 176));
   transform-origin: top left;
   background-position: 0 0;
   background-repeat: no-repeat;
   image-rendering: pixelated;
   vertical-align: bottom;
 }
+
+/* Cadence: the AMBIENT LOOPS (breathing 1.6s/4f, weight-shift 3.5s/6f) run
+   at a calm pace — their frames sway the body by 1-2 art px, and a brief
+   5fps experiment made that sway read as jitter/wobble. The ONE-SHOTS are
+   retimed snappier (5-9fps) since those poses are meant to pop.
+   utils/idleDirector.ts mirrors every duration; its lockstep test fails if
+   the two files drift apart. */
 
 .arshad-sprite--breathing {
   background-image: url("./breathing-idle.webp");
