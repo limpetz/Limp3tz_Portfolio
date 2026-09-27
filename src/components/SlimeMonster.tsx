@@ -11,10 +11,10 @@ import {
   slimeFrameContent,
   slimeScaleFor,
 } from '../utils/slime';
-import slimeEmeraldImg from '../assets/images/Emerald_slime.png';
-import slimeVioletImg from '../assets/images/violet_slime.png';
-import slimeAmberImg from '../assets/images/Amber_slime.png';
-import slimeCyanImg from '../assets/images/Cyan_slime.png';
+import slimeEmeraldImg from '../assets/images/Emerald_slime.webp';
+import slimeVioletImg from '../assets/images/violet_slime.webp';
+import slimeAmberImg from '../assets/images/Amber_slime.webp';
+import slimeCyanImg from '../assets/images/Cyan_slime.webp';
 
 // Re-exported so consumers can keep importing the state union from here while
 // the single source of truth lives in the pure utils module.
@@ -31,7 +31,7 @@ interface SlimeMonsterProps {
   height?: number;
 }
 
-/** One sheet per colour; all four share the identical 4x3 / 362px frame grid. */
+/** One sheet per colour; all four share the identical 4x3 / 181px frame grid. */
 const SLIME_SHEETS: Record<SlimeColor, string> = {
   emerald: slimeEmeraldImg,
   violet: slimeVioletImg,
@@ -43,16 +43,18 @@ const SHEET_W = SLIME_SHEET_W; // 1448
 const SHEET_H = SLIME_SHEET_H; // 1086 — three rows, 362px each
 
 /**
- * The 362px frames are hi-res art drawn well below native size (the body fills
- * a 44px collision box), so the renderer scales DOWN via `slimeScaleFor` — the
- * pixel-art class keeps the result crisp on integer device pixels.
+ * The 181px frames are half-resolution art drawn well below native size (the
+ * body fills a 44px collision box), so the renderer scales DOWN via
+ * `slimeScaleFor` — the pixel-art class keeps the result crisp on integer
+ * device pixels. (Half of the original 362px frames; see
+ * `scripts/convert-sheets-webp.mjs`.)
  */
 function scaleFor(width: number): number {
   return slimeScaleFor(width);
 }
 
 /**
- * Medium-slime hazard sprite. Draws one 362px cell from the colour's 4x3
+ * Medium-slime hazard sprite. Draws one 181px cell from the colour's 4x3
  * sheet (rows: movement, attack, squished-death; see `SLIME_ANIM`).
  *
  * The frame's opaque content is anchored on the collision box's centre-x and

@@ -1,14 +1,14 @@
 import React from 'react';
 
-import nameBlockImg from '../assets/images/Identifier_Name_block.png';
-import roleBlockImg from '../assets/images/class_role_block.png';
-import locationBlockImg from '../assets/images/base-location_block.png';
-import statusBlockImg from '../assets/images/status_block.png';
+import nameBlockImg from '../assets/images/Identifier_Name_block.webp';
+import roleBlockImg from '../assets/images/class_role_block.webp';
+import locationBlockImg from '../assets/images/base-location_block.webp';
+import statusBlockImg from '../assets/images/status_block.webp';
 
 export type MysteryBlockKey = 'name' | 'role' | 'location' | 'status';
 export type MysteryBlockVisualState = 'idle' | 'bump' | 'revealed';
 
-/** One sheet per block; all four share the identical 4x3 / 362px frame grid. */
+/** One sheet per block; all four share the identical 4x3 / 181px frame grid. */
 const BLOCK_SHEETS: Record<MysteryBlockKey, string> = {
   name: nameBlockImg,
   role: roleBlockImg,
@@ -74,8 +74,9 @@ interface MysteryBlockSpriteProps {
 }
 
 /**
- * Pixel-art sprite for one mystery block, drawn from its 1448x1086 sheet
- * (4x3 grid of 362px frames: idle / bump / revealed rows). The art carries the
+ * Pixel-art sprite for one mystery block, drawn from its 724x543 sheet
+ * (4x3 grid of 181px frames: idle / bump / revealed rows — half the original
+ * 1448x1086 / 362px art; see `scripts/convert-sheets-webp.mjs`). The art carries the
  * whole block — rivets, `?`, bump pose and revealed label — so the button
  * behind it stays transparent and only supplies hitbox, hint glow and drag.
  */

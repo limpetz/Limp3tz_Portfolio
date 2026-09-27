@@ -79,8 +79,10 @@ export const SPAWN_GRACE_MS = 2000; // no contact damage before the player has c
 export const ACTOR_WIDTH = 72;
 
 /**
- * Sheet geometry. Every slime sheet is 1448x1086 holding a 4x3 grid of 362px
- * frames:
+ * Sheet geometry. Every slime sheet is 724x543 holding a 4x3 grid of 181px
+ * frames (re-encoded at half resolution from the original 1448x1086 / 362px
+ * art — see `scripts/convert-sheets-webp.mjs`; the full-res PNGs live in the
+ * git-ignored `.originals/slime-block-sheets/` folder):
  *
  *   row 0 — movement: a 4-frame hop cycle (squat → rise → stretch → land)
  *   row 1 — attack: a 4-frame lunge, holding its deepest pose
@@ -89,18 +91,20 @@ export const ACTOR_WIDTH = 72;
  * The art carries its own face (eyes and mouth are drawn in), so the renderer
  * never overlays eyes and never mirrors the sheets.
  */
-export const SLIME_FRAME = 362;
-export const SLIME_SHEET_W = 1448;
-export const SLIME_SHEET_H = 1086;
+export const SLIME_FRAME = 181;
+export const SLIME_SHEET_W = 724;
+export const SLIME_SHEET_H = 543;
 export const SLIME_SHEET_COLS = 4;
 export const SLIME_SHEET_ROWS = 3;
 
 /**
- * Content bounding boxes, measured from the Emerald sheet (the four colours
- * share one layout within ~10 art px). Values are frame-relative art pixels:
- * `rx`/`ry` = opaque top-left inside the 362px frame, `w`/`h` = opaque size,
- * `baseSole` = the row's ground line (the largest `ry + h` in the row), so
- * airborne frames keep their hop while grounded frames sit on the sole.
+ * Content bounding boxes, in frame-relative art pixels of the shipped 724x543
+ * sheet (exactly half the original 1448x1086 measurements — the 2:1 resize
+ * maps the grid onto itself). Measured from the Emerald sheet (the four
+ * colours share one layout within ~5 art px). `rx`/`ry` = opaque top-left
+ * inside the 181px frame, `w`/`h` = opaque size, `baseSole` = the row's ground
+ * line (the largest `ry + h` in the row), so airborne frames keep their hop
+ * while grounded frames sit on the sole.
  */
 export interface SlimeFrameContent {
   rx: number;
@@ -112,20 +116,20 @@ export interface SlimeFrameContent {
 
 const FRAME_CONTENT: readonly SlimeFrameContent[] = [
   // row 0 — movement
-  { rx: 34, ry: 181, w: 274, h: 173, baseSole: 354 },
-  { rx: 45, ry: 141, w: 269, h: 211, baseSole: 354 },
-  { rx: 41, ry: 89, w: 263, h: 246, baseSole: 354 },
-  { rx: 10, ry: 206, w: 331, h: 146, baseSole: 354 },
+  { rx: 17, ry: 90.5, w: 137, h: 86.5, baseSole: 177 },
+  { rx: 22.5, ry: 70.5, w: 134.5, h: 105.5, baseSole: 177 },
+  { rx: 20.5, ry: 44.5, w: 131.5, h: 123, baseSole: 177 },
+  { rx: 5, ry: 103, w: 165.5, h: 73, baseSole: 177 },
   // row 1 — attack
-  { rx: 34, ry: 127, w: 283, h: 201, baseSole: 328 },
-  { rx: 46, ry: 159, w: 316, h: 168, baseSole: 328 },
-  { rx: 0, ry: 144, w: 362, h: 183, baseSole: 328 },
-  { rx: 0, ry: 144, w: 319, h: 183, baseSole: 328 },
+  { rx: 17, ry: 63.5, w: 141.5, h: 100.5, baseSole: 164 },
+  { rx: 23, ry: 79.5, w: 158, h: 84, baseSole: 164 },
+  { rx: 0, ry: 72, w: 181, h: 91.5, baseSole: 164 },
+  { rx: 0, ry: 72, w: 159.5, h: 91.5, baseSole: 164 },
   // row 2 — squished-death
-  { rx: 49, ry: 94, w: 269, h: 203, baseSole: 308 },
-  { rx: 45, ry: 108, w: 276, h: 199, baseSole: 308 },
-  { rx: 8, ry: 204, w: 329, h: 104, baseSole: 308 },
-  { rx: 47, ry: 246, w: 267, h: 62, baseSole: 308 },
+  { rx: 24.5, ry: 47, w: 134.5, h: 101.5, baseSole: 154 },
+  { rx: 22.5, ry: 54, w: 138, h: 99.5, baseSole: 154 },
+  { rx: 4, ry: 102, w: 164.5, h: 52, baseSole: 154 },
+  { rx: 23.5, ry: 123, w: 133.5, h: 31, baseSole: 154 },
 ];
 
 /** Content box (in art px) of a flat frame index — the renderer's anchor data. */
@@ -136,12 +140,13 @@ export function slimeFrameContent(frameIndex: number): SlimeFrameContent {
 
 /**
  * Reference content width the drawn slime is scaled by: the base movement
- * frame's opaque body is 274 art px wide, and the renderer draws every frame
- * at `boxWidth / SLIME_REF_CONTENT_W` of its art size — so a body fills the
- * 44px collision box and the squash cycle keeps its drawn proportions
- * (flatter frames spread wider, taller hops rise higher, as authored).
+ * frame's opaque body is 137 art px wide (half the original 274), and the
+ * renderer draws every frame at `boxWidth / SLIME_REF_CONTENT_W` of its art
+ * size — so a body fills the 44px collision box and the squash cycle keeps
+ * its drawn proportions (flatter frames spread wider, taller hops rise
+ * higher, as authored).
  */
-export const SLIME_REF_CONTENT_W = 274;
+export const SLIME_REF_CONTENT_W = 137;
 
 /** Drawn scale for a collision-box width: hi-res art, so this is < 1. */
 export function slimeScaleFor(boxWidth: number): number {

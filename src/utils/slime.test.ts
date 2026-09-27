@@ -245,8 +245,8 @@ describe('safeZoneBounds', () => {
 });
 
 describe('slime sheets', () => {
-  it('is a 4x3 grid of 362px frames', () => {
-    expect(SLIME_FRAME).toBe(362);
+  it('is a 4x3 grid of 181px frames (half the original 362px art)', () => {
+    expect(SLIME_FRAME).toBe(181);
     expect(SLIME_SHEET_COLS).toBe(4);
     expect(SLIME_SHEET_ROWS).toBe(3);
   });

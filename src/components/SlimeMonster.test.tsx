@@ -27,10 +27,10 @@ describe('SlimeMonster rendering', () => {
     // One content window per slime, sized to the default 44x40 box.
     expect(px(html, 'width')).toBe(44);
     expect(px(html, 'height')).toBe(SLIME_HEIGHT);
-    // Base frame: 274x173 art px at 44/274 scale — exactly the box width.
+    // Base frame: 137x86.5 art px at 44/137 scale — exactly the box width.
     const s = slimeScaleFor(44);
     expect(px(html, 'height')).toBe(40);
-    expect(s).toBeCloseTo(44 / 274, 10);
+    expect(s).toBeCloseTo(44 / 137, 10);
     // The face lives in the art — no DOM eye overlay.
     expect(html).not.toContain('data-slime-eye');
   });
@@ -45,10 +45,11 @@ describe('SlimeMonster rendering', () => {
     const html = htmlWith({ x: 0, y: 0, color: 'violet', state: 'run', frameIndex: 5 });
     const s = slimeScaleFor(SLIME_WIDTH);
     const c = slimeFrameContent(5); // attack row, col 1
-    // The shared table is Emerald-derived: r1c1 emerald x[408-723] → rx = 46
-    // (other colours sit within ~10 art px, absorbed by the shared anchor).
-    expect(c.rx).toBe(46);
-    expect(px(html, 'background-position')).toBeCloseTo(-((1 * 362 + c.rx) * s), 6);
+    // The shared table is Emerald-derived: r1c1 emerald x[204-361.5] → rx = 23
+    // (half the original 1448-wide measurement; other colours sit within ~5
+    // art px, absorbed by the shared anchor).
+    expect(c.rx).toBe(23);
+    expect(px(html, 'background-position')).toBeCloseTo(-((1 * 181 + c.rx) * s), 6);
     expect(px(html, 'background-size')).toBeCloseTo(SLIME_SHEET_W * s, 6);
     // background-size is a pair; check the height too via the second number.
     const sizePair = html.match(/background-size:(-?[\d.]+)px (-?[\d.]+)px/);
