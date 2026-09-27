@@ -39,8 +39,8 @@ const SLIME_SHEETS: Record<SlimeColor, string> = {
   cyan: slimeCyanImg,
 };
 
-const SHEET_W = SLIME_SHEET_W; // 1448
-const SHEET_H = SLIME_SHEET_H; // 1086 — three rows, 362px each
+const SHEET_W = SLIME_SHEET_W; // 724
+const SHEET_H = SLIME_SHEET_H; // 543 — three rows, 181px each
 
 /**
  * The 181px frames are half-resolution art drawn well below native size (the

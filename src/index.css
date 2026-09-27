@@ -323,8 +323,9 @@
 /* ---------------------------------------------------------------------------
    Mystery block sprite states
 
-   The block sheets are 1448x1086 grids of 362px frames, drawn through the
-   element with `background-size: 400% 300%`: x positions 0/33.33/66.67/100%
+   The block sheets are 724x543 grids of 181px frames (half the original
+   1448x1086 / 362px art; see `scripts/convert-sheets-webp.mjs`), drawn through
+   the element with `background-size: 400% 300%`: x positions 0/33.33/66.67/100%
    pick columns 0-3, y positions 0/50/100% pick the idle/bump/revealed rows.
    Each block keyframe pair sets BOTH coordinates so the other axis can't leak
    through between steps.
