@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  BASE_LOOPS,
   FIRST_GAP_MAX_MS,
   FIRST_GAP_MIN_MS,
   GREETING_DELAY_MS,
@@ -13,6 +14,7 @@ import {
   ONE_SHOT_GAP_MIN_MS,
   ONE_SHOT_HOLD_MS,
   firstOneShotDelayMs,
+  nextBaseLoop,
   nextOneShotDelayMs,
   pickOneShot,
 } from './idleDirector';
@@ -70,6 +72,27 @@ describe('idle director scheduling', () => {
   it('exposes the end-pose hold constant', () => {
     expect(ONE_SHOT_HOLD_MS).toBeGreaterThan(0);
   });
+
+  it('rotates the base loops without repeating and always returns home', () => {
+    // Deterministic walk through the full cycle.
+    let cur = IDLE_BASE_CLASS;
+    const seen: string[] = [cur];
+    for (let i = 0; i < BASE_LOOPS.length * 2; i++) {
+      cur = nextBaseLoop(cur, () => 0);
+      seen.push(cur);
+    }
+    expect(seen).toEqual([
+      'breathing',
+      'weight-shift',
+      'look-around-loop',
+      'breathing',
+      'weight-shift',
+      'look-around-loop',
+      'breathing',
+    ]);
+    // An unknown previous loop (e.g. a class rename) falls back to the default.
+    expect(nextBaseLoop('not-a-loop' as never)).toBe(IDLE_BASE_CLASS);
+  });
 });
 
 /**
@@ -94,6 +117,14 @@ describe('idle director / pack CSS lockstep', () => {
 
   it('base loop matches the pack breathing cycle', () => {
     expect(IDLE_BASE_CYCLE_MS).toBe(animationDurationOf(IDLE_BASE_CLASS));
+  });
+
+  it('every rotating base loop exists in the pack CSS and loops forever', () => {
+    for (const cls of BASE_LOOPS) {
+      const block = css.match(new RegExp(`\\.arshad-sprite--${cls}\\s*\\{([^}]*)\\}`));
+      expect(block, `.arshad-sprite--${cls} not found in the pack CSS`).not.toBeNull();
+      expect(block![1]).toMatch(/infinite/);
+    }
   });
 
   it('every one-shot duration matches its pack CSS animation', () => {

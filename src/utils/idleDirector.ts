@@ -48,9 +48,30 @@ export const IDLE_ACTION_MS: Record<IdleAction, number> = {
   'weight-shift': 1800,
 };
 
+/**
+ * Base idle rotation. Instead of only ever breathing, the portrait rotates
+ * through the calm loops as its resting state — breathing → weight-shift →
+ * look-around-loop — picking the next one each time it returns to base.
+ * (`look-around-loop` is the pack CSS's looping variant of the look-around
+ * strip; the plain class is a one-shot that would hold its end pose.)
+ */
+export const BASE_LOOPS = ['breathing', 'weight-shift', 'look-around-loop'] as const;
+export type BaseLoop = (typeof BASE_LOOPS)[number];
+
+/** The default starting base loop. */
+export const IDLE_BASE_CLASS: BaseLoop = 'breathing';
 /** Breathing base loop: one full 4-frame cycle per the pack CSS (1.2s). */
-export const IDLE_BASE_CLASS = 'breathing';
 export const IDLE_BASE_CYCLE_MS = 1200;
+
+/**
+ * The next base loop in the rotation, cycling forever. Injected `random`
+ * keeps tests deterministic (an injected 0/0.5/1 maps to consecutive picks).
+ */
+export function nextBaseLoop(prev: BaseLoop, random: () => number = Math.random): BaseLoop {
+  const i = BASE_LOOPS.indexOf(prev);
+  if (i < 0) return IDLE_BASE_CLASS;
+  return BASE_LOOPS[(i + 1) % BASE_LOOPS.length];
+}
 
 /**
  * Weighted pool of self-directed one-shots. Blink dominates (a character that

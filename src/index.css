@@ -111,6 +111,14 @@
   transform-origin: bottom center;
 }
 
+/* The character-sheet portrait smooth-scales its 2x strips (the pack class
+   defaults to nearest-neighbour). The original portrait's crispness came
+   from smooth-downscaling hi-res art — pixelated on a fractional 0.96x
+   downscale renders ragged, uneven art pixels instead. */
+#about .arshad-sprite {
+  image-rendering: auto;
+}
+
 /* Arcade attract-mode blink for the "scroll down" nudge. Hard on/off steps
    rather than a soft fade, so it reads like a cabinet's INSERT COIN prompt.
    ~0.6Hz, well under the 3Hz flashing threshold. */

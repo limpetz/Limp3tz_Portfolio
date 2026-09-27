@@ -11,8 +11,10 @@ import {
   IDLE_BASE_CLASS,
   ONE_SHOT_HOLD_MS,
   firstOneShotDelayMs,
+  nextBaseLoop,
   nextOneShotDelayMs,
   pickOneShot,
+  type BaseLoop,
   type IdleAction,
 } from '../utils/idleDirector';
 import '../assets/images/idle-sprites/character-sprites.css';
@@ -35,15 +37,20 @@ import '../assets/images/idle-sprites/character-sprites.css';
  * Behaviour (cadence constants live in utils/idleDirector.ts, lockstep-tested
  * against this pack CSS):
  * - **greets** with the wave ~0.8s after mount;
- * - **breathing** loop plays as the base state;
- * - self-directed one-shots (blink, look-around, check-watch, weight-shift)
- *   start after a short first beat, then on the resting cadence;
+ * - the base state **rotates the calm loops** (breathing → weight-shift →
+ *   look-around-loop) each time an action returns to base;
+ * - self-directed one-shots (blink, check-watch, …) start after a short first
+ *   beat, then on the resting cadence;
  * - **hover** greets with the wave;
  * - heart buttons drive quest-complete (heal) and blink (damage) via
  *   the `signal` prop.
  *
- * Under `prefers-reduced-motion` the pack CSS freezes every strip to frame 0
- * and this component stops scheduling — a static standing pose.
+ * Under `prefers-reduced-motion` the one-shots freeze (no waving, flashing
+ * or glinting), but the calm loops keep playing at the slower cadence the
+ * pack CSS declares — with a slow base-loop rotation on a plain interval —
+ * because a fully static hero reads as a broken image. (The previous
+ * behaviour froze everything, matching the old `animate-idle-breathe`; that
+ * read as "the animation is broken" on machines with Animation effects off.)
  */
 
 export type IdleSpriteSignal = 'heal' | 'damage';
@@ -64,6 +71,7 @@ type Phase = { kind: 'base' } | { kind: 'action'; action: IdleAction; epoch: num
 
 export const IdleSprite: React.FC<IdleSpriteProps> = ({ signal, className }) => {
   const [phase, setPhase] = useState<Phase>({ kind: 'base' });
+  const [baseLoop, setBaseLoop] = useState<BaseLoop>(IDLE_BASE_CLASS);
   const [reduced, setReduced] = useState(false);
   const epoch = useRef(0);
 
@@ -87,6 +95,18 @@ export const IdleSprite: React.FC<IdleSpriteProps> = ({ signal, className }) => 
     return () => window.clearTimeout(t);
   }, [reduced, beginAction]);
 
+  // Reduced motion: no one-shots at all, but the calm base loops keep
+  // breathing (slower, per the pack CSS) and rotate on a slow interval so
+  // the portrait still feels tended-to.
+  useEffect(() => {
+    if (!reduced) return undefined;
+    const iv = window.setInterval(
+      () => setBaseLoop((b) => nextBaseLoop(b)),
+      12_000,
+    );
+    return () => window.clearInterval(iv);
+  }, [reduced]);
+
   // The scheduler, keyed on phase: actions time their return to base; base
   // schedules the next self-directed one-shot. `first` is consumed when the
   // fidget actually FIRES, not when scheduled: the mount greeting (or a
@@ -96,10 +116,11 @@ export const IdleSprite: React.FC<IdleSpriteProps> = ({ signal, className }) => 
   useEffect(() => {
     if (reduced) return undefined;
     if (phase.kind === 'action') {
-      const t = window.setTimeout(
-        () => setPhase({ kind: 'base' }),
-        IDLE_ACTION_MS[phase.action] + ONE_SHOT_HOLD_MS,
-      );
+      const t = window.setTimeout(() => {
+        // Each return to base advances the calm-loop rotation.
+        setBaseLoop((b) => nextBaseLoop(b));
+        setPhase({ kind: 'base' });
+      }, IDLE_ACTION_MS[phase.action] + ONE_SHOT_HOLD_MS);
       return () => window.clearTimeout(t);
     }
     const first = !hadFirstFidget.current;
@@ -133,14 +154,13 @@ export const IdleSprite: React.FC<IdleSpriteProps> = ({ signal, className }) => 
       <span className={`arshad-sprite-stage ${className ?? ''}`}>
         <span
           aria-hidden="true"
-          className="arshad-sprite arshad-sprite--breathing"
-          style={{ animation: 'none' }}
+          className={`arshad-sprite arshad-sprite--${baseLoop}`}
         />
       </span>
     );
   }
 
-  const cssClass = phase.kind === 'action' ? IDLE_ACTION_CLASS[phase.action] : IDLE_BASE_CLASS;
+  const cssClass = phase.kind === 'action' ? IDLE_ACTION_CLASS[phase.action] : baseLoop;
 
   return (
     <span className={`arshad-sprite-stage ${className ?? ''}`} onPointerEnter={onPointerEnter}>

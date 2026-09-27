@@ -298,14 +298,23 @@ try {
   if (portrait.missing) {
     assert(false, `portrait: ${portrait.missing}`);
   } else {
+    // The base state rotates the calm loops, so any of the three strips (and
+    // their loop keyframes) is a valid resting portrait. The portrait renders
+    // SMOOTH (image-rendering: auto): the 2x strips downscale at a fractional
+    // 0.96x, where nearest-neighbour would draw ragged uneven pixels.
+    const BASE_STRIPS = ['breathing-idle', 'weight-shift', 'look-around'];
+    const BASE_ANIMS = ['arshad-loop-4', 'arshad-loop-6', 'arshad-look-around'];
     assert(
-      typeof portrait.bg === 'string' && portrait.bg.startsWith('breathing-idle'),
-      `portrait uses the breathing strip (got ${portrait.bg})`,
+      typeof portrait.bg === 'string' && BASE_STRIPS.some((s) => portrait.bg.startsWith(s)),
+      `portrait uses a rotated base strip (got ${portrait.bg})`,
     );
-    assert(portrait.rendering === 'pixelated', 'portrait samples with image-rendering: pixelated');
     assert(
-      portrait.anim === 'arshad-loop-4',
-      `portrait runs the 4-frame breathing loop (got ${portrait.anim})`,
+      portrait.rendering === 'auto',
+      `portrait smooth-scales the 2x art (image-rendering: ${portrait.rendering})`,
+    );
+    assert(
+      BASE_ANIMS.includes(portrait.anim),
+      `portrait runs a base loop animation (got ${portrait.anim})`,
     );
     assert(
       portrait.decode?.ok === true,
@@ -348,8 +357,9 @@ try {
     });
     await sharp(buf).toFile(join(OUT_DIR, 'portrait.png'));
 
-    // Reduced motion: the pack CSS freezes to frame 0 and the component stops
-    // scheduling (animation: none inline) — the correct static portrait.
+    // Reduced motion: the one-shots freeze (component never schedules them,
+    // CSS kills them with !important) but the calm loops keep breathing at
+    // the pack CSS's slower cadence — a static hero reads as a broken image.
     await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
     await new Promise((r) => setTimeout(r, 200));
     const reduced = await page.evaluate(() => {
@@ -357,11 +367,17 @@ try {
       return {
         cls: el?.className || '',
         anim: el ? getComputedStyle(el).animationName : null,
+        dur: el ? getComputedStyle(el).animationDuration : null,
       };
     });
+    // Whichever calm loop is current, its slowed cadence must be active.
+    const SLOW_DUR = { 'arshad-loop-4': '3.6s', 'arshad-loop-6': '5.4s', 'arshad-look-around': '7.2s' };
+    const slowOk =
+      /arshad-sprite--(breathing|weight-shift|look-around-loop)/.test(reduced.cls) &&
+      SLOW_DUR[reduced.anim] === reduced.dur;
     assert(
-      reduced.cls.includes('arshad-sprite--breathing') && reduced.anim === 'none',
-      `reduced motion renders the static frame-0 portrait (anim: ${reduced.anim})`,
+      slowOk,
+      `reduced motion keeps the calm loop at the slower cadence (cls: ${reduced.cls}, anim: ${reduced.anim} ${reduced.dur})`,
     );
     await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
   }

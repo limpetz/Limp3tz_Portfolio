@@ -59,6 +59,14 @@
   background-size: 400% 100%;
   animation: arshad-look-around 1.2s steps(1, end) 1 both;
 }
+
+/* Looping variant: look-around rotating in as a BASE idle (the one-shot class
+   holds its end pose via `both`). Same strip and keyframes, calm 2.4s cycle. */
+.arshad-sprite--look-around-loop {
+  background-image: url("./look-around.webp");
+  background-size: 400% 100%;
+  animation: arshad-look-around 2.4s steps(1, end) infinite;
+}
 @keyframes arshad-look-around {
   0%   { background-position: 0 0; }
   25%  { background-position: -176px 0; }
@@ -114,6 +122,26 @@
   100%    { background-position: -1232px 0; }
 }
 
+/* Reduced motion: freeze the one-shots (no waving, flashing or glinting for
+   motion-sensitive visitors) but keep the two gentle loops breathing at a
+   slower, calmer cadence — a fully static hero reads as a broken image, and
+   these loops are ambient, low-motion movement. */
 @media (prefers-reduced-motion: reduce) {
-  .arshad-sprite { animation: none !important; background-position: 0 0 !important; }
+  .arshad-sprite--blink,
+  .arshad-sprite--look-around,
+  .arshad-sprite--check-watch,
+  .arshad-sprite--wave,
+  .arshad-sprite--quest-complete {
+    animation: none !important;
+    background-position: 0 0 !important;
+  }
+  .arshad-sprite--breathing {
+    animation: arshad-loop-4 3.6s steps(4, end) infinite !important;
+  }
+  .arshad-sprite--weight-shift {
+    animation: arshad-loop-6 5.4s steps(6, end) infinite !important;
+  }
+  .arshad-sprite--look-around-loop {
+    animation: arshad-look-around 7.2s steps(1, end) infinite !important;
+  }
 }
