@@ -11,7 +11,14 @@
    stage asked 0.75 after the 1.0 layout felt too large). 1.0 (176×340) and
    0.5 (88×170) are the other clean options. The portrait smooth-scales via
    the `#about` override in index.css, so the 1.5px-per-art-pixel inside a
-   frame stays even. */
+   frame stays even.
+
+   Cadence: the AMBIENT LOOPS (breathing 1.6s/4f, weight-shift 2.4s/6f) run
+   at a calm pace — their frames sway the body by 1-2 art px, and a brief
+   5fps experiment made that sway read as jitter/wobble. The ONE-SHOTS are
+   retimed snappier (5-9fps) since those poses are meant to pop.
+   utils/idleDirector.ts mirrors every duration; its lockstep test fails if
+   the two files drift apart. */
 .arshad-sprite-stage {
   position: relative;
   width: 132px;
@@ -36,12 +43,12 @@
 .arshad-sprite--breathing {
   background-image: url("./breathing-idle.webp");
   background-size: 400% 100%;
-  animation: arshad-loop-4 0.8s steps(4, end) infinite;
+  animation: arshad-loop-4 1.6s steps(4, end) infinite;
 }
 .arshad-sprite--weight-shift {
   background-image: url("./weight-shift.webp");
   background-size: 600% 100%;
-  animation: arshad-loop-6 1.2s steps(6, end) infinite;
+  animation: arshad-loop-6 2.4s steps(6, end) infinite;
 }
 @keyframes arshad-loop-4 {
   from { background-position: 0 0; }
