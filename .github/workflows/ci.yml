@@ -40,6 +40,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Payload guard: dist/assets total and the largest js chunk must stay
+      # inside their budgets (see scripts/check-size-budget.mjs). Runs after
+      # the build so it measures what would actually deploy.
+      - name: Size budget
+        run: npm run size:check
+
       - name: Playtest (walk + bounce assertions, retry once)
         run: |
           npx vite preview --port 4173 --strictPort &

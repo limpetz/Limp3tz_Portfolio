@@ -14,7 +14,8 @@
     "playtest": "node scripts/playtest.mjs",
     "playtest:ci": "bash scripts/playtest-retry.sh",
     "playtest:slime": "node scripts/slime-playtest.mjs",
-    "gait:check": "node scripts/check-gait.mjs"
+    "gait:check": "node scripts/check-gait.mjs",
+    "size:check": "node scripts/check-size-budget.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
