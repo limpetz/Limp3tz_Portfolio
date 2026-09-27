@@ -88,6 +88,22 @@ export function nextOneShotDelayMs(random: () => number = Math.random): number {
 }
 
 /**
+ * Shorter gap before the FIRST self-directed fidget (after the mount
+ * greeting): a portrait that sits perfectly still for its first 20 seconds
+ * reads as a static image, not a character.
+ */
+export const FIRST_GAP_MIN_MS = 4_000;
+export const FIRST_GAP_MAX_MS = 9_000;
+
+/** Random short delay before the first self-directed one-shot, in ms. */
+export function firstOneShotDelayMs(random: () => number = Math.random): number {
+  return FIRST_GAP_MIN_MS + random() * (FIRST_GAP_MAX_MS - FIRST_GAP_MIN_MS);
+}
+
+/** The mount greeting (wave) plays this soon after the portrait appears. */
+export const GREETING_DELAY_MS = 800;
+
+/**
  * Extra hold after a one-shot's animation finishes before returning to the
  * base loop — the pack CSS keeps the final pose via `both`, so a short beat
  * on the end pose reads intentional instead of snatched away.

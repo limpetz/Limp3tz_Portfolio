@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  FIRST_GAP_MAX_MS,
+  FIRST_GAP_MIN_MS,
+  GREETING_DELAY_MS,
   IDLE_ACTION_CLASS,
   IDLE_ACTION_MS,
   IDLE_BASE_CLASS,
@@ -9,6 +12,7 @@ import {
   ONE_SHOT_GAP_MAX_MS,
   ONE_SHOT_GAP_MIN_MS,
   ONE_SHOT_HOLD_MS,
+  firstOneShotDelayMs,
   nextOneShotDelayMs,
   pickOneShot,
 } from './idleDirector';
@@ -20,6 +24,21 @@ describe('idle director scheduling', () => {
       expect(delay).toBeGreaterThanOrEqual(ONE_SHOT_GAP_MIN_MS);
       expect(delay).toBeLessThanOrEqual(ONE_SHOT_GAP_MAX_MS);
     }
+  });
+
+  it('bounds the first fidget gap to the short 4-9s window', () => {
+    for (let i = 0; i < 200; i++) {
+      const delay = firstOneShotDelayMs();
+      expect(delay).toBeGreaterThanOrEqual(FIRST_GAP_MIN_MS);
+      expect(delay).toBeLessThanOrEqual(FIRST_GAP_MAX_MS);
+    }
+    expect(firstOneShotDelayMs(() => 0)).toBe(FIRST_GAP_MIN_MS);
+    expect(firstOneShotDelayMs(() => 1)).toBe(FIRST_GAP_MAX_MS);
+  });
+
+  it('greets shortly after mount', () => {
+    expect(GREETING_DELAY_MS).toBeGreaterThan(0);
+    expect(GREETING_DELAY_MS).toBeLessThan(2000);
   });
 
   it('scales the quiet delay with the injected random', () => {
