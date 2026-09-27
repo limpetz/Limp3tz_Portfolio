@@ -853,8 +853,10 @@ export const ArcadeStage: React.FC<ArcadeStageProps> = ({
     const coinInterval = setInterval(() => {
       if (!stageVisibleRef.current) return;
       // Collectibles spawn at twice the old rate with twice the on-stage cap,
-      // so the sky stays busier without piling up.
-      if (fallingCoinsRef.current.length < 10 && Math.random() < 0.7) {
+      // so the sky stays busier without piling up. Chance bumped 0.7 -> 0.8
+      // when the shaped coin trails were removed: the rain carries the sky's
+      // whole rhythm now (measured avg ~1.9 coins on screen at 0.7).
+      if (fallingCoinsRef.current.length < 10 && Math.random() < 0.8) {
         const newCoin: FallingCoin = {
           id: Math.random() + Date.now(),
           x: 40 + Math.random() * (stateRef.current.stageWidth - 80),
